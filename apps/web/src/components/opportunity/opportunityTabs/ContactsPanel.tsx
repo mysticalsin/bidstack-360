@@ -18,6 +18,7 @@ import {
   useUnlinkContact,
   useUpdateContactRole,
 } from '@/hooks/useOpportunityContacts';
+import { buyingGroupPhase } from '@/components/opportunity/buying-group-read';
 import {
   opportunityContactCaption,
   shownOpportunityContacts,
@@ -31,6 +32,7 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
   const unlink = useUnlinkContact();
   const update = useUpdateContactRole();
   const allContacts = useContacts();
+  const phase = buyingGroupPhase({ isError: contacts.isError, data: contacts.data });
   const page = shownOpportunityContacts(contacts.data?.items ?? [], contacts.data?.contactsContinue);
 
   return (
@@ -38,7 +40,11 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
       <div className="flex items-center justify-between px-5 py-4">
         <SectionHeader
           title={t('contacts.linkedTitle', 'Linked contacts')}
-          caption={opportunityContactCaption(page.items.length, page.pageContinues)}
+          caption={
+            phase === 'ready'
+              ? opportunityContactCaption(page.items.length, page.pageContinues)
+              : undefined
+          }
         />
         <button className="btn btn-secondary btn-sm" onClick={() => setShowLink(true)}>
           {t('contacts.linkAction', '+ Link contact')}
@@ -77,6 +83,14 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
 
       {contacts.isLoading ? (
         <LoadingSkeleton rows={3} />
+      ) : phase === 'error' ? (
+        <p className="px-5 pb-5 text-sm text-[var(--fg-secondary)]" role="alert">
+          {t('contacts.loadError', 'Could not load the buying group.')}
+        </p>
+      ) : phase === 'unread' ? (
+        <p className="px-5 pb-5 text-sm text-[var(--fg-secondary)]">
+          {t('contacts.checking', 'Checking the buying group.')}
+        </p>
       ) : page.items.length === 0 ? (
         <EmptyState
           title={t('contacts.emptyTitle', 'No linked contacts')}

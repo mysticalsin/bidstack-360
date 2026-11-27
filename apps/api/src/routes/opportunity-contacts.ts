@@ -10,6 +10,8 @@ import {
   opportunityContactTake,
 } from '@bidstack/shared';
 
+import { selectBuyingGroup } from '../demo/fixture-buying-group.js';
+import { dealHasContactLink, loadProjectedBuyingGroup, materializeFixtureBuyingGroup } from '../demo/fixture-buying-group-store.js';
 import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 
 function serialize(oc: {
@@ -95,6 +97,7 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
       await assertVisibleOpportunity(req.auth, req.params.id);
       // One row past the contacts the deal list draws. The extra row is the
       // probe. It is not a shown contact, and it is not a total.
+      const anyStored = await dealHasContactLink(req.auth.orgId, req.params.id);
       const loaded = await prisma.opportunityContact.findMany({
         where: { opportunityId: req.params.id, orgId: req.auth.orgId, deletedAt: null },
         include: {
@@ -103,7 +106,10 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
         orderBy: [{ isPrimary: 'desc' }, { id: 'asc' }],
         take: opportunityContactTake(),
       });
-      const page = opportunityContactPage(loaded);
+      const projected = anyStored
+        ? null
+        : await loadProjectedBuyingGroup(req.auth.orgId, req.params.id, process.env.POLO_DATA_MODE);
+      const page = opportunityContactPage(selectBuyingGroup(anyStored, loaded, projected));
       return {
         items: page.items.map(serialize),
         contactsContinue: page.pageContinues,
@@ -132,6 +138,10 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
         select: { id: true, name: true, email: true, phone: true, role: true },
       });
       if (!contact) throw server.httpErrors.notFound('Contact not found');
+
+      await materializeFixtureBuyingGroup(req.auth.orgId, req.params.id, process.env.POLO_DATA_MODE, {
+        omitContactId: req.body.contactId,
+      });
 
       if (req.body.isPrimary) {
         await prisma.opportunityContact.updateMany({
@@ -169,6 +179,9 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     },
     async (req) => {
       await assertVisibleOpportunity(req.auth, req.params.id);
+      await materializeFixtureBuyingGroup(req.auth.orgId, req.params.id, process.env.POLO_DATA_MODE, {
+        requireContactId: req.params.contactId,
+      });
       if (req.body.isPrimary) {
         await prisma.opportunityContact.updateMany({
           where: { opportunityId: req.params.id, orgId: req.auth.orgId, isPrimary: true },
@@ -211,6 +224,9 @@ export const opportunityContactsRoutes: FastifyPluginAsyncZod = async (server) =
     },
     async (req, reply) => {
       await assertVisibleOpportunity(req.auth, req.params.id);
+      await materializeFixtureBuyingGroup(req.auth.orgId, req.params.id, process.env.POLO_DATA_MODE, {
+        requireContactId: req.params.contactId,
+      });
       const existing = await prisma.opportunityContact.findFirst({
         where: {
           opportunityId: req.params.id,
