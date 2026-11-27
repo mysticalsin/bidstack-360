@@ -7,11 +7,14 @@
 
 import { prisma } from '@bidstack/db';
 import {
-  formatMicrosDecimal,
   PLACEHOLDER_TOKEN_SET,
   type EmailTemplateRenderRequest,
   type EmailTemplateRenderResponse,
 } from '@bidstack/shared';
+
+import { emailOpportunityAmount } from './email-opportunity-amount.js';
+
+export { formatAmountFromMicros } from './email-token-amount.js';
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z][a-zA-Z0-9_.]*)\s*\}\}/g;
 const MISSING_SENTINEL = '[—]';
@@ -104,7 +107,7 @@ async function buildRenderContext(args: {
     args.opportunityId
       ? prisma.opportunity.findFirst({
           where: { id: args.opportunityId, orgId: args.orgId, deletedAt: null },
-          select: { name: true, valueMicros: true, country: true },
+          select: { name: true, valueMicros: true },
         })
       : null,
     args.contactId
@@ -138,12 +141,8 @@ async function buildRenderContext(args: {
     opportunity: opportunity
       ? {
           name: opportunity.name,
-          // Polo PreSales stores values as micros (millionths) to avoid float math.
-          // Render in the opportunity's country-implied currency (EUR fallback).
-          amount: formatAmountFromMicros(
-            opportunity.valueMicros,
-            inferCurrencyFromCountry(opportunity.country),
-          ),
+          // Exact units. The column has no currency, so the token does not name EUR.
+          amount: emailOpportunityAmount(opportunity.valueMicros),
         }
       : null,
     contact: contact
@@ -178,29 +177,6 @@ function resolveToken(token: string, ctx: RenderContext): unknown {
   if (scope === 'opportunity') return ctx.opportunity?.[field];
   if (scope === 'contact') return ctx.contact?.[field];
   return null;
-}
-
-export function formatAmountFromMicros(micros: bigint | number, currency: string): string {
-  const decimal = formatMicrosDecimal(micros);
-  if (decimal === '0' || decimal === '-0') return '';
-  return `${currency} ${decimal}`;
-}
-
-/**
- * Best-effort currency inference from country code so the email-template
- * preview renders something reasonable without forcing a per-Opportunity
- * currency column. A future Sprint can swap to a real per-record currency.
- */
-function inferCurrencyFromCountry(country: string | null | undefined): string {
-  if (!country) return 'EUR';
-  const c = country.toUpperCase();
-  if (['US'].includes(c)) return 'USD';
-  if (['GB'].includes(c)) return 'GBP';
-  if (['CH'].includes(c)) return 'CHF';
-  if (['JP'].includes(c)) return 'JPY';
-  if (['AU'].includes(c)) return 'AUD';
-  if (['CA'].includes(c)) return 'CAD';
-  return 'EUR';
 }
 
 function formatToday(): string {
