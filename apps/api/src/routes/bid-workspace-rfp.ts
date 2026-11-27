@@ -26,6 +26,7 @@ import {
   extractedRequirementTake,
 } from '@bidstack/shared';
 
+import { pickBidProposal } from './bid-proposal.js';
 import { WorkspaceParams, ensureOpportunity } from './bid-workspace.helpers.js';
 import {
   IMMUTABLE_PROPOSAL_STATUSES,
@@ -97,16 +98,47 @@ const toDraftSection = (r: SectionRow) => ({
   lastEditedAt: r.updated_at.toISOString(),
 });
 
-/** The most recent non-deleted proposal for an opportunity (the active draft). */
+// One bid's proposal versions stay well under this. The cap keeps the
+// read inside the query guard.
+const PROPOSALS_ON_A_BID = 100;
+
+/**
+ * The proposal the bid workspace should open.
+ *
+ * Two proposals can share one opportunity. The one touched last is not
+ * the draft when it has no sections and a sibling does.
+ */
 async function latestProposal(
   orgId: string,
   opportunityId: string,
 ): Promise<{ id: string; status: string } | null> {
-  return prisma.proposal.findFirst({
+  const proposals = await prisma.proposal.findMany({
     where: { orgId, opportunityId, deletedAt: null },
+    select: { id: true, status: true, updatedAt: true },
     orderBy: { updatedAt: 'desc' },
-    select: { id: true, status: true },
+    take: PROPOSALS_ON_A_BID,
   });
+  if (proposals.length === 0) return null;
+
+  const counts = await prisma.proposalSection.groupBy({
+    by: ['proposalId'],
+    where: {
+      orgId,
+      deletedAt: null,
+      proposalId: { in: proposals.map((proposal) => proposal.id) },
+    },
+    _count: { _all: true },
+  });
+  const countById = new Map(counts.map((row) => [row.proposalId, row._count._all]));
+  const picked = pickBidProposal(
+    proposals.map((proposal) => ({
+      id: proposal.id,
+      status: proposal.status,
+      updatedAt: proposal.updatedAt.getTime(),
+      sectionCount: countById.get(proposal.id) ?? 0,
+    })),
+  );
+  return picked ? { id: picked.id, status: picked.status } : null;
 }
 
 async function latestProposalId(orgId: string, opportunityId: string): Promise<string | null> {
