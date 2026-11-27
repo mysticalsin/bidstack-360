@@ -85,14 +85,40 @@ export function useNotificationStream(
   }, [enabled, factory, qc]);
 }
 
+function withReadAt(page: NotificationPage | undefined, id: string | 'all'): NotificationPage | undefined {
+  if (!page) return page;
+  const readAt = new Date().toISOString();
+  if (id === 'all') {
+    return {
+      unread: 0,
+      items: page.items.map((item) => (item.readAt === null ? { ...item, readAt } : item)),
+    };
+  }
+  let dropped = false;
+  const items = page.items.map((item) => {
+    if (item.id !== id || item.readAt !== null) return item;
+    dropped = true;
+    return { ...item, readAt };
+  });
+  return { unread: dropped ? Math.max(0, page.unread - 1) : page.unread, items };
+}
+
 export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       api<AppNotification>(`/api/notifications/${id}/read`, { method: 'PATCH' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : 'Could not mark notification read'),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: NOTIFICATIONS_KEY });
+      const previous = qc.getQueryData<NotificationPage>(NOTIFICATIONS_KEY);
+      qc.setQueryData<NotificationPage>(NOTIFICATIONS_KEY, (page) => withReadAt(page, id));
+      return { previous };
+    },
+    onError: (err, _id, context) => {
+      if (context?.previous) qc.setQueryData(NOTIFICATIONS_KEY, context.previous);
+      toast.error(err instanceof Error ? err.message : 'Could not mark notification read');
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
   });
 }
 
@@ -100,8 +126,16 @@ export function useMarkAllNotificationsRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api<{ updated: number }>('/api/notifications/read-all', { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
-    onError: (err) =>
-      toast.error(err instanceof Error ? err.message : 'Could not mark all notifications read'),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: NOTIFICATIONS_KEY });
+      const previous = qc.getQueryData<NotificationPage>(NOTIFICATIONS_KEY);
+      qc.setQueryData<NotificationPage>(NOTIFICATIONS_KEY, (page) => withReadAt(page, 'all'));
+      return { previous };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) qc.setQueryData(NOTIFICATIONS_KEY, context.previous);
+      toast.error(err instanceof Error ? err.message : 'Could not mark all notifications read');
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
   });
 }
