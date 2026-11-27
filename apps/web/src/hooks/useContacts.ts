@@ -49,33 +49,46 @@ export function useCreateContact() {
   });
 }
 
-// Optimistic patch — fans across every cached `['contacts', …]` query so
-// inline edits to influence / sentiment / role land instantly on any list
-// that has the contact.
+// Optimistic patch. The list key is ['contacts', …]. The record is
+// ['contact', id]. A prefix match does not cross those, so a saved phone
+// would stay on the row while the open record kept dialing the number it
+// loaded. Patch both, and roll both back together.
 export function useUpdateContact() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ContactPatch }) =>
       api<Contact>(`/api/contacts/${id}`, { method: 'PATCH', body: patch }),
     onMutate: async ({ id, patch }) => {
-      await qc.cancelQueries({ queryKey: ['contacts'] });
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ['contacts'] }),
+        qc.cancelQueries({ queryKey: ['contact', id] }),
+      ]);
+      const { customFieldValues: _cf, ...rest } = patch as Record<string, unknown>;
       const snapshots: Array<readonly [readonly unknown[], ContactsPayload | undefined]> = [];
       qc.getQueriesData<ContactsPayload>({ queryKey: ['contacts'] }).forEach(([key, value]) => {
         snapshots.push([key, value]);
         if (!value) return;
-        const { customFieldValues: _cf, ...rest } = patch as Record<string, unknown>;
         qc.setQueryData<ContactsPayload>(key, {
           ...value,
           items: value.items.map((c) => (c.id === id ? { ...c, ...rest } : c)),
         });
       });
-      return { snapshots };
+      const detailKey = ['contact', id] as const;
+      const detailSnap = qc.getQueryData<Contact>(detailKey);
+      if (detailSnap) {
+        qc.setQueryData<Contact>(detailKey, { ...detailSnap, ...rest });
+      }
+      return { snapshots, detailKey, detailSnap };
     },
     onError: (err, _vars, ctx) => {
       ctx?.snapshots.forEach(([key, value]) => qc.setQueryData(key, value));
+      if (ctx?.detailSnap) qc.setQueryData(ctx.detailKey, ctx.detailSnap);
       toast.error(err instanceof Error ? err.message : 'Could not update contact');
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ['contacts'] }),
+    onSettled: (_data, _err, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['contacts'] });
+      void qc.invalidateQueries({ queryKey: ['contact', id] });
+    },
   });
 }
 
