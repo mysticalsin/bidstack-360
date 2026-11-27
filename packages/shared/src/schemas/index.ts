@@ -77,3 +77,4 @@ export * from './enrichment-watchdog.js';
 export * from './org-chart.js';
 export * from './mars.js';
 export * from './activity-ingest.js';
+export * from '../demo/fixture-task-clock.js';
