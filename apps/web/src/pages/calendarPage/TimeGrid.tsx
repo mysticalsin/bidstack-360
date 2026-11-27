@@ -6,13 +6,14 @@
  * events sit in a lane above the hours (layoutLane). Every label truncates
  * with an ellipsis and carries the full text in a title tooltip.
  */
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 
 import { DeadlinesRow } from './DeadlinesRow';
+import { allDayLengthDays, dropTargetFromElement, moveToAllDay, moveToHour, type DropTarget } from './eventDrag';
 import {
   dayKey,
   formatDayLabel,
@@ -43,11 +44,25 @@ interface TimeGridProps {
   showDeadlines: boolean;
   onSlot: (key: string, hour: number) => void;
   onSelect: (ev: CalendarEvent) => void;
+  /** Persist a drag. A 409 means the row is in sync conflict. */
+  onMove?: (ev: CalendarEvent, move: { startAt: string; endAt: string; isAllDay: boolean }) => void | Promise<void>;
 }
 
-export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, onSelect }: TimeGridProps) {
+function isConflictError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && 'status' in err && (err as { status: number }).status === 409;
+}
+
+export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, onSelect, onMove }: TimeGridProps) {
   const { t } = useTranslation('crm');
   const scroller = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: string; x: number; y: number; moved: boolean; target: DropTarget | null } | null>(null);
+  const suppressClickRef = useRef(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ id: string; target: DropTarget } | null>(null);
+  const [refusedId, setRefusedId] = useState<string | null>(null);
+  const [moveError, setMoveError] = useState(false);
+  const refused = events.find((ev) => ev.id === refusedId);
+  const showConflict = refused?.syncState === 'CONFLICT';
   const lane = useMemo(() => layoutLane(events, keys, tz), [events, keys, tz]);
   const laneRows = lane.reduce((n, s) => Math.max(n, s.row + 1), 0);
   const timed = useMemo(
@@ -73,8 +88,86 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
           end: formatTime(ev.endAt, tz),
         });
 
+  const previewEvent = preview ? events.find((ev) => ev.id === preview.id) : undefined;
+
+  function bindDrag(ev: CalendarEvent) {
+    return {
+      onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // jsdom does not implement capture. The test dispatches on the button.
+        }
+        dragRef.current = { id: ev.id, x: e.clientX, y: e.clientY, moved: false, target: null };
+        setMoveError(false);
+      },
+      onPointerMove: (e: PointerEvent<HTMLButtonElement>) => {
+        const drag = dragRef.current;
+        if (!drag || drag.id !== ev.id) return;
+        if (!drag.moved) {
+          if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return;
+          drag.moved = true;
+          setDraggingId(ev.id);
+        }
+        const target = dropTargetFromElement(document.elementFromPoint(e.clientX, e.clientY));
+        drag.target = target;
+        setPreview(target ? { id: ev.id, target } : null);
+      },
+      onPointerUp: (e: PointerEvent<HTMLButtonElement>) => {
+        const drag = dragRef.current;
+        if (!drag || drag.id !== ev.id) return;
+        dragRef.current = null;
+        setDraggingId(null);
+        setPreview(null);
+        if (!drag.moved) return;
+        suppressClickRef.current = true;
+        const target = drag.target ?? dropTargetFromElement(document.elementFromPoint(e.clientX, e.clientY));
+        if (!target) return;
+        if (ev.syncState === 'CONFLICT') {
+          setRefusedId(ev.id);
+          return;
+        }
+        const move =
+          target.kind === 'all-day'
+            ? moveToAllDay(target.dayKey, allDayLengthDays(ev))
+            : moveToHour(ev, target.dayKey, target.hour ?? 0, tz);
+        void Promise.resolve(onMove?.(ev, move)).catch((err: unknown) => {
+          if (isConflictError(err)) setRefusedId(ev.id);
+          else setMoveError(true);
+        });
+      },
+      onClick: (e: MouseEvent<HTMLButtonElement>) => {
+        if (suppressClickRef.current) {
+          suppressClickRef.current = false;
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        onSelect(ev);
+      },
+    };
+  }
+
+  const laneRowsShown = Math.max(laneRows, 1);
+
   return (
     <div ref={scroller} className="flex-1 overflow-auto" data-testid="calendar-grid">
+      {moveError ? (
+        <p role="alert" className="border-b border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--danger)]">
+          {t('calendar.moveError', 'Could not move the event. Try again.')}
+        </p>
+      ) : null}
+      {showConflict ? (
+        <p
+          role="status"
+          data-testid="calendar-conflict-notice"
+          className="border-b border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--warning)]"
+        >
+          {t('calendar.moveConflict', 'This event has a sync conflict. Resolve it before moving it.')}
+        </p>
+      ) : null}
       <div
         className="sticky top-0 z-20 grid border-b border-[var(--border-default)] bg-[var(--surface-page)]"
         style={columns(keys.length)}
@@ -104,37 +197,58 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
         })}
       </div>
 
-      {laneRows > 0 && (
+      <div
+        className="grid gap-y-1 border-b border-[var(--border-subtle)] py-1"
+        style={{ ...columns(keys.length), gridAutoRows: `${LANE_ROW_PX}px` }}
+        data-testid="calendar-all-day"
+      >
         <div
-          className="grid gap-y-1 border-b border-[var(--border-subtle)] py-1"
-          style={{ ...columns(keys.length), gridAutoRows: `${LANE_ROW_PX}px` }}
-          data-testid="calendar-all-day"
+          className="flex items-center justify-end pr-2 text-xs text-[var(--fg-tertiary)]"
+          style={{ gridColumn: 1, gridRow: `1 / span ${laneRowsShown}` }}
         >
-          <div
-            className="flex items-center justify-end pr-2 text-xs text-[var(--fg-tertiary)]"
-            style={{ gridColumn: 1, gridRow: `1 / span ${laneRows}` }}
-          >
-            {t('calendar.allDay', 'All day')}
-          </div>
-          {lane.map((seg) => (
-            <button
-              key={seg.event.id}
-              type="button"
-              title={`${seg.event.subject}, ${timeRange(seg.event)}`}
-              onClick={() => onSelect(seg.event)}
-              className={cn(
-                'mx-0.5 min-w-0 truncate rounded px-2 text-left text-xs font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
-                eventFill(seg.event),
-                seg.continuesBefore && 'rounded-l-none',
-                seg.continuesAfter && 'rounded-r-none',
-              )}
-              style={{ gridColumn: `${seg.startCol + 2} / span ${seg.span}`, gridRow: seg.row + 1 }}
-            >
-              {seg.event.subject}
-            </button>
-          ))}
+          {t('calendar.allDay', 'All day')}
         </div>
-      )}
+        {keys.map((key, index) => (
+          <div
+            key={key}
+            data-drop="all-day"
+            data-day={key}
+            className="relative mx-0.5 min-h-7"
+            style={{ gridColumn: index + 2, gridRow: `1 / span ${laneRowsShown}` }}
+          >
+            {preview?.target.kind === 'all-day' && preview.target.dayKey === key && previewEvent ? (
+              <div
+                data-testid="calendar-drag-preview"
+                className={cn(
+                  'pointer-events-none truncate rounded px-2 text-xs font-medium text-white',
+                  eventFill(previewEvent),
+                )}
+              >
+                {previewEvent.subject}
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {lane.map((seg) => (
+          <button
+            key={seg.event.id}
+            type="button"
+            title={`${seg.event.subject}, ${timeRange(seg.event)}`}
+            aria-grabbed={draggingId === seg.event.id}
+            {...bindDrag(seg.event)}
+            className={cn(
+              'mx-0.5 min-w-0 truncate rounded px-2 text-left text-xs font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
+              eventFill(seg.event),
+              seg.continuesBefore && 'rounded-l-none',
+              seg.continuesAfter && 'rounded-r-none',
+              draggingId && 'pointer-events-none',
+            )}
+            style={{ gridColumn: `${seg.startCol + 2} / span ${seg.span}`, gridRow: seg.row + 1 }}
+          >
+            {seg.event.subject}
+          </button>
+        ))}
+      </div>
 
       {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} />}
 
@@ -156,6 +270,9 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
               <button
                 key={hour}
                 type="button"
+                data-drop="hour"
+                data-day={key}
+                data-hour={hour}
                 aria-label={t('calendar.slotLabel', 'New event {{date}} at {{time}}', {
                   date: formatDayLabel(key, { weekday: 'short', month: 'short', day: 'numeric' }),
                   time: `${String(hour).padStart(2, '0')}:00`,
@@ -174,13 +291,15 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
                   type="button"
                   title={label}
                   aria-label={label}
-                  onClick={() => onSelect(b.event)}
+                  aria-grabbed={draggingId === b.event.id}
+                  {...bindDrag(b.event)}
                   data-testid="calendar-event"
                   className={cn(
                     'absolute z-10 flex min-w-0 flex-col overflow-hidden rounded pointer-coarse:min-h-11 focus-visible:z-20 px-1.5 py-0.5 text-left text-xs leading-tight text-white shadow-[var(--shadow-sm)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
                     eventFill(b.event),
                     b.event.syncState === 'CONFLICT' && 'ring-2 ring-[var(--warning)]',
                     b.event.syncState === 'PENDING_PUSH' && 'opacity-80',
+                    draggingId && 'pointer-events-none',
                   )}
                   style={{
                     top: (b.startMin / 60) * HOUR_PX + 1,
@@ -201,6 +320,18 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
                 </button>
               );
             })}
+            {preview?.target.kind === 'hour' && preview.target.dayKey === key && previewEvent ? (
+              <div
+                data-testid="calendar-drag-preview"
+                className={cn(
+                  'pointer-events-none absolute inset-x-0.5 z-20 truncate rounded px-1.5 text-xs font-medium text-white',
+                  eventFill(previewEvent),
+                )}
+                style={{ top: (preview.target.hour ?? 0) * HOUR_PX + 1, height: MIN_EVENT_PX }}
+              >
+                {previewEvent.subject}
+              </div>
+            ) : null}
             {nowMinutes !== null && key === todayKey && (
               <div
                 aria-hidden="true"
