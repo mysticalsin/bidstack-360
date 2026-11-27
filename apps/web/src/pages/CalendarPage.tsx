@@ -16,6 +16,7 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { AgendaList } from './calendarPage/AgendaList';
+import { calendarEventsRead } from './calendarPage/calendar-events-read';
 import { CreateEventModal } from './calendarPage/CreateEventModal';
 import { EventPanel } from './calendarPage/EventPanel';
 import {
@@ -89,11 +90,14 @@ export function CalendarPage() {
   const to = zonedMidnight(addDays(lastKey, 1), tz).toISOString();
   const todayKey = dayKey(new Date(), tz);
 
-  const { data, isLoading, isError, refetch } = useCalendarEvents(from, to);
+  const { data, status, refetch } = useCalendarEvents(from, to);
   const createEvent = useCreateEvent();
+  // isLoading is false while a read is paused, so that flag alone still drew
+  // a free week. A payload with no list is not an empty book either.
+  const eventsRead = calendarEventsRead(status, data?.items);
 
   const events = useMemo(() => {
-    const all = data?.items ?? [];
+    const all = Array.isArray(data?.items) ? data.items : [];
     return providerFilter === 'all' ? all : all.filter((e) => e.provider === providerFilter);
   }, [data, providerFilter]);
 
@@ -225,19 +229,13 @@ export function CalendarPage() {
         </button>
       </div>
 
-      {isLoading ? (
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label={t('calendar.loading', 'Loading calendar')}
-          className="flex-1 px-4 py-3 space-y-2"
-          data-testid="calendar-loading"
-        >
-          {Array.from({ length: 6 }).map((_, row) => (
-            <span key={row} aria-hidden className="bs-shimmer block h-10" />
-          ))}
+      {eventsRead === 'checking' ? (
+        <div role="status" aria-live="polite" className="flex-1 px-4 py-6">
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t('calendar.eventsUnread', 'Checking events. They have not arrived.')}
+          </p>
         </div>
-      ) : isError ? (
+      ) : eventsRead === 'failed' ? (
         <div className="flex-1">
           <ErrorState
             title={t('calendar.loadError', 'Could not load events')}
