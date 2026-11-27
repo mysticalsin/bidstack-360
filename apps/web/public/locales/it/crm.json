@@ -2582,7 +2582,7 @@
       "ariaLabel": "Ricerca nello spazio di lavoro"
     },
     "input": {
-      "placeholder": "Cerca tra opportunità, contatti, aziende, attività, note e ordini…",
+      "placeholder": "Cerca tra opportunità, contatti, aziende, attività, note, proposte, requisiti e riferimenti…",
       "ariaLabel": "Cerca nello spazio di lavoro"
     },
     "tab": {
@@ -2592,7 +2592,10 @@
       "contact": "Contatti",
       "company": "Aziende",
       "task": "Attività",
-      "note": "Note"
+      "note": "Note",
+      "proposal": "Proposte",
+      "rfp_requirement": "Requisiti",
+      "reference": "Riferimenti"
     },
     "type": {
       "opportunity": "Opportunità",
@@ -2600,7 +2603,10 @@
       "contact": "Contatto",
       "company": "Azienda",
       "task": "Attività",
-      "note": "Nota"
+      "note": "Nota",
+      "proposal": "Proposta",
+      "rfp_requirement": "Requisito",
+      "reference": "Riferimento"
     },
     "results": {
       "ariaLabel": "Risultati della ricerca",
@@ -2618,7 +2624,7 @@
     "guidance": {
       "ariaLabel": "Guida alla ricerca",
       "title": "Cerca in tutto il tuo spazio di lavoro",
-      "message": "Digita una parola chiave qui sopra per trovare opportunità, contatti, aziende, attività, note e ordini di vendita."
+      "message": "Digita una parola chiave qui sopra per trovare opportunità, contatti, aziende, attività, note, proposte, requisiti e riferimenti."
     }
   },
   "createWebhook": {

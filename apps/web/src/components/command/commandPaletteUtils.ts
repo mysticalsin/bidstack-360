@@ -7,7 +7,7 @@
  * this file composes them into the palette's match → rank pipeline.
  */
 import type { ReactNode } from 'react';
-import type { Contact, CrmCompany, Task } from '@bidstack/shared';
+import type { Contact, CrmCompany, SearchResultType, Task } from '@bidstack/shared';
 
 import {
   isNavItemVisible,
@@ -36,6 +36,9 @@ export interface Item {
     | 'action'
     | 'company'
     | 'note'
+    | 'proposal'
+    | 'rfp_requirement'
+    | 'reference'
     | 'invoice'
     | 'agent'
     | 'create'
@@ -285,7 +288,19 @@ export function groupTag(group: Item['group']): string {
   if (group === 'task') return 'todo';
   if (group === 'agent') return 'agent';
   if (group === 'ask') return 'ai';
+  if (group === 'proposal') return 'prop';
+  if (group === 'rfp_requirement') return 'rfp';
+  if (group === 'reference') return 'ref';
   return group;
+}
+
+/**
+ * Group for a global-search hit. `sales_order` stays out: that module was
+ * removed, and a stale cached row must not become a palette destination.
+ */
+export function paletteSearchGroup(type: SearchResultType): Item['group'] | null {
+  if (type === 'sales_order') return null;
+  return type;
 }
 
 // Human-readable group names for the listbox's `role="group"` wrappers —
@@ -301,6 +316,9 @@ const GROUP_ARIA_LABELS: Record<Item['group'], string> = {
   action: 'Actions',
   company: 'Companies',
   note: 'Notes',
+  proposal: 'Proposals',
+  rfp_requirement: 'Requirements',
+  reference: 'References',
   invoice: 'Invoices',
   agent: 'Agents',
   create: 'Create',

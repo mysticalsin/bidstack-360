@@ -56,7 +56,7 @@ describe('search results page', () => {
     const page = pageSrc.slice(pageSrc.indexOf('export function SearchPage'));
     const drawn = Number(/limit=(\d+)/.exec(hookSrc)?.[1] ?? 16);
     expect(page).toMatch(
-      /searchResultsCaption\(\s*filtered\.length,\s*pageContinues,\s*data\?\.items\.length \?\? filtered\.length,?\s*\)/,
+      /searchResultsCaption\(\s*filtered\.length,\s*pageContinues,\s*rows\.length,?\s*\)/,
     );
     expect(page).toContain('Boolean(data?.pageContinues)');
     expect(page).not.toContain('search.results.countOne');
@@ -143,7 +143,7 @@ describe('search results page', () => {
     );
     expect(page).toContain('new Set(data?.continuedTypes ?? [])');
     expect(page).not.toMatch(/\{counts\[tab\.key\]\}/);
-    expect(hookSrc).toContain('continuedTypes?: string[]');
+    expect(hookSrc).toContain('SearchResponse');
     expect(schemaSrc).toMatch(/continuedTypes:\s*z\.array\(SearchResultType\)/);
     expect(apiSrc).toContain('searchPageSlice(');
     expect(apiSrc).toMatch(/probedTypes\.push\(type\)/);

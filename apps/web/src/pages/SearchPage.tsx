@@ -3,46 +3,47 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
-import { Icon } from '@/components/ui/Icon';
+import { Icon, type IconName } from '@/components/ui/Icon';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 import { cn } from '@/lib/cn';
 
 import { searchResultsCaption, searchTabBadge } from './search-results-caption';
+import {
+  isSearchPageType,
+  SEARCH_PAGE_TYPE_KEYS,
+  searchPageRows,
+  searchPageTab,
+  type SearchPageTabKey,
+  type SearchPageTypeKey,
+} from './search-page-types';
 
-const TABS = [
-  { key: 'all', label: 'All' },
-  { key: 'opportunity', label: 'Opportunities' },
-  { key: 'lead', label: 'Leads' },
-  { key: 'contact', label: 'Contacts' },
-  { key: 'company', label: 'Companies' },
-  { key: 'task', label: 'Tasks' },
-  { key: 'note', label: 'Notes' },
-] as const;
+const TABS = [{ key: 'all' as const }, ...SEARCH_PAGE_TYPE_KEYS.map((key) => ({ key }))];
 
-type TabKey = (typeof TABS)[number]['key'];
-
-const TYPE_ICONS: Record<string, string> = {
+const TYPE_ICONS: Record<SearchPageTypeKey, IconName> = {
   opportunity: 'briefcase',
   lead: 'zap',
   contact: 'contacts',
   company: 'building',
   task: 'tasks',
   note: 'note',
+  proposal: 'file',
+  rfp_requirement: 'list',
+  reference: 'book',
 };
 
 export function SearchPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
-  const activeTab = (searchParams.get('type') as TabKey) ?? 'all';
+  const activeTab = searchPageTab(searchParams.get('type'));
   const [draft, setDraft] = useState({ query, value: query });
   const inputValue = draft.query === query ? draft.value : query;
 
   const { data, isLoading, isError, error } = useGlobalSearch(query);
 
-  const tabLabels: Record<TabKey, string> = {
+  const tabLabels: Record<SearchPageTabKey, string> = {
     all: t('search.tab.all', 'All'),
     opportunity: t('search.tab.opportunity', 'Opportunities'),
     lead: t('search.tab.lead', 'Leads'),
@@ -50,37 +51,39 @@ export function SearchPage() {
     company: t('search.tab.company', 'Companies'),
     task: t('search.tab.task', 'Tasks'),
     note: t('search.tab.note', 'Notes'),
+    proposal: t('search.tab.proposal', 'Proposals'),
+    rfp_requirement: t('search.tab.rfp_requirement', 'Requirements'),
+    reference: t('search.tab.reference', 'References'),
   };
 
-  const typeLabels: Record<string, string> = {
+  const typeLabels: Record<SearchPageTypeKey, string> = {
     opportunity: t('search.type.opportunity', 'Opportunity'),
     lead: t('search.type.lead', 'Lead'),
     contact: t('search.type.contact', 'Contact'),
     company: t('search.type.company', 'Company'),
     task: t('search.type.task', 'Task'),
     note: t('search.type.note', 'Note'),
+    proposal: t('search.type.proposal', 'Proposal'),
+    rfp_requirement: t('search.type.rfp_requirement', 'Requirement'),
+    reference: t('search.type.reference', 'Reference'),
   };
 
+  const rows = useMemo(() => searchPageRows(data?.items), [data]);
   const filtered = useMemo(() => {
-    if (!data?.items) return [];
-    if (activeTab === 'all') return data.items;
-    return data.items.filter((i) => i.type === activeTab);
-  }, [data, activeTab]);
+    if (activeTab === 'all') return rows;
+    return rows.filter((i) => i.type === activeTab);
+  }, [rows, activeTab]);
   const pageContinues = Boolean(data?.pageContinues);
   const continuedTypes = new Set(data?.continuedTypes ?? []);
-  const resultCaption = searchResultsCaption(
-    filtered.length,
-    pageContinues,
-    data?.items.length ?? filtered.length,
-  );
+  const resultCaption = searchResultsCaption(filtered.length, pageContinues, rows.length);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: data?.items.length ?? 0 };
-    for (const item of data?.items ?? []) {
+    const c: Record<string, number> = { all: rows.length };
+    for (const item of rows) {
       c[item.type] = (c[item.type] ?? 0) + 1;
     }
     return c;
-  }, [data]);
+  }, [rows]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +92,7 @@ export function SearchPage() {
     setSearchParams({ q: trimmed, type: activeTab });
   };
 
-  const setTab = (tab: TabKey) => {
+  const setTab = (tab: SearchPageTabKey) => {
     setSearchParams({ q: query, type: tab });
   };
 
@@ -110,7 +113,7 @@ export function SearchPage() {
               className="flex-1 bg-transparent text-lg text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)] outline-none"
               placeholder={t(
                 'search.input.placeholder',
-                'Search across opportunities, contacts, companies, tasks, notes, and orders…',
+                'Search across opportunities, contacts, companies, tasks, notes, proposals, requirements, and references…',
               )}
               value={inputValue}
               onChange={(e) => setDraft({ query, value: e.target.value })}
@@ -195,14 +198,20 @@ export function SearchPage() {
                       className="group flex items-center gap-4 rounded-lg border border-transparent px-4 py-3 transition-colors hover:border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-sunken)] text-[var(--fg-secondary)] group-hover:text-[var(--brand-primary)] transition-colors">
-                        <Icon name={TYPE_ICONS[item.type] ?? 'search'} size={18} ariaHidden />
+                        <Icon
+                          name={isSearchPageType(item.type) ? TYPE_ICONS[item.type] : 'search'}
+                          size={18}
+                          ariaHidden
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
                             {item.title}
                           </span>
-                          <Badge tone="gray">{typeLabels[item.type] ?? item.type}</Badge>
+                          <Badge tone="gray">
+                            {isSearchPageType(item.type) ? typeLabels[item.type] : item.type}
+                          </Badge>
                         </div>
                         <p className="truncate text-xs text-[var(--fg-secondary)]">
                           {item.subtitle}
@@ -228,7 +237,7 @@ export function SearchPage() {
               title={t('search.guidance.title', 'Search across your workspace')}
               message={t(
                 'search.guidance.message',
-                'Type a keyword above to find opportunities, contacts, companies, tasks, notes, and sales orders.',
+                'Type a keyword above to find opportunities, contacts, companies, tasks, notes, proposals, requirements, and references.',
               )}
             />
           </section>

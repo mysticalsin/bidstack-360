@@ -47,6 +47,7 @@ import {
   matchTasks,
   accountSubtitle,
   contactSubtitle,
+  paletteSearchGroup,
   taskSubtitle,
 } from './commandPaletteUtils';
 import { getFrecencyScores, recordPaletteSelection } from './paletteFrecency';
@@ -342,9 +343,13 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     // Server searches matched on fields we may not display — keep every row
     // (score-0 floor), but let label matches rank alongside local sources.
     for (const g of globalSearch.data?.items ?? []) {
+      const group = paletteSearchGroup(g.type);
+      // sales_order is a tolerated stale type. The module stays deleted, so
+      // the palette does not draw a row or a route for it.
+      if (!group) continue;
       pushNavigable(
         q ? (fuzzyMatch(q, g.title)?.score ?? 0) : 0,
-        { id: `search:${g.type}:${g.id}`, group: g.type, label: g.title, hint: g.subtitle },
+        { id: `search:${g.type}:${g.id}`, group, label: g.title, hint: g.subtitle },
         g.url,
         true,
       );

@@ -5,7 +5,10 @@ import type { CrmCompany } from '@bidstack/shared';
 import {
   finalizePaletteItems,
   fuzzyMatch,
+  groupAriaLabel,
+  groupTag,
   matchCompanies,
+  paletteSearchGroup,
   rankPaletteItems,
   type Item,
 } from './commandPaletteUtils';
@@ -108,6 +111,26 @@ describe('fuzzyMatch', () => {
   it('returns null for empty queries and non-matches', () => {
     expect(fuzzyMatch('', 'anything')).toBeNull();
     expect(fuzzyMatch('zz', 'abc')).toBeNull();
+  });
+});
+
+describe('palette search groups', () => {
+  it('names proposal, requirement, and reference groups, and drops sales orders', () => {
+    // WHY: those three types are real global-search hits. Without a group
+    // name the palette announced the row with no section, and the badge
+    // printed the raw id `rfp_requirement`. sales_order must not become a
+    // destination: the module stays deleted.
+    expect(paletteSearchGroup('proposal')).toBe('proposal');
+    expect(paletteSearchGroup('rfp_requirement')).toBe('rfp_requirement');
+    expect(paletteSearchGroup('reference')).toBe('reference');
+    expect(paletteSearchGroup('sales_order')).toBeNull();
+    expect(groupAriaLabel('proposal')).toBe('Proposals');
+    expect(groupAriaLabel('rfp_requirement')).toBe('Requirements');
+    expect(groupAriaLabel('reference')).toBe('References');
+    expect(groupTag('proposal')).toBe('prop');
+    expect(groupTag('rfp_requirement')).toBe('rfp');
+    expect(groupTag('reference')).toBe('ref');
+    expect(groupTag('rfp_requirement')).not.toBe('rfp_requirement');
   });
 });
 

@@ -1,24 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+
+import type { SearchResponse } from '@bidstack/shared';
+
 import { api } from '@/lib/api';
 
-export interface SearchResult {
-  id: string;
-  type: 'opportunity' | 'lead' | 'contact' | 'company' | 'task' | 'note';
-  title: string;
-  subtitle: string;
-  url: string;
-  score: number;
-}
-
-export interface SearchResponse {
-  items: SearchResult[];
-  /** True when this page is not every match. Not a result total. */
-  pageContinues?: boolean;
-  /** Types whose drawn rows are not every match of that type. Not a total. */
-  continuedTypes?: string[];
-  total: number;
-  query: string;
-}
+export type { SearchResponse, SearchResult } from '@bidstack/shared';
 
 export function useGlobalSearch(query: string) {
   return useQuery({

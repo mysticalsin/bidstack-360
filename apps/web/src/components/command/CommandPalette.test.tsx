@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CommandPalette } from './CommandPalette';
@@ -111,6 +111,11 @@ function mockAppModules(overrides: Partial<AppModules>): void {
       ...overrides,
     },
   } as ReturnType<typeof useAppModules>);
+}
+
+function PaletteLocation() {
+  const location = useLocation();
+  return <div data-testid="palette-location">{location.pathname}</div>;
 }
 
 function renderPalette(onOpenChange: (open: boolean) => void = () => {}) {
@@ -351,5 +356,87 @@ describe('CommandPalette — loading state while server searches are pending', (
     });
     await screen.findByText('Globex Industries');
     expect(screen.queryByText('Searching…')).toBeNull();
+  });
+
+  it('lists proposal, requirement, and reference hits, and does not open a deleted sales order', async () => {
+    // WHY: the palette used to keep every global-search row, including a
+    // stale sales_order, and the live proposal / requirement / reference
+    // types had no group name. A deleted module must not be a destination.
+    // The three live types must stay selectable and named.
+    mockAppModules({});
+    const onOpenChange = vi.fn();
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (!path.startsWith('/api/search')) return Promise.resolve({ items: [] });
+      return Promise.resolve({
+        items: [
+          {
+            id: 'prop_1',
+            type: 'proposal',
+            title: 'Rail signaling proposal',
+            subtitle: 'draft',
+            url: '/proposals/prop_1',
+            score: 3,
+          },
+          {
+            id: 'req_1',
+            type: 'rfp_requirement',
+            title: 'Platform screen doors',
+            subtitle: 'REQ-4',
+            url: '/opportunities/opp_1',
+            score: 2,
+          },
+          {
+            id: 'ref_1',
+            type: 'reference',
+            title: 'Metro reference',
+            subtitle: 'Transit',
+            url: '/references?search=Metro%20reference',
+            score: 2,
+          },
+          {
+            id: 'so_1',
+            type: 'sales_order',
+            title: 'Legacy order',
+            subtitle: 'deleted',
+            url: '/sales/orders/so_1',
+            score: 9,
+          },
+        ],
+        pageContinues: false,
+        continuedTypes: [],
+      });
+    });
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter
+          initialEntries={['/dashboard']}
+          future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+        >
+          <PaletteLocation />
+          <CommandPalette open={true} onOpenChange={onOpenChange} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const input = screen.getByRole('combobox', { name: /search across the workspace/i });
+    fireEvent.change(input, { target: { value: 'zzgap' } });
+
+    expect(await screen.findByText('Rail signaling proposal')).toBeTruthy();
+    expect(screen.getByText('Platform screen doors')).toBeTruthy();
+    expect(screen.getByText('Metro reference')).toBeTruthy();
+    expect(screen.queryByText('Legacy order')).toBeNull();
+
+    const proposal = screen.getByText('Rail signaling proposal').closest('[role="option"]');
+    expect(proposal?.closest('[role="group"]')?.getAttribute('aria-label')).toBe('Proposals');
+    const requirement = screen.getByText('Platform screen doors').closest('[role="option"]');
+    expect(requirement?.closest('[role="group"]')?.getAttribute('aria-label')).toBe('Requirements');
+    expect(requirement?.textContent).toContain('rfp');
+    expect(requirement?.textContent).not.toContain('rfp_requirement');
+
+    fireEvent.click(screen.getByText('Rail signaling proposal'));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.getByTestId('palette-location').textContent).toBe('/proposals/prop_1');
   });
 });
