@@ -9,23 +9,26 @@ import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { TechLogo } from '@/components/company/TechLogo';
 import { useCompanyTechnicalStack } from '@/hooks/useCompanyTechnicalStack';
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
 
-import { deriveFundingPrograms } from './fundingEligibility';
+import { fundingRead } from './fundingEligibility';
 
 export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSnapshot }) {
   const { t } = useTranslation('crm');
-  const companyKey = cockpit.company.name;
-  const ts = useCompanyTechnicalStack(companyKey);
-  // Mirror TechStackCard: prefer a saved/curated stack, else the cockpit snapshot.
-  const stack =
-    ts.data && (ts.data.updatedAt || ts.data.effectiveStack.length > 0)
-      ? ts.data.effectiveStack
-      : cockpit.technicalStack;
-  const programs = useMemo(() => deriveFundingPrograms(stack), [stack]);
+  const read = useCompanyTechnicalStack(cockpit.company.name);
+  // The cockpit snapshot used to fill an empty read with a canned Microsoft /
+  // AWS / Google catalog. Funding waits for this account's own stack, and a
+  // sample fixture is not a vendor footprint.
+  const posture = useMemo(
+    () =>
+      read.data
+        ? fundingRead(read.data.effectiveStack, read.data.coverage?.sample === true)
+        : null,
+    [read.data],
+  );
 
   return (
     <Card>
@@ -34,17 +37,21 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
         caption={t('fundingEligibility.caption', 'Vendor co-funding signals from the technical stack')}
       />
       <div className="px-5 pb-5">
-        {programs.length === 0 ? (
-          <EmptyState
-            title={t('fundingEligibility.emptyTitle', 'No co-funding signal yet')}
+        {read.isLoading ? (
+          <p className="text-sm text-[var(--fg-secondary)]" role="status">
+            {t('fundingEligibility.loading', "Checking this account's stack…")}
+          </p>
+        ) : read.isError || !posture ? (
+          <ErrorState
+            title={t('fundingEligibility.errorTitle', "Couldn't load the stack")}
             message={t(
-              'fundingEligibility.emptyMessage',
-              'No Microsoft, AWS, or Google footprint detected in the current stack.',
+              'fundingEligibility.errorMessage',
+              "Co-funding stays hidden until this account's stack loads.",
             )}
           />
-        ) : (
+        ) : posture.kind === 'programs' ? (
           <ul className="space-y-3">
-            {programs.map((p) => (
+            {posture.programs.map((p) => (
               <li
                 key={p.key}
                 className={`rounded-xl border p-3 ${
@@ -77,6 +84,21 @@ export function FundingEligibilityCard({ cockpit }: { cockpit: AccountCockpitSna
               </li>
             ))}
           </ul>
+        ) : (
+          <EmptyState
+            title={t('fundingEligibility.emptyTitle', 'No co-funding signal yet')}
+            message={
+              posture.kind === 'sample'
+                ? t(
+                    'fundingEligibility.sampleMessage',
+                    'Microsoft, AWS, or Google names on this account are sample data, not a funding signal.',
+                  )
+                : t(
+                    'fundingEligibility.emptyMessage',
+                    'No Microsoft, AWS, or Google footprint detected in the current stack.',
+                  )
+            }
+          />
         )}
       </div>
     </Card>

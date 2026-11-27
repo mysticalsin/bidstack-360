@@ -3,6 +3,7 @@
  * technical stack. The stack tells us which OEM funding levers apply to a deal:
  * a Microsoft shop unlocks ECIF, an AWS shop unlocks MAP, a GCP shop unlocks PSF.
  * Pure + deterministic (keyword match on detected tech names) — no LLM.
+ * Sample rows and a sample snapshot are fixtures, not a vendor footprint.
  */
 import type { TechnicalStackCategory } from '@bidstack/shared';
 
@@ -73,15 +74,25 @@ const RULES: FundingRule[] = [
   },
 ];
 
-export function deriveFundingPrograms(stack: TechnicalStackCategory[]): FundingProgram[] {
-  const names = stack.flatMap((cat) => cat.items.map((item) => item.name));
+export type FundingRead =
+  | { kind: 'programs'; programs: FundingProgram[] }
+  | { kind: 'sample' }
+  | { kind: 'none' };
+
+function namesFrom(stack: TechnicalStackCategory[], sample: boolean): string[] {
+  return stack.flatMap((category) =>
+    category.items.filter((item) => item.sample === sample).map((item) => item.name),
+  );
+}
+
+function programsFor(names: string[]): FundingProgram[] {
   const programs: FundingProgram[] = [];
   for (const rule of RULES) {
     const matched = Array.from(
-      new Set(names.filter((n) => rule.keywords.some((k) => n.toLowerCase().includes(k)))),
+      new Set(names.filter((name) => rule.keywords.some((keyword) => name.toLowerCase().includes(keyword)))),
     );
     if (matched.length > 0) {
-      const { keywords: _kw, ...program } = rule;
+      const { keywords: _keywords, ...program } = rule;
       programs.push({ ...program, matched });
     }
   }
@@ -89,4 +100,30 @@ export function deriveFundingPrograms(stack: TechnicalStackCategory[]): FundingP
   return programs.sort(
     (a, b) => Number(Boolean(b.primary)) - Number(Boolean(a.primary)) || b.matched.length - a.matched.length,
   );
+}
+
+/** Recorded technologies only. A sample row is a demo fixture, not a vendor footprint. */
+export function deriveFundingPrograms(stack: TechnicalStackCategory[]): FundingProgram[] {
+  return programsFor(
+    stack.flatMap((category) =>
+      category.items.filter((item) => item.sample !== true).map((item) => item.name),
+    ),
+  );
+}
+
+/**
+ * What the funding card may say. A sample snapshot (coverage.sample, or only
+ * sample rows matching a vendor) is not a co-funding recommendation. An
+ * observed Azure still counts when a sample Microsoft 365 sits beside it.
+ */
+export function fundingRead(stack: TechnicalStackCategory[], sampleSnapshot = false): FundingRead {
+  if (!sampleSnapshot) {
+    const programs = deriveFundingPrograms(stack);
+    if (programs.length > 0) return { kind: 'programs', programs };
+  }
+  const sampleNames = sampleSnapshot
+    ? stack.flatMap((category) => category.items.map((item) => item.name))
+    : namesFrom(stack, true);
+  if (programsFor(sampleNames).length > 0) return { kind: 'sample' };
+  return { kind: 'none' };
 }
