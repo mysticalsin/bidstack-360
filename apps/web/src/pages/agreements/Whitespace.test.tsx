@@ -14,7 +14,7 @@ const perms = vi.hoisted(() => ({ allow: true }));
 vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: vi.fn(() => perms.allow) }));
 
 import { SourcesPanel } from '@/components/agreements/SourcesPanel';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 
 import WhitespacePage from './WhitespacePage';
 
@@ -237,6 +237,78 @@ describe('WhitespacePage', () => {
     await screen.findAllByTestId('whitespace-row');
     expect(container.querySelector('.agr-head p')).toBeNull();
     expect(container.querySelector('.agr-caption')).toBeNull();
+  });
+
+  it('says the book is empty only after a whitespace read settles with no flags', async () => {
+    // A finished zero is an empty book. It is not a failed read, so Retry would
+    // pretend the sample or the live list still had something to fetch.
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (String(path).startsWith('/api/msa/whitespace')) {
+        return { items: [], total: 0, byLine: [], facets: { entities: [], countries: [], lines: [], owners: [] } };
+      }
+      if (String(path).startsWith('/api/users')) return { items: [], nextCursor: null };
+      throw new Error(`unexpected ${path}`);
+    });
+    renderPage();
+    expect(await screen.findByText('No flags match these filters.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByText(/Sample preview/)).toBeNull();
+  });
+
+  it('does not offer Retry when the whitespace route is missing under the sample preview', async () => {
+    // Demo servers without /api/msa answer 404 "Route ... not found". Retry
+    // would call that same missing route. The list must not read as an empty book.
+    vi.mocked(api).mockRejectedValue(new ApiError(
+      'Route GET:/api/v1/msa/whitespace?state=new&limit=10 not found',
+      404,
+      { message: 'Route GET:/api/v1/msa/whitespace?state=new&limit=10 not found' },
+    ));
+    renderPage();
+    const note = await screen.findByTestId('whitespace-read');
+    expect(note.textContent).toMatch(/Sample preview/);
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByText('No flags match these filters.')).toBeNull();
+    expect(screen.queryByTestId('whitespace-row')).toBeNull();
+  });
+
+  it('offers Retry when a real whitespace read fails before any flags arrive', async () => {
+    // A 404 that is not a missing route, and a 503, are recoverable. They are
+    // not an empty HEMA book.
+    vi.mocked(api).mockRejectedValue(new ApiError('unavailable', 503, { message: 'unavailable' }));
+    renderPage();
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/Could not load whitespace/);
+    expect(screen.queryByText('No flags match these filters.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => {
+      const calls = vi.mocked(api).mock.calls.filter(([p]) => String(p).startsWith('/api/msa/whitespace'));
+      expect(calls.length).toBeGreaterThan(1);
+    });
+  });
+
+  it('keeps the HEMA flags when a later whitespace read fails', async () => {
+    // Northwind / Pfizer via HEMA is already on screen. A failed refresh must
+    // not replace that list with an empty or unavailable book.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage('/agreements/whitespace', qc);
+    expect(await screen.findByText('Global MSA via HEMA, no IT or Engineering business yet')).toBeTruthy();
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (String(path).startsWith('/api/msa/whitespace')) {
+        throw new ApiError('unavailable', 503, { message: 'unavailable' });
+      }
+      if (String(path).includes('/relationship-map')) return map;
+      if (String(path).startsWith('/api/users')) return { items: [], nextCursor: null };
+      throw new Error(`unexpected ${path}`);
+    });
+    await qc.invalidateQueries({ queryKey: ['msa', 'whitespace'] });
+    expect(await screen.findByText(/Could not refresh this whitespace read/)).toBeTruthy();
+    expect(screen.getByText('Global MSA via HEMA, no IT or Engineering business yet')).toBeTruthy();
+    expect(screen.queryByText('No flags match these filters.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => {
+      const calls = vi.mocked(api).mock.calls.filter(([p]) => String(p).startsWith('/api/msa/whitespace'));
+      expect(calls.length).toBeGreaterThan(1);
+    });
   });
 });
 

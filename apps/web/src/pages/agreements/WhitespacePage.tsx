@@ -12,13 +12,15 @@ import { labelBusinessLine, type WhitespaceFactor, type WhitespaceFlag } from '@
 import { WhoWorksWithThem } from '@/components/agreements/WhoWorksWithThem';
 import { BarChart } from '@/components/charts/charts';
 import { Button } from '@/components/ui/Button';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useWhitespace, useWhitespaceDecision } from '@/hooks/useMsaWhitespace';
 import { useUsers } from '@/hooks/useUsers';
 import { fmtDate } from '@/lib/msa/labels';
 import type { WhitespaceFilters } from '@/lib/msa/whitespace';
+
+import { whitespaceReadKind, type WhitespaceReadKind } from './whitespace-read';
 
 const STATES: Array<{ value: NonNullable<WhitespaceFilters['state']>; label: string }> = [
   { value: 'new', label: 'New' },
@@ -213,6 +215,35 @@ function Row({ flag, rank, open, onToggle, canWrite, owners }: {
   );
 }
 
+function WhitespaceRetry({ onRetry }: { onRetry: () => void }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-medium text-[var(--brand-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+      onClick={onRetry}
+    >
+      Retry
+    </button>
+  );
+}
+
+function WhitespaceReadNote({ kind, onRetry }: { kind: WhitespaceReadKind; onRetry: () => void }) {
+  if (kind === 'sample-missing') {
+    return (
+      <p className="agr-sample" role="note" data-testid="whitespace-read">
+        Whitespace is off in this Sample preview. It turns on once the Agreements service is live on this server.
+      </p>
+    );
+  }
+  if (kind !== 'refresh-failed' && kind !== 'load-failed') return null;
+  return (
+    <div className="agr-caption" role="alert" data-testid="whitespace-read">
+      <span>{kind === 'refresh-failed' ? 'Could not refresh this whitespace read.' : 'Could not load whitespace.'}</span>
+      <WhitespaceRetry onRetry={onRetry} />
+    </div>
+  );
+}
+
 export default function WhitespacePage() {
   const [params, setParams] = useSearchParams();
   const canWrite = useHasPermission('msa:write');
@@ -250,6 +281,14 @@ export default function WhitespacePage() {
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtered = ['line', 'entity', 'country', 'owner', 'state'].some((k) => params.get(k));
+  const kind = whitespaceReadKind({
+    isLoading: list.isLoading,
+    isError: list.isError,
+    error: list.error,
+    hasPayload: list.data != null,
+    itemCount: items.length,
+  });
+  const showList = kind === 'ready' || kind === 'refresh-failed';
 
   return (
     <div className="agr" data-testid="whitespace-page">
@@ -283,11 +322,12 @@ export default function WhitespacePage() {
           </select>
           {filtered ? <button type="button" className="drill-more" onClick={() => setParams(new URLSearchParams(), { replace: true })}>Clear filters</button> : null}
         </div>
-        {list.isLoading ? <LoadingSkeleton rows={6} /> : list.isError ? (
-          <ErrorState title="Couldn't load whitespace" message={list.error instanceof Error ? list.error.message : 'Try again in a moment.'} />
-        ) : items.length === 0 ? (
-          <p className="drill-empty">No flags match these filters.</p>
-        ) : (
+        {kind === 'loading' ? <LoadingSkeleton rows={6} /> : null}
+        {kind === 'sample-missing' || kind === 'refresh-failed' || kind === 'load-failed' ? (
+          <WhitespaceReadNote kind={kind} onRetry={() => void list.refetch()} />
+        ) : null}
+        {kind === 'empty' ? <p className="drill-empty">No flags match these filters.</p> : null}
+        {showList ? (
           <>
             {chart.length > 1 ? (
               <div className="agr-ws-chart" data-testid="whitespace-chart">
@@ -303,7 +343,7 @@ export default function WhitespacePage() {
               <button type="button" className="drill-more" onClick={() => set('all', '1')} data-testid="whitespace-more">Show {Math.min(total, 50) - items.length} more</button>
             ) : null}
           </>
-        )}
+        ) : null}
       </section>
     </div>
   );
