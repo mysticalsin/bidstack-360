@@ -26,6 +26,7 @@ import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
 import { createNotification } from '../services/notification.service.js';
 import { emitOpportunityAccountEventSafe } from '../services/account-events.service.js';
 import { buildOpportunityBrief, estimateBriefTokens } from './opportunities.brief.js';
+import { opportunityBriefStage } from './opportunity-brief-stage.js';
 
 /** Task.type marker for the Stage-10 debrief, so it can be found and deduped. */
 const LESSONS_LEARNED_TASK_TYPE = 'lessons_learned';
@@ -508,7 +509,10 @@ export const opportunityTransitionRoutes: FastifyPluginAsyncZod = async (server)
           customer: opp.customer,
           name: opp.name,
           stage: opp.stage,
-          pipelineStageName: opp.pipelineStage?.name ?? null,
+          pipelineStageName: opportunityBriefStage({
+            stage: opp.stage,
+            pipelineStageName: opp.pipelineStage ? opp.pipelineStage.name : null,
+          }),
           valueMicros: opp.valueMicros,
           probability: opp.probability,
           dueDate: opp.dueDate,
