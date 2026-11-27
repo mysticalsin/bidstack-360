@@ -938,7 +938,7 @@
     "callScheduledAt": "Pianificata {{date}}",
     "callDurationMinutes": "{{count}} min",
     "documentsEmptyTitle": "Nessun documento allegato",
-    "documentsEmptyMessage": "Carica una RFP, un SoW o una bozza di proposta.",
+    "documentsEmptyMessage": "Nessun documento è allegato a questa offerta, quindi non c'è nulla da inviare.",
     "documentsTitle": "Documenti",
     "documentsCount": "{{count}} file",
     "documentUnknownSize": "dimensione sconosciuta",

@@ -23,6 +23,7 @@ import {
 } from './opportunity-call-caption';
 import {
   opportunityDocumentCaption,
+  opportunityDocumentKindLabel,
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
 
@@ -377,9 +378,9 @@ function DocumentsPanel({
   const page = shownOpportunityDocuments(documents, documentsContinue);
   const primaryDocumentId = page.items[0]?.id;
   const hasDocument = page.items.length > 0;
-  // A signature request needs a Document id, not a DocumentTemplate id — with
-  // no document uploaded there is nothing to send, so the trigger is disabled
-  // rather than opening a modal that could only send a broken fallback id.
+  // A signature request needs a Document id, not a DocumentTemplate id. This
+  // tab cannot accept an upload, so with no document the trigger stays
+  // disabled rather than opening a modal that could only send a broken id.
   const sendAction = hasDocument ? (
     <Button variant="secondary" size="sm" onClick={() => setSendOpen(true)}>
       <Icon name="mail" size={13} />
@@ -392,7 +393,7 @@ function DocumentsPanel({
       disabled
       title={t(
         'opportunityTabs.sendForSignatureDisabledTitle',
-        'Upload a document before sending it for signature',
+        'Nothing is attached to this bid yet',
       )}
     >
       <Icon name="mail" size={13} />
@@ -406,7 +407,7 @@ function DocumentsPanel({
         title={t('opportunityTabs.documentsEmptyTitle', 'No documents attached')}
         message={t(
           'opportunityTabs.documentsEmptyMessage',
-          'Upload an RFP, SoW, or proposal draft.',
+          'Nothing is attached to this bid, so there is nothing to send.',
         )}
         action={sendAction}
       />
@@ -427,13 +428,13 @@ function DocumentsPanel({
                   {d.name}
                 </div>
                 <div className="text-xs text-[var(--fg-tertiary)]">
-                  {d.kind} ·{' '}
+                  {opportunityDocumentKindLabel(d.kind)} ·{' '}
                   {d.bytes
                     ? `${(d.bytes / 1024).toFixed(1)} KB`
                     : t('opportunityTabs.documentUnknownSize', 'unknown size')}
                 </div>
               </div>
-              <Badge tone="gray">{d.kind}</Badge>
+              <Badge tone="gray">{opportunityDocumentKindLabel(d.kind)}</Badge>
             </li>
           ))}
         </ul>

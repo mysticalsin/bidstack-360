@@ -938,7 +938,7 @@
     "callScheduledAt": "已安排 {{date}}",
     "callDurationMinutes": "{{count}} 分钟",
     "documentsEmptyTitle": "未附加文档",
-    "documentsEmptyMessage": "上传 RFP、SoW 或提案草稿。",
+    "documentsEmptyMessage": "此投标尚未附加文件，因此没有可发送的内容。",
     "documentsTitle": "文档",
     "documentsCount": "{{count}} 个文件",
     "documentUnknownSize": "大小未知",

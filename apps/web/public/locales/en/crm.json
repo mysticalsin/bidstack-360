@@ -939,7 +939,7 @@
     "callScheduledAt": "Scheduled {{date}}",
     "callDurationMinutes": "{{count}} min",
     "documentsEmptyTitle": "No documents attached",
-    "documentsEmptyMessage": "Upload an RFP, SoW, or proposal draft.",
+    "documentsEmptyMessage": "Nothing is attached to this bid, so there is nothing to send.",
     "documentsTitle": "Documents",
     "documentsCount": "{{count}} files",
     "documentUnknownSize": "unknown size",

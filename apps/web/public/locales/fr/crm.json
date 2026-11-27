@@ -1023,7 +1023,7 @@
     "callScheduledAt": "Planifié {{date}}",
     "callDurationMinutes": "{{count}} min",
     "documentsEmptyTitle": "Aucun document joint",
-    "documentsEmptyMessage": "Téléversez un appel d'offres, un SoW ou un brouillon de proposition.",
+    "documentsEmptyMessage": "Aucun document n'est joint à cette offre, il n'y a donc rien à envoyer.",
     "documentsTitle": "Documents",
     "documentsCount": "{{count}} fichiers",
     "documentUnknownSize": "taille inconnue",
