@@ -114,6 +114,10 @@ export function ComplianceMatrix() {
   const decide = useDecideBidFact({ subjectType: 'matrix_row', workspaceId: bidWorkspaceId });
 
   const settled = !isLoading && !isError;
+  // undefined means the matrix has not arrived. An empty items array is a
+  // settled book. A paused or idle read reports isLoading false, so a missing
+  // payload must not read as "No compliance data yet".
+  const hasPayload = data != null;
 
   return (
     <Card>
@@ -122,9 +126,10 @@ export function ComplianceMatrix() {
         isLoading={isLoading}
         isError={isError}
         error={error}
-        isEmpty={settled && allRows.length === 0}
+        hasPayload={hasPayload}
+        isEmpty={settled && hasPayload && allRows.length === 0}
       />
-      {settled && allRows.length > 0 && (
+      {settled && hasPayload && allRows.length > 0 && (
         <div className="flex flex-col gap-3 p-3">
           <MatrixTable
             rows={pageRows}
@@ -186,28 +191,32 @@ function MatrixFetchStates({
   isLoading,
   isError,
   error,
+  hasPayload,
   isEmpty,
 }: {
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  hasPayload: boolean;
   isEmpty: boolean;
 }) {
   const { t } = useTranslation('rfp');
 
-  if (isLoading) {
-    return (
-      <div className="p-4">
-        <LoadingSkeleton rows={6} />
-      </div>
-    );
-  }
   if (isError) {
     return (
       <div className="p-4">
         <p role="alert" className="text-sm text-danger">
           {error instanceof Error ? error.message : t('states.error')}
         </p>
+      </div>
+    );
+  }
+  // Pending, paused, or not fetched yet. isLoading is false on that first
+  // paint, so a missing payload would read as no compliance rows.
+  if (isLoading || !hasPayload) {
+    return (
+      <div className="p-4">
+        <LoadingSkeleton rows={6} />
       </div>
     );
   }
