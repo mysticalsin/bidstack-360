@@ -3262,6 +3262,7 @@
     "statusDone": "已完成",
     "idLabel": "ID",
     "createdLabel": "创建时间",
+    "dueDateLabel": "截止日期",
     "toast": {
       "updateFailedTitle": "无法更新任务",
       "serverRejected": "服务器拒绝了请求。"
