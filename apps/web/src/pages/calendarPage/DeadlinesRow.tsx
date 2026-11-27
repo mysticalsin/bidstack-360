@@ -6,19 +6,23 @@
  * synced meetings — an RFP due Thursday was invisible while a 1:1 was not.
  * Opportunity and proposal due dates render as outline chips with a diamond
  * marker (deliberately unlike the solid meeting bars) and deep-link to their
- * record. Urgency follows DueDateChip semantics so every surface agrees on
- * the bid clock: overdue = danger, due today = amber emphasis.
+ * record. Urgency follows the calendar day the grid is showing (`todayKey`,
+ * the selected time zone's today): a due date before that day is overdue,
+ * that day is due today, and later dates stay an outline. The comparison is
+ * the YYYY-MM-DD strings, not UTC midnight — a western evening is still
+ * "today" on the grid after UTC has rolled over, and marking that column
+ * overdue tells a bid team the submission already slipped. The spoken date
+ * is that same calendar day, not the viewer's local shift of UTC midnight.
  */
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { dueDateUrgency } from '@/components/ui/DueDateChip';
 import { useCalendarDeadlines, type CalendarDeadline } from '@/hooks/useCalendarDeadlines';
 import { cn } from '@/lib/cn';
-import { formatDate } from '@/lib/format';
 
 import { toLocalIsoDate } from './dateUtils';
+import { formatDayLabel } from './layout';
 
 const LANE_GRID = 'grid border-b border-[var(--border-subtle)]';
 
@@ -36,9 +40,8 @@ interface ChipTone {
   dueToday: boolean;
 }
 
-function chipTone(dueDate: string): ChipTone {
-  const { urgency, days } = dueDateUrgency(dueDate);
-  if (urgency === 'danger') {
+function chipTone(dueDate: string, todayKey: string): ChipTone {
+  if (dueDate < todayKey) {
     // --danger on --danger-tint: 5.31:1 light / dark pair verified in index.css.
     return {
       className:
@@ -48,8 +51,8 @@ function chipTone(dueDate: string): ChipTone {
       dueToday: false,
     };
   }
-  if (days === 0) {
-    // Due today — amber emphasis, same tone DueDateChip uses for "Due today".
+  if (dueDate === todayKey) {
+    // Due on the calendar's today — amber emphasis.
     // --warning on --warning-tint: 5.28:1 light / dark pair verified in index.css.
     return {
       className:
@@ -67,9 +70,9 @@ function chipTone(dueDate: string): ChipTone {
   };
 }
 
-function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
+function DeadlineChip({ deadline, todayKey }: { deadline: CalendarDeadline; todayKey: string }) {
   const { t } = useTranslation('crm');
-  const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate);
+  const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate, todayKey);
 
   const isOpp = deadline.kind === 'opportunity';
   const label =
@@ -89,7 +92,9 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
       title={`${kindLabel}: ${label}`}
       aria-label={
         `${kindLabel}: ${label}, ` +
-        t('calendar.deadlineDue', 'due {{date}}', { date: formatDate(deadline.dueDate) }) +
+        t('calendar.deadlineDue', 'due {{date}}', {
+          date: formatDayLabel(deadline.dueDate, { month: 'short', day: 'numeric', year: 'numeric' }),
+        }) +
         stateSuffix
       }
       className={cn(
@@ -111,7 +116,7 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
   );
 }
 
-export function DeadlinesRow({ days }: { days: Date[] }) {
+export function DeadlinesRow({ days, todayKey }: { days: Date[]; todayKey: string }) {
   const { t } = useTranslation('crm');
   const first = days[0] ?? new Date();
   const last = days[days.length - 1] ?? first;
@@ -193,7 +198,7 @@ export function DeadlinesRow({ days }: { days: Date[] }) {
             className="flex min-h-[28px] flex-col gap-1 border-l border-[var(--border-subtle)] p-1"
           >
             {dayItems.map((d) => (
-              <DeadlineChip key={`${d.kind}-${d.id}`} deadline={d} />
+              <DeadlineChip key={`${d.kind}-${d.id}`} deadline={d} todayKey={todayKey} />
             ))}
           </div>
         );
