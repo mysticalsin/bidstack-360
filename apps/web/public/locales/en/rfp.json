@@ -127,6 +127,8 @@
     "title": "Bid Crew",
     "subtitle": "Your role-based agents working this RFP, stage by stage. Drag an agent to re-assign its stage.",
     "dropHere": "Drop an agent here",
+    "layoutChecking": "Checking the crew layout. It has not arrived.",
+    "layoutFailed": "Could not read the crew layout.",
     "closeBrief": "Close role brief",
     "responsibilities": "Responsibilities"
   },
