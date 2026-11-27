@@ -5,6 +5,8 @@
 // - a write shows the exact change and only a Confirm click sends it,
 // - the mic only appears where the browser can listen,
 // - the mute choice persists.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -183,5 +185,32 @@ describe('JarvisPanel', () => {
     expect(screen.getByRole('button', { name: 'Unmute voice' }).getAttribute('aria-pressed')).toBe(
       'true',
     );
+  });
+
+  // A resized demo window stays pointer:fine, so the coarse-pointer 44px floor
+  // never applies. index.html sets viewport-fit=cover, so the notch and the
+  // home indicator are real bands. The sheet edge stays on the screen. Mute
+  // and Close have to clear both, or they sit in the status bar at 36px.
+  it('keeps mute and close at 44px clear of the phone chrome', () => {
+    renderAt('/dashboard');
+    const sheet = screen.getByRole('dialog', { name: 'Jarvis' });
+    expect(sheet.className).toContain('top-0');
+    expect(sheet.className).toContain('right-0');
+    expect(sheet.className).toContain('bottom-0');
+    const frame = sheet.firstElementChild;
+    if (!(frame instanceof HTMLElement)) throw new Error('Jarvis sheet has no content frame');
+    expect(frame.classList.contains('jarvis-sheet-frame')).toBe(true);
+    const css = readFileSync(join(process.cwd(), 'src/components/command/jarvis-sheet.css'), 'utf8');
+    const rule = css.slice(css.indexOf('.jarvis-sheet-frame'));
+    expect(rule).toContain('padding-top: env(safe-area-inset-top, 0px)');
+    expect(rule).toContain('padding-right: env(safe-area-inset-right, 0px)');
+    expect(rule).toContain('padding-bottom: env(safe-area-inset-bottom, 0px)');
+    for (const name of ['Mute voice', 'Close Jarvis']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.className).toContain('h-11');
+      expect(button.className).toContain('w-11');
+      expect(button.className).not.toContain('h-9');
+      expect(button.className).not.toContain('w-9');
+    }
   });
 });
