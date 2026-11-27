@@ -22,6 +22,7 @@ import {
 import { useTableSort } from '@/hooks/useTableSort';
 import type { WorkloadOwner } from '@/hooks/useWorkload';
 import { capacityLevel, relativeLoad, type CapacityLevel } from './workloadConfig';
+import { workloadDeskAmount } from './workload-desk-amount';
 import { OwnerDrilldown } from './OwnerDrilldown';
 
 type SortKey = 'owner' | 'openBids' | 'weighted' | 'overdueTasks' | 'closing';
@@ -92,7 +93,7 @@ interface Props {
   formatMoneyMicros: (micros: string) => string;
 }
 
-export function WorkloadTable({ owners, formatMoneyMicros }: Props) {
+export function WorkloadTable({ owners, formatMoneyMicros: _formatMoneyMicros }: Props) {
   const { t } = useTranslation('crm');
   const { state, setState, sorted } = useTableSort<WorkloadOwner, SortKey>(owners, ACCESSORS, {
     initial: { key: 'weighted', dir: 'desc' },
@@ -176,7 +177,11 @@ export function WorkloadTable({ owners, formatMoneyMicros }: Props) {
                     {owner.openBids}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
-                    {formatMoneyMicros(owner.weightedValueMicros)}
+                    {/* Desk rows sum opportunity valueMicros. Those rows do not
+                        store a currency, so the label is the grouped units.
+                        The page still passes the money hook. The team total
+                        and the owner drilldown stay on their own formatters. */}
+                    {workloadDeskAmount(owner.weightedValueMicros)}
                   </TableCell>
                   <TableCell
                     className={`text-right tabular-nums ${owner.overdueTasks > 0 ? 'font-semibold text-[var(--danger)]' : ''}`}
