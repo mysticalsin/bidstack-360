@@ -17,8 +17,9 @@ import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-c
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
   accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
-  winRateByQuarter, wonByQuarter, type OppRow,
+  winRateByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
+import { performanceRevenueQuarters } from './performance-revenue';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
 
 /** Opens the bid drill-down sheet with a starting filter. */
@@ -190,12 +191,7 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   headingLevel?: 2 | 3;
   projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
 }) {
-  const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
-  const future = (projection?.periods ?? [])
-    .filter((p) => p.openMicros > 0 || p.weightedMicros > 0)
-    .map((p) => ({ label: p.label, won: p.wonMicros / 1e6, weighted: p.weightedMicros / 1e6, open: p.openMicros / 1e6 }));
-  const seen = new Set(future.map((f) => f.label));
-  const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
+  const data = performanceRevenueQuarters(rows, projection?.periods);
   const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
   const target = commits.length ? commits[0]! / 1e6 : null;
   return (
