@@ -846,6 +846,7 @@
     "editRowLabel": "Modifica {{name}}",
     "editAction": "Modifica",
     "deleteRowLabel": "Elimina {{name}}",
+    "callPhone": "Chiama {{phone}}",
     "deleteAction": "Elimina"
   },
   "companies": {

@@ -9,7 +9,7 @@
  * Exports ContactSortKey and ContactSortState so ContactsPage can type its
  * URL-persisted sort state without duplicating the union.
  *
- * Import DAG: no local sibling imports. Imported by ContactsPage.
+ * Import DAG: the list dial helper is the only sibling import. Imported by ContactsPage.
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -29,6 +29,8 @@ import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTabl
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import type { useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
+
+import { contactListDialHref } from './contact-list-dial';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,22 @@ const SENTIMENT_OPTS = [
   { value: 'neutral' as Sentiment, label: 'Neutral' },
   { value: 'cold' as Sentiment, label: 'Cold' },
 ];
+
+// The printed phone stays the label. Dark mode uses the foreground green
+// (--brand-deep, 8.38:1) rather than the fill green. The hit area is 44px.
+const CALL_LINK =
+  'inline-flex min-h-[44px] items-center rounded text-xs text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]';
+
+function ContactListPhone({ phone }: { phone: string }) {
+  const { t } = useTranslation('crm');
+  const dial = contactListDialHref(phone);
+  if (!dial) return <span className="text-xs text-[var(--fg-tertiary)]">{phone}</span>;
+  return (
+    <a href={dial} aria-label={t('contactTable.callPhone', 'Call {{phone}}', { phone })} className={CALL_LINK}>
+      {phone}
+    </a>
+  );
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -332,14 +350,12 @@ export function ContactTable({
                       {c.email ? (
                         <a
                           href={`mailto:${c.email}`}
-                          className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                          className="inline-flex min-h-[44px] items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
                         >
                           {c.email}
                         </a>
                       ) : null}
-                      {c.phone ? (
-                        <span className="text-xs text-[var(--fg-tertiary)]">{c.phone}</span>
-                      ) : null}
+                      {c.phone ? <ContactListPhone phone={c.phone} /> : null}
                       {!c.email && !c.phone ? '—' : null}
                     </div>
                   </td>
