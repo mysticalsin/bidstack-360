@@ -35,6 +35,26 @@ describe('parseCsv', () => {
   it('returns empty result for empty input', () => {
     expect(parseCsv('')).toEqual({ headers: [], rows: [] });
   });
+
+  it('drops comma-only rows a spreadsheet leaves after the last record', () => {
+    // WHY: Excel writes an empty sheet row as commas. Those cells are not a
+    // company. Keeping them imports a blank record beside the real one, and a
+    // file of only those rows looks like it has data.
+    const withRecord = parseCsv('name,domain\nAcme,acme.com\n,\n,,\n  ,  \n');
+    expect(withRecord.rows).toEqual([{ name: 'Acme', domain: 'acme.com' }]);
+
+    const onlyBlanks = parseCsv('name,domain\n,\n,,\n');
+    expect(onlyBlanks).toEqual({ headers: ['name', 'domain'], rows: [] });
+  });
+
+  it('keeps a row that has a value in any column', () => {
+    // WHY: a blank name next to a real domain is a row the mapper can still
+    // place. Only a row with no values at all is a leftover.
+    expect(parseCsv('name,domain\n,acme.com\n')).toEqual({
+      headers: ['name', 'domain'],
+      rows: [{ name: '', domain: 'acme.com' }],
+    });
+  });
 });
 
 describe('autoMap', () => {

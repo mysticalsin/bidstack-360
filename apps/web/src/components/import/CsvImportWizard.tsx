@@ -16,7 +16,7 @@ import {
 
 import { Icon } from '@/components/ui/Icon';
 import { ApiError } from '@/lib/api';
-import { parseCsv, type ParsedCsv } from '@/lib/csv-parse';
+import { csvRowHasValue, parseCsv, type ParsedCsv } from '@/lib/csv-parse';
 import {
   autoMap,
   IMPORT_ENTITIES,
@@ -156,16 +156,25 @@ export function CsvImportWizard() {
     setParseError(null);
     try {
       const lower = file.name.toLowerCase();
-      const result = lower.endsWith('.xlsx') || lower.endsWith('.xls')
+      const parsedFile = lower.endsWith('.xlsx') || lower.endsWith('.xls')
         ? await parseSheet.mutateAsync({
             filename: file.name,
             contentBase64: await fileToBase64(file),
           })
         : parseCsv(await file.text());
-      if (result.headers.length === 0 || result.rows.length === 0) {
+      const rows = parsedFile.rows.filter(csvRowHasValue);
+      if (parsedFile.headers.length === 0 || rows.length === 0) {
+        // A blank file is not the previous workbook. Stay on upload so the
+        // error is the thing on screen, not the last account that was mapped.
+        setParsed(null);
+        setFileName('');
+        setMappings({});
+        setPreviewResult(null);
+        setStep('upload');
         setParseError(t('csvImport.error.noDataRows', 'That file has no data rows.'));
         return;
       }
+      const result: ParsedCsv = { headers: parsedFile.headers, rows };
       if (result.rows.length > MAX_ROWS) {
         setParseError(
           t('csvImport.error.tooManyRows', 'That file has {{count}} rows — the limit is {{limit}}.', {
