@@ -297,7 +297,7 @@ export function DemoSignIn() {
             >
               {t(
                 'demoSignIn.subtitle',
-                'Step inside a working pre-sales bid piloting workspace with real accounts, live pipeline, and an RFP response engine. Enter your email to open a private workspace.',
+                'Step inside a working pre-sales bid piloting workspace with sample accounts, a sample pipeline, and an RFP response engine. Enter your email to open a private sandbox.',
               )}
             </motion.p>
 
