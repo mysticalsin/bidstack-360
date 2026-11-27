@@ -9,13 +9,11 @@
 // the API contract is untouched, and the save/override/calibrate/defend paths
 // below are the same code they were. This is a presentation change.
 //
-// ── "NO BLANK FRAME AFTER FIRST PAINT" ──────────────────────────────────────
-// The rows derive from the criteria registry in @bidstack/shared, not from a
-// fetch, so the table is fully painted on the first frame and a category or sort
-// change re-orders rows already in the DOM — there is no request to be pending
-// and no state in which the body is empty. The two async reads on this page (the
-// opportunity list, the latest saved score) feed controls that carry their own
-// loading/error copy and never blank the matrix.
+// The criteria rows come from the registry in @bidstack/shared. They paint
+// when no opportunity is selected, or after the latest-score read has settled.
+// A paused, in-flight, or failed score is not an unscored deal: the matrix
+// does not say Not yet rated and does not show a composite of 0 until that
+// read arrives. A 404 is a settled miss and still shows the blank matrix.
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryState } from 'nuqs';
@@ -49,6 +47,7 @@ import { CriteriaCategoryFilter } from './bidNoBid/CriteriaCategoryFilter';
 import { CriteriaTable } from './bidNoBid/CriteriaTable';
 import { OverrideDialog } from './bidNoBid/OverrideDialog';
 import { ScoreInstrumentPanel } from './bidNoBid/ScoreInstrumentPanel';
+import { bidScoreReadPhase } from './bidNoBid/bid-score-read';
 
 // One bordered surface, reused by the three secondary panels so the page reads
 // as a stack of instruments rather than a pile of differently-shaped cards.
@@ -78,7 +77,19 @@ export function BidNoBidPage() {
   const [defenseReasoning, setDefenseReasoning] = useState<string | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
 
-  const { data: latestScore } = useBidScoreLatest(opportunityId);
+  const latestScoreQuery = useBidScoreLatest(opportunityId);
+  const latestScore = latestScoreQuery.data ?? undefined;
+  const scorePhase = bidScoreReadPhase({
+    opportunityId,
+    data: latestScoreQuery.data,
+    isError: latestScoreQuery.isError,
+    error: latestScoreQuery.error,
+    status: latestScoreQuery.status,
+  });
+  // Idle has no score request. Missing is a settled 404. Ready is a score.
+  // Unread and failed have not produced a matrix, so they must not render one.
+  const scoreFormVisible =
+    scorePhase === 'idle' || scorePhase === 'missing' || scorePhase === 'ready';
   const createScore = useCreateBidScore();
   const aiCalibrate = useAICalibrate();
   const defendScore = useBidScoreDefend();
@@ -90,10 +101,11 @@ export function BidNoBidPage() {
   // to the latest persisted values when the opportunity or score changes. An
   // unscored deal starts blank, so one deal's draft is never saved onto another.
   useEffect(() => {
+    if (scorePhase === 'unread' || scorePhase === 'failed') return;
     setScores((latestScore?.criteria as Scores | undefined) ?? {});
     setNotes(latestScore?.notes ?? '');
     setDefenseReasoning(null);
-  }, [opportunityId, latestScore]);
+  }, [opportunityId, latestScore, scorePhase]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const saveScore = useCallback(
@@ -207,7 +219,7 @@ export function BidNoBidPage() {
           </span>
         }
         description={
-          ratedCount > 0
+          scoreFormVisible && ratedCount > 0
             ? t('bidNoBid.criteriaRated', '{{rated}}/{{total}} criteria rated.', {
                 rated: ratedCount,
                 total: CRITERIA.length,
@@ -215,7 +227,7 @@ export function BidNoBidPage() {
             : undefined
         }
         actions={
-          opportunityId && canWrite ? (
+          opportunityId && canWrite && (scorePhase === 'ready' || scorePhase === 'missing') ? (
             <>
               <Button
                 variant="secondary"
@@ -314,43 +326,60 @@ export function BidNoBidPage() {
         ) : null}
       </div>
 
-      <ScoreInstrumentPanel
-        totalScore={totalScore}
-        savedScore={latestScore?.totalScore ?? null}
-        recommendation={recommendation}
-        ratedCount={ratedCount}
-        ratedWeight={ratedWeight}
-        criteriaCount={CRITERIA.length}
-      />
-
-      <CriteriaCategoryFilter
-        value={query.tab}
-        onChange={query.setTab}
-        totalScore={totalScore}
-        categoryScores={categoryScores}
-      />
-
-      <CriteriaTable
-        criteria={rows}
-        scores={scores}
-        onScore={handleScore}
-        sort={query.sort}
-        dir={query.dir}
-        onToggleSort={query.toggleSort}
-      />
-
-      {defenseReasoning && (
-        <div className={`${PANEL} mb-6`}>
-          <div className="mb-2 flex items-center gap-2">
-            <Icon name="sparkle" size={16} className="text-brand-primary" />
-            <h2 className="text-sm font-semibold text-fg-primary">
-              {t('bidNoBid.defensePanel.title', 'AI Score Defense')}
-            </h2>
-          </div>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg-secondary">
-            {defenseReasoning}
+      {scorePhase === 'unread' ? (
+        <p role="status" className="mb-4 text-sm text-fg-secondary">
+          {t('bidNoBid.score.unread', 'Checking the bid score. The score has not arrived.')}
+        </p>
+      ) : scorePhase === 'failed' ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <p role="alert" className="text-sm text-[var(--danger)]">
+            {t('bidNoBid.score.loadFailed', 'Could not load the bid score.')}
           </p>
+          <Button variant="secondary" size="sm" onClick={() => void latestScoreQuery.refetch()}>
+            {t('bidNoBid.score.retry', 'Retry')}
+          </Button>
         </div>
+      ) : (
+        <>
+          <ScoreInstrumentPanel
+            totalScore={totalScore}
+            savedScore={latestScore?.totalScore ?? null}
+            recommendation={recommendation}
+            ratedCount={ratedCount}
+            ratedWeight={ratedWeight}
+            criteriaCount={CRITERIA.length}
+          />
+
+          <CriteriaCategoryFilter
+            value={query.tab}
+            onChange={query.setTab}
+            totalScore={totalScore}
+            categoryScores={categoryScores}
+          />
+
+          <CriteriaTable
+            criteria={rows}
+            scores={scores}
+            onScore={handleScore}
+            sort={query.sort}
+            dir={query.dir}
+            onToggleSort={query.toggleSort}
+          />
+
+          {defenseReasoning && (
+            <div className={`${PANEL} mb-6`}>
+              <div className="mb-2 flex items-center gap-2">
+                <Icon name="sparkle" size={16} className="text-brand-primary" />
+                <h2 className="text-sm font-semibold text-fg-primary">
+                  {t('bidNoBid.defensePanel.title', 'AI Score Defense')}
+                </h2>
+              </div>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-fg-secondary">
+                {defenseReasoning}
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       <OverrideDialog
@@ -368,21 +397,23 @@ export function BidNoBidPage() {
         saved={opps?.items.find((o) => o.id === opportunityId) ?? null}
       />
 
-      <div className={`${PANEL} mb-8`}>
-        <h2 className="mb-2 text-sm font-semibold text-fg-primary">
-          {t('bidNoBid.notes.title', 'Decision Notes')}
-        </h2>
-        <textarea
-          className="dialog-input min-h-[100px] w-full resize-y"
-          placeholder={t(
-            'bidNoBid.notes.placeholder',
-            'Add rationale, key concerns, or conditions for bidding…',
-          )}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          aria-label={t('bidNoBid.notes.aria', 'Bid decision notes')}
-        />
-      </div>
+      {scoreFormVisible ? (
+        <div className={`${PANEL} mb-8`}>
+          <h2 className="mb-2 text-sm font-semibold text-fg-primary">
+            {t('bidNoBid.notes.title', 'Decision Notes')}
+          </h2>
+          <textarea
+            className="dialog-input min-h-[100px] w-full resize-y"
+            placeholder={t(
+              'bidNoBid.notes.placeholder',
+              'Add rationale, key concerns, or conditions for bidding…',
+            )}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            aria-label={t('bidNoBid.notes.aria', 'Bid decision notes')}
+          />
+        </div>
+      ) : null}
     </>
   );
 }
