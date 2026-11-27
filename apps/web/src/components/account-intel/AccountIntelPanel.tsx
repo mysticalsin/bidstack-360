@@ -18,6 +18,7 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { toast } from '@/components/ui/Toast';
 import { springSoft, staggerParent } from '@/lib/motion';
+import { documentExtractionFilesPhase } from './document-extraction-files-read';
 import { ExtractionsTab, ProductsTab, SolutionsTab } from './IntelTabs';
 
 interface Props {
@@ -55,6 +56,13 @@ export function AccountIntelPanel({ accountId }: Props) {
   const { t } = useTranslation('crm');
   const [activeTab, setActiveTab] = useState<IntelTabKey>('solutions');
   const tabStrip = useScrollableTabs(activeTab);
+  const filesPhase = documentExtractionFilesPhase({
+    data: files.data,
+    isError: files.isError,
+    status: files.status,
+  });
+  // A failed or unread read must not hand the tab a stale or invented list.
+  const extractionFiles = filesPhase === 'ready' ? (files.data?.items ?? []) : [];
 
   const solutions = intel.data?.solutions ?? [];
   const products = intel.data?.products ?? [];
@@ -212,7 +220,8 @@ export function AccountIntelPanel({ accountId }: Props) {
             >
               <ExtractionsTab
                 extractions={extractions}
-                files={files.data?.items ?? []}
+                files={extractionFiles}
+                filesPhase={filesPhase}
                 onExtract={handleExtract}
                 isExtracting={extract.isPending}
               />

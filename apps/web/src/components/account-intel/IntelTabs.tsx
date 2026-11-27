@@ -8,6 +8,8 @@ import { SourceBadge, type CockpitSourceState } from '@/components/cockpit/Sourc
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { AccountIntelFieldProvenance } from '@bidstack/shared';
 
+import type { DocumentExtractionFilesPhase } from './document-extraction-files-read';
+
 // ─── Shared helper (module-private) ────────────────────────────────────────
 
 function sourceLabel(
@@ -328,6 +330,7 @@ export function ProductsTab({
 export function ExtractionsTab({
   extractions,
   files,
+  filesPhase = 'ready',
   onExtract,
   isExtracting,
 }: {
@@ -340,10 +343,30 @@ export function ExtractionsTab({
     createdAt: string;
   }>;
   files: Array<{ id: string; name: string }>;
+  filesPhase?: DocumentExtractionFilesPhase;
   onExtract: (documentId: string) => void;
   isExtracting: boolean;
 }) {
   const { t } = useTranslation('crm');
+  // A missing list is not an empty library. The caller used to pass [] before
+  // the file payload arrived, which painted "No documents".
+  if (filesPhase === 'failed') {
+    return (
+      <p role="alert" className="px-5 py-8 text-sm text-[var(--fg-secondary)]">
+        {t('intelTabs.extractionsFailed', "Couldn't load documents. The file list did not load.")}
+      </p>
+    );
+  }
+  if (filesPhase === 'unread') {
+    return (
+      <p role="status" className="px-5 py-8 text-sm text-[var(--fg-secondary)]">
+        {t(
+          'intelTabs.extractionsChecking',
+          'Checking documents. The file list has not arrived.',
+        )}
+      </p>
+    );
+  }
   return (
     <div className="space-y-3">
       {files.length === 0 ? (
