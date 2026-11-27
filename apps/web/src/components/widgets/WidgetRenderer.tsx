@@ -29,6 +29,9 @@ import {
 import { KpiCard } from '@/components/charts/KpiCard';
 import type { DashboardWidget } from '@/hooks/useDashboards';
 import { useReportRun, useRunReport, type ReportRun } from '@/hooks/useAnalyticsReports';
+import { usePipelineReport } from '@/hooks/usePipelineReport';
+
+import { builtinWidgetRows, resolveBuiltinSource } from './builtinWidgetData';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 
@@ -216,21 +219,36 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
   const qc = useQueryClient();
   const runMutation = useRunReport();
 
-  // If the widget has a reportId, poll the latest run
+  // A saved report still polls its latest run. The seeded pipeline cards have
+  // no reportId; they read the live pipeline snapshot instead of an empty run.
+  const source = resolveBuiltinSource(widget);
+  const pipeline = usePipelineReport();
   const { data: run, isLoading, error } = useReportRun(
     widget.reportId ?? '',
     (widget.config as { latestRunId?: string }).latestRunId ?? '',
   );
 
+  const reportRows: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
+  const data: DataRow[] =
+    source && pipeline.data ? builtinWidgetRows(source, pipeline.data) : source ? [] : reportRows;
+  const loading = source ? pipeline.isLoading && !pipeline.data : isLoading;
+  const failure = source ? pipeline.error : error;
+  const empty = !loading && !(failure instanceof Error) && data.length === 0;
+
+  const refetchPipeline = pipeline.refetch;
   const handleRefresh = useCallback(async () => {
+    if (source) {
+      await refetchPipeline();
+      return;
+    }
     if (!widget.reportId) return;
     await runMutation.mutateAsync({ id: widget.reportId });
     // Invalidate the widget so consumers re-fetch the new runId
     qc.invalidateQueries({ queryKey: ['dashboards', 'widgets', widget.dashboardId] });
-  }, [widget.reportId, widget.dashboardId, runMutation, qc]);
+  }, [source, refetchPipeline, widget.reportId, widget.dashboardId, runMutation, qc]);
 
   const handleExportCsv = useCallback(() => {
-    const rows: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
+    const rows = data;
     if (rows.length === 0) return;
     const headers = Object.keys(rows[0]!);
     const lines = [
@@ -252,7 +270,7 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
     a.download = `${widget.title}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [run, widget.title]);
+  }, [data, widget.title]);
 
   const actions = [
     ...(onConfigure
@@ -261,22 +279,24 @@ export function WidgetRenderer({ widget, onConfigure, onDuplicate, onDelete }: P
     ...(onDuplicate
       ? [{ label: t('widgetRenderer.duplicate', 'Duplicate'), icon: <Copy size={14} />, onClick: onDuplicate }]
       : []),
-    { label: t('widgetRenderer.exportCsv', 'Export CSV'), icon: <Download size={14} />, onClick: handleExportCsv },
+    ...(data.length > 0
+      ? [{ label: t('widgetRenderer.exportCsv', 'Export CSV'), icon: <Download size={14} />, onClick: handleExportCsv }]
+      : []),
     ...(onDelete
       ? [{ label: t('widgetRenderer.delete', 'Delete'), icon: <Trash2 size={14} />, onClick: onDelete }]
       : []),
   ];
 
-  const data: DataRow[] = (run as ReportRun | undefined)?.result ?? [];
-  const empty = !isLoading && !error && data.length === 0;
-
   return (
     <ChartContainer
       title={widget.type !== 'kpi' ? widget.title : undefined}
-      loading={isLoading}
-      error={error instanceof Error ? error.message : null}
+      loading={loading}
+      error={failure instanceof Error ? failure.message : null}
       empty={empty}
-      onRefresh={widget.reportId ? handleRefresh : undefined}
+      emptyMessage={
+        source ? t('widgetRenderer.noOpenDeals', 'No open deals to chart.') : undefined
+      }
+      onRefresh={source || widget.reportId ? handleRefresh : undefined}
       actions={actions}
       aria-label={widget.title}
     >
