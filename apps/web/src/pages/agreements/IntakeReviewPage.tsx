@@ -11,6 +11,8 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
 
+import { signingEntityChoicePhase } from './signing-entity-choice';
+
 /** Grouped cents from integer micros. Half a cent rounds away from zero. */
 function centsFromIntegerMicros(micros: bigint): string {
   const negative = micros < 0n;
@@ -112,6 +114,12 @@ export default function IntakeReviewPage() {
 
   const resolvedCompany = companyId || suggestedCompany?.companyId || '';
   const resolvedEntity = signingEntityId || suggestedEntity?.entityId || '';
+  const entityPhase = signingEntityChoicePhase({
+    data: entities.data,
+    isError: entities.isError,
+    status: entities.status,
+  });
+  const entityItems = entityPhase === 'ready' ? (entities.data?.items ?? []) : [];
 
   if (draft.isLoading) return <LoadingSkeleton rows={8} />;
   if (draft.isError || !draft.data) {
@@ -180,12 +188,18 @@ export default function IntakeReviewPage() {
           ) : null}
           <label>
             Our signing entity
-            <select value={resolvedEntity} onChange={(e) => setSigningEntityId(e.target.value)} data-testid="msa-review-entity">
-              <option value="">Not confirmed</option>
-              {(entities.data?.items ?? []).map((e) => (
-                <option key={e.id} value={e.id}>{e.name}{e.verificationStatus === 'unverified' ? ' (unverified)' : ''}</option>
-              ))}
-            </select>
+            {entityPhase === 'failed' ? (
+              <p className="agr-error" role="alert">Could not load signing entities.</p>
+            ) : entityPhase === 'unread' ? (
+              <p className="agr-caption" role="status">Checking signing entities. The list has not arrived.</p>
+            ) : (
+              <select value={resolvedEntity} onChange={(e) => setSigningEntityId(e.target.value)} data-testid="msa-review-entity">
+                <option value="">Not confirmed</option>
+                {entityItems.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name}{e.verificationStatus === 'unverified' ? ' (unverified)' : ''}</option>
+                ))}
+              </select>
+            )}
           </label>
           {suggestedEntity ? (
             <p className="agr-caption">Detected {suggestedEntity.name}{suggestedEntity.alias ? ` as "${suggestedEntity.alias}"` : ''} ({Math.round(suggestedEntity.scoreBps / 100)}%)</p>
@@ -219,7 +233,7 @@ export default function IntakeReviewPage() {
         <Button
           type="button"
           variant="primary"
-          disabled={d.needsOcr || confirm.isPending || (!resolvedCompany && !(createName || clientGuess))}
+          disabled={d.needsOcr || confirm.isPending || entityPhase !== 'ready' || (!resolvedCompany && !(createName || clientGuess))}
           onClick={() => void submit()}
           data-testid="msa-review-confirm"
         >
