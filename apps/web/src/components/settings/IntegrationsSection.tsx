@@ -145,7 +145,12 @@ export function IntegrationsSection() {
             dustConfigured={status.data?.configured ?? false}
             dustAgents={status.data?.agents.length ?? 0}
           />
-          <ConnectionTester guide={setupGuide.data} isLoading={setupGuide.isLoading} />
+          <ConnectionTester
+            guide={setupGuide.data}
+            isLoading={setupGuide.isLoading}
+            isError={setupGuide.isError}
+            status={setupGuide.status}
+          />
           <ProviderHealthSection />
           <DataSourceCredentialsCard />
           <WebhookEventsCard
