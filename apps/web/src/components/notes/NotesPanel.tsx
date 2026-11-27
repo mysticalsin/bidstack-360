@@ -16,7 +16,7 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
-import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks/useNotes';
+import { orderNotes, useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks/useNotes';
 import { relativeTime } from '@/lib/format';
 import type { Note } from '@bidstack/shared';
 import { MeetingNotesImportDialog } from './MeetingNotesImportDialog';
@@ -27,7 +27,14 @@ interface Props {
   domain?: string | null;
 }
 
-export function NotesPanel({ accountId, companyName, domain }: Props) {
+export function NotesPanel(props: Props) {
+  // The cockpit route reuses this panel across /accounts/:accountId. Remount
+  // on account change so an open draft or import dialog cannot be saved
+  // onto the next account.
+  return <NotesPanelBody key={props.accountId ?? ''} {...props} />;
+}
+
+function NotesPanelBody({ accountId, companyName, domain }: Props) {
   const { t } = useTranslation('crm');
   const list = useNotes(accountId);
   const [composing, setComposing] = useState(false);
@@ -35,12 +42,15 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
 
   // Filter out auto-generated meeting import notes with numeric timestamps
   // (e.g. "Meeting Import 1778695956797") — these are noise in the UI.
-  const filteredNotes =
-    list.data?.items.filter((note) => {
+  // Order matches GET /api/notes so a pin moves the row before refetch.
+  const visibleNotes = orderNotes(
+    (list.data?.items ?? []).filter((note) => {
       if (!note.title) return true;
-      const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
-      return !isNumericImport;
-    }) ?? [];
+      return !/Meeting\s*Import\s*\d{10,}/i.test(note.title);
+    }),
+  );
+  const loaded = list.data !== undefined;
+  const refreshFailed = list.isError && loaded;
 
   return (
     <Card>
@@ -84,44 +94,74 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
             title={t('notes.noAccountTitle', 'Select an account to view notes')}
             message={t('notes.noAccountMessage', 'Notes are attached to a customer account.')}
           />
-        ) : list.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : list.isError ? (
-          <ErrorState
-            title={t('notes.loadErrorTitle', "Couldn't load notes")}
-            message={
-              list.error instanceof Error
-                ? list.error.message
-                : t('notes.unknownError', 'Unknown error')
-            }
-          />
-        ) : filteredNotes.length === 0 ? (
-          <EmptyState
-            title={t('notes.emptyTitle', 'No notes yet')}
-            message={t('notes.emptyMessage', 'Capture a meeting summary or context.')}
-          />
+        ) : !loaded ? (
+          list.isError ? (
+            <ErrorState
+              title={t('notes.loadErrorTitle', "Couldn't load notes")}
+              message={
+                list.error instanceof Error
+                  ? list.error.message
+                  : t('notes.unknownError', 'Unknown error')
+              }
+              action={
+                <Button size="sm" variant="secondary" onClick={() => void list.refetch()}>
+                  {t('notes.retry', 'Retry')}
+                </Button>
+              }
+            />
+          ) : (
+            // Pending, paused, or still fetching with nothing to show. An
+            // empty card here would read as "this account has no notes"
+            // before the first payload arrives.
+            <LoadingSkeleton rows={3} />
+          )
         ) : (
-          <ul className="divide-y divide-[var(--border-subtle)]">
-            {filteredNotes.map((note) =>
-              editingId === note.id ? (
-                <li key={note.id} className="py-3">
-                  <NoteEditor
-                    accountId={accountId}
-                    initial={note}
-                    onDone={() => setEditingId(null)}
-                    onCancel={() => setEditingId(null)}
-                  />
-                </li>
-              ) : (
-                <NoteRow
-                  key={note.id}
-                  note={note}
-                  accountId={accountId}
-                  onEdit={() => setEditingId(note.id)}
+          <>
+            {refreshFailed ? (
+              <div
+                role="status"
+                className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-[var(--tag-amber-bg)] px-3 py-2 text-xs text-[var(--tag-amber-fg)]"
+              >
+                <p>
+                  {t('notes.staleTitle', 'Showing the last loaded notes.')}{' '}
+                  {t('notes.staleDetail', "Couldn't refresh notes just now.")}
+                </p>
+                <Button size="sm" variant="secondary" onClick={() => void list.refetch()}>
+                  {t('notes.retry', 'Retry')}
+                </Button>
+              </div>
+            ) : null}
+            {visibleNotes.length === 0 ? (
+              refreshFailed ? null : (
+                <EmptyState
+                  title={t('notes.emptyTitle', 'No notes yet')}
+                  message={t('notes.emptyMessage', 'Capture a meeting summary or context.')}
                 />
-              ),
+              )
+            ) : (
+              <ul className="divide-y divide-[var(--border-subtle)]">
+                {visibleNotes.map((note) =>
+                  editingId === note.id ? (
+                    <li key={note.id} className="py-3">
+                      <NoteEditor
+                        accountId={accountId}
+                        initial={note}
+                        onDone={() => setEditingId(null)}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    </li>
+                  ) : (
+                    <NoteRow
+                      key={note.id}
+                      note={note}
+                      accountId={accountId}
+                      onEdit={() => setEditingId(note.id)}
+                    />
+                  ),
+                )}
+              </ul>
             )}
-          </ul>
+          </>
         )}
       </div>
     </Card>
@@ -191,8 +231,8 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             disabled={update.isPending}
             aria-label={
               note.pinned
-                ? t('notes.unpinAriaLabel', 'Unpin note')
-                : t('notes.pinAriaLabel', 'Pin note')
+                ? t('notes.unpinAriaLabel', 'Unpin {{title}}', { title: note.title })
+                : t('notes.pinAriaLabel', 'Pin {{title}}', { title: note.title })
             }
             title={note.pinned ? t('notes.unpinTitle', 'Unpin') : t('notes.pinTitle', 'Pin')}
           >
@@ -202,7 +242,7 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             size="sm"
             variant="ghost"
             onClick={onEdit}
-            aria-label={t('notes.editAriaLabel', 'Edit note')}
+            aria-label={t('notes.editAriaLabel', 'Edit {{title}}', { title: note.title })}
             title={t('notes.editTitle', 'Edit')}
           >
             {t('notes.editAction', 'Edit')}
@@ -212,7 +252,7 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             variant="ghost"
             onClick={onDelete}
             disabled={remove.isPending}
-            aria-label={t('notes.deleteAriaLabel', 'Delete note')}
+            aria-label={t('notes.deleteAriaLabel', 'Delete {{title}}', { title: note.title })}
             title={t('notes.deleteTitle', 'Delete')}
             className="text-[var(--danger)]"
           >
