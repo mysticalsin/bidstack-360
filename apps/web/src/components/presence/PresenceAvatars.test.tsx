@@ -30,6 +30,18 @@ vi.mock('@/hooks/usePresence', () => ({ usePresence: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ useUser: vi.fn() }));
 
 const SELF_ID = 'user-self';
+const DEMO_TOKEN_KEY = 'bidstack:demo-token';
+const DEMO_SESSION_USER_ID = '33333333-3333-4333-8333-333333333333';
+
+function demoSessionToken(userId: string): string {
+  const json = JSON.stringify({
+    u: userId,
+    o: '22222222-2222-4222-8222-222222222222',
+    exp: 4_000_000_000,
+  });
+  const body = btoa(json).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+  return `demo_${body}.not-a-signature`;
+}
 
 function viewer(id: string, name: string) {
   return { userId: id, userName: name, lastSeenAt: new Date().toISOString() };
@@ -48,6 +60,7 @@ function mockSelf(): void {
 }
 
 afterEach(() => {
+  localStorage.removeItem(DEMO_TOKEN_KEY);
   cleanup();
   vi.clearAllMocks();
 });
@@ -116,6 +129,31 @@ describe('PresenceAvatars', () => {
     // 4 real others after excluding self — exactly `max`, so no overflow badge.
     expect(screen.getByTestId('avatar-stack').getAttribute('aria-label')).toBe('4 people viewing');
     expect(screen.queryByText(/^\+\d+$/)).toBeNull();
+  });
+
+  it('renders nothing for the signed-in demo person and still shows a teammate', () => {
+    // WHY: the second self-filter has to use the session uuid, not only
+    // useUser().id. Demo auth reports "demo-user", so a raw viewer list
+    // that includes the session user would otherwise draw that person as
+    // a collaborator on a bid they are viewing alone.
+    localStorage.setItem(DEMO_TOKEN_KEY, demoSessionToken(DEMO_SESSION_USER_ID));
+    vi.mocked(useUser).mockReturnValue({
+      user: {
+        id: 'demo-user',
+        firstName: null,
+        lastName: null,
+        fullName: 'Demo User',
+        primaryEmailAddress: null,
+      },
+    });
+    vi.mocked(usePresence).mockReturnValue({
+      viewers: [viewer(DEMO_SESSION_USER_ID, 'Demo Visitor'), viewer('u2', 'A Teammate')],
+      isLoading: false,
+    });
+
+    render(<PresenceAvatars entityType="opportunity" entityId="opp-1" />);
+
+    expect(screen.getByTestId('avatar-stack').getAttribute('aria-label')).toBe('1 person viewing');
   });
 
   it('renders one avatar with no overflow badge for a single other viewer', () => {

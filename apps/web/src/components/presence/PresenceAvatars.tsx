@@ -10,6 +10,7 @@
 // response) and again here defensively — seeing yourself listed as a
 // "collaborator" undermines trust in the whole signal, so this stays
 // filtered even if a future caller feeds it a raw, unfiltered viewer list.
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
@@ -17,6 +18,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { usePresence } from '@/hooks/usePresence';
 import { useUser } from '@/lib/auth';
+import { readDemoSessionUserId } from '@/lib/demo-session-user';
 import { cn } from '@/lib/cn';
 import { easeStandard, easeAccel } from '@/lib/motion';
 
@@ -41,9 +43,12 @@ export function PresenceAvatars({
   const { user } = useUser();
   const reduced = useReducedMotion();
   const { viewers } = usePresence(entityType, entityId);
+  // Same demo-session id the hook excludes. This layer still has to drop
+  // it when a caller passes a raw viewer list. See usePresence.
+  const [demoSelfId] = useState(readDemoSessionUserId);
 
   // Defensive self-exclusion — see file header WHY.
-  const others = viewers.filter((v) => v.userId !== user?.id);
+  const others = viewers.filter((v) => v.userId !== user?.id && v.userId !== demoSelfId);
   if (others.length === 0) return null;
 
   // Stable-sort by userId before slicing: the underlying query has no

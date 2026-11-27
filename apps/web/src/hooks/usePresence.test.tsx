@@ -26,6 +26,21 @@ vi.mock('@/lib/auth', () => ({ useUser: vi.fn() }));
 const SELF_ID = 'user-self';
 const ENTITY_TYPE = 'opportunity';
 const ENTITY_ID = '11111111-1111-4111-8111-111111111111';
+const DEMO_TOKEN_KEY = 'bidstack:demo-token';
+// The signed-in demo person. Auth reports the placeholder id "demo-user".
+// The presence row stores the uuid from the session token instead.
+const DEMO_SESSION_USER_ID = '33333333-3333-4333-8333-333333333333';
+const DEMO_TEAMMATE_ID = '44444444-4444-4444-8444-444444444444';
+
+function demoSessionToken(userId: string): string {
+  const json = JSON.stringify({
+    u: userId,
+    o: '22222222-2222-4222-8222-222222222222',
+    exp: 4_000_000_000,
+  });
+  const body = btoa(json).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+  return `demo_${body}.not-a-signature`;
+}
 
 function presenceEntry(overrides: Partial<UserPresence> = {}): UserPresence {
   return {
@@ -76,6 +91,7 @@ describe('usePresence', () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem(DEMO_TOKEN_KEY);
     vi.clearAllMocks();
     vi.useRealTimers();
   });
@@ -179,6 +195,40 @@ describe('usePresence', () => {
     await waitFor(() => expect(result.current.viewers).toHaveLength(1));
     expect(result.current.viewers[0]?.userId).toBe('user-other');
     expect(result.current.viewers.some((v) => v.userId === SELF_ID)).toBe(false);
+  });
+
+  it('stays empty when the only viewer is the signed-in demo person', async () => {
+    // WHY: demo auth's user id is the placeholder "demo-user", and the
+    // presence row's userId is the uuid inside the session token. A filter
+    // that only compares those two never matches, so a person alone on a
+    // bid is painted as "1 person viewing". The stack has to stay empty
+    // for that person and still show a real teammate.
+    localStorage.setItem(DEMO_TOKEN_KEY, demoSessionToken(DEMO_SESSION_USER_ID));
+    vi.mocked(useUser).mockReturnValue({
+      user: {
+        id: 'demo-user',
+        firstName: null,
+        lastName: null,
+        fullName: 'Demo User',
+        primaryEmailAddress: null,
+      },
+    });
+    vi.mocked(api).mockImplementation((path: string) => {
+      if (typeof path === 'string' && path.startsWith('/api/presence?')) {
+        return Promise.resolve({
+          items: [
+            presenceEntry({ userId: DEMO_SESSION_USER_ID, userName: 'Demo Visitor' }),
+            presenceEntry({ userId: DEMO_TEAMMATE_ID, userName: 'A Teammate' }),
+          ],
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(() => usePresence(ENTITY_TYPE, ENTITY_ID), { wrapper });
+
+    await waitFor(() => expect(result.current.viewers).toHaveLength(1));
+    expect(result.current.viewers.map((v) => v.userId)).toEqual([DEMO_TEAMMATE_ID]);
   });
 
   it('drops viewers whose lastSeenAt is stale (crashed tab that never sent a leave)', async () => {
