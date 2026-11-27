@@ -17,6 +17,13 @@ type StageMoveResponse = {
   pipelineStage?: PipelineStage | null;
 };
 
+function stageTextForMove(pipelineStageId: string, pipelineStage?: PipelineStage): string {
+  // A legacy column id is the enum (closed_won). The column title is not.
+  // Storing the title clears the link the board uses to find that column.
+  if (isPipelineStageIdUuid(pipelineStageId)) return pipelineStage?.name ?? pipelineStageId;
+  return pipelineStageId;
+}
+
 function applyStageMove<T extends Opportunity>(
   opportunity: T,
   move: {
@@ -76,7 +83,7 @@ export function useStageMutation() {
               o.id === id
                 ? applyStageMove(o, {
                     pipelineStageId,
-                    stage: pipelineStage?.name ?? pipelineStageId,
+                    stage: stageTextForMove(pipelineStageId, pipelineStage),
                     pipelineStage,
                   })
                 : o,
@@ -92,7 +99,7 @@ export function useStageMutation() {
           detailKey,
           applyStageMove(detailSnap, {
             pipelineStageId,
-            stage: pipelineStage?.name ?? pipelineStageId,
+            stage: stageTextForMove(pipelineStageId, pipelineStage),
             pipelineStage,
           }),
         );
