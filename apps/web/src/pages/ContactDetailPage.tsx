@@ -16,6 +16,8 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
+import { contactRecordDialHref } from './contact-record-dial';
+
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
@@ -59,6 +61,7 @@ export function ContactDetailPage() {
   }
 
   const c = contact.data;
+  const dialHref = contactRecordDialHref(c.phone);
   const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
@@ -110,12 +113,21 @@ export function ContactDetailPage() {
                 </span>
               ) : null}
               {c.phone ? (
-                <span className="flex items-center gap-1.5">
-                  <Icon name="phone" size={12} />
-                  <a href={`tel:${c.phone}`} className="hover:text-[var(--brand-primary)]">
+                dialHref ? (
+                  <a
+                    href={dialHref}
+                    aria-label={t('contactDetail.callPhone', 'Call {{phone}}', { phone: c.phone })}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:hover:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]"
+                  >
+                    <Icon name="phone" size={12} />
                     {c.phone}
                   </a>
-                </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="phone" size={12} />
+                    {c.phone}
+                  </span>
+                )
               ) : null}
               {c.influence ? (
                 <span>
