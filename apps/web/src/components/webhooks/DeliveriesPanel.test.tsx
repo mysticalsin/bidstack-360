@@ -71,6 +71,74 @@ describe('DeliveriesPanel', () => {
     expect(table.textContent).toContain('14:00');
   });
 
+  it('does not call a window of only retries an empty delivery book', () => {
+    // WHY: a demo admin opens Deliveries to see whether outbound webhooks are
+    // healthy. Retries in flight have no settled success rate. The panel used
+    // to say there were no delivered or failed messages, which reads as all clear.
+    m.useWebhookDeliveryStats.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        messages: { total: 3, succeeded: 0, failed: 0, pending: 3 },
+        successRate: null,
+        heatmap: [],
+        latencyMs: [],
+      },
+    });
+
+    render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={vi.fn()} />);
+
+    expect(screen.queryByText('No delivered or failed messages in this window yet.')).toBeNull();
+    expect(
+      screen.getByText('Retries still in flight: 3. This window is not clear.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('meter', { name: 'Success rate' })).toBeNull();
+  });
+
+  it('keeps open retries visible beside a settled success rate', () => {
+    // WHY: one settled success does not make the window clear while retries
+    // are still open. The settled rate can stay. The caption has to keep the
+    // retries, or the gauge reads as a stale all clear.
+    m.useWebhookDeliveryStats.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        messages: { total: 3, succeeded: 1, failed: 0, pending: 2 },
+        successRate: 1,
+        heatmap: [],
+        latencyMs: [80],
+      },
+    });
+
+    render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={vi.fn()} />);
+
+    expect(screen.getByRole('meter', { name: 'Success rate' })).toBeTruthy();
+    expect(
+      screen.getByText('0 of 1 settled failed. 2 still retrying.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('0 of 1 failed')).toBeNull();
+  });
+
+  it('keeps a settled empty window as no delivery activity', () => {
+    // WHY: a finished window with no successes, failures, or retries is a real
+    // empty book. That sentence stays. Only open retries must refuse it.
+    m.useWebhookDeliveryStats.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        messages: { total: 0, succeeded: 0, failed: 0, pending: 0 },
+        successRate: null,
+        heatmap: [],
+        latencyMs: [],
+      },
+    });
+
+    render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={vi.fn()} />);
+
+    expect(screen.getByText('No delivered or failed messages in this window yet.')).toBeTruthy();
+    expect(screen.queryByText(/not clear/)).toBeNull();
+  });
+
   it('passes endpoint, event, status and window filters up', () => {
     const onFiltersChange = vi.fn();
     render(<DeliveriesPanel subscriptions={SUBS} filters={{}} onFiltersChange={onFiltersChange} />);

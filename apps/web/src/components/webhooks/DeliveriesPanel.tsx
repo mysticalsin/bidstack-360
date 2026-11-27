@@ -11,6 +11,7 @@ import {
 } from '@/hooks/useWebhookDeliveries';
 import { cn } from '@/lib/cn';
 
+import { webhookDeliveryHealth } from './webhook-delivery-health';
 import { endpointHost, hourLabel } from './webhook-format';
 
 export interface EndpointOption {
@@ -138,32 +139,68 @@ export function DeliveriesPanel({
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem),minmax(0,1fr)]">
-          {data.successRate === null ? (
-            <Shell>
-              <ShellHeader title={t('webhooks.deliveries.successRate', 'Success rate')} />
-              <Panel className="p-4 text-sm text-[var(--fg-secondary)]">
-                {t(
-                  'webhooks.deliveries.noSettled',
-                  'No delivered or failed messages in this window yet.',
-                )}
-              </Panel>
-            </Shell>
-          ) : (
-            <TickGauge
-              value={data.successRate}
-              title={t('webhooks.deliveries.successRate', 'Success rate')}
-              caption={t('webhooks.deliveries.caption', '{{failed}} of {{total}} failed', {
-                failed: data.messages.failed,
-                total: data.messages.failed + data.messages.succeeded,
-              })}
-              target={0.99}
-              targetLabel="99%"
-            />
-          )}
+          <DeliveryHealth stats={data} />
           <AttemptsHeatmap subscriptions={subscriptions} stats={data} filters={filters} />
         </div>
       )}
     </div>
+  );
+}
+
+function DeliveryHealth({ stats }: { stats: WebhookDeliveryStats }) {
+  const { t } = useTranslation('settings');
+  const health = webhookDeliveryHealth(stats.messages);
+  const title = t('webhooks.deliveries.successRate', 'Success rate');
+
+  if (health.kind === 'retrying') {
+    return (
+      <Shell>
+        <ShellHeader title={title} />
+        <Panel className="p-4 text-sm text-[var(--fg-secondary)]">
+          {t(
+            'webhooks.deliveries.retrying',
+            'Retries still in flight: {{count}}. This window is not clear.',
+            { count: health.pending },
+          )}
+        </Panel>
+      </Shell>
+    );
+  }
+
+  if (health.kind === 'empty') {
+    return (
+      <Shell>
+        <ShellHeader title={title} />
+        <Panel className="p-4 text-sm text-[var(--fg-secondary)]">
+          {t(
+            'webhooks.deliveries.noSettled',
+            'No delivered or failed messages in this window yet.',
+          )}
+        </Panel>
+      </Shell>
+    );
+  }
+
+  const rate =
+    stats.successRate ?? (health.settled - health.failed) / health.settled;
+  const caption =
+    health.pending > 0
+      ? t(
+          'webhooks.deliveries.captionPending',
+          '{{failed}} of {{settled}} settled failed. {{pending}} still retrying.',
+          {
+            failed: health.failed,
+            settled: health.settled,
+            pending: health.pending,
+          },
+        )
+      : t('webhooks.deliveries.caption', '{{failed}} of {{total}} failed', {
+          failed: health.failed,
+          total: health.settled,
+        });
+
+  return (
+    <TickGauge value={rate} title={title} caption={caption} target={0.99} targetLabel="99%" />
   );
 }
 
