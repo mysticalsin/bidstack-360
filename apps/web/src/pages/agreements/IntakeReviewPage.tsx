@@ -11,24 +11,57 @@ import { useCompanies } from '@/hooks/useCompanies';
 import { useConfirmMsaIntake, useMsaIntakeDraft } from '@/hooks/useMsaIntake';
 import { useSigningEntities } from '@/hooks/useSigningEntities';
 
+/** Absolute cents after half-cent rounding away from zero. */
+function roundedAbsCents(micros: bigint): bigint {
+  const abs = micros < 0n ? -micros : micros;
+  return (abs + 5_000n) / 10_000n;
+}
+
 /** Grouped cents from integer micros. Half a cent rounds away from zero. */
-function centsFromIntegerMicros(micros: bigint): string {
-  const negative = micros < 0n;
-  const abs = negative ? -micros : micros;
-  const cents = (abs + 5_000n) / 10_000n;
+function centsFromIntegerMicros(micros: bigint, showCents = false): string {
+  const cents = roundedAbsCents(micros);
   const units = cents / 100n;
   const frac = cents % 100n;
   const body = units.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const text = frac === 0n ? body : `${body}.${frac.toString().padStart(2, '0')}`;
-  return negative && cents !== 0n ? `-${text}` : text;
+  const text = showCents || frac !== 0n ? `${body}.${frac.toString().padStart(2, '0')}` : body;
+  return micros < 0n && cents !== 0n ? `-${text}` : text;
 }
 
 /** Integer micros. A missing currency stays unspecified instead of becoming a euro amount. */
-export function formatExtractedMicros(micros: number, currency?: string | null): string {
+export function formatExtractedMicros(micros: number, currency?: string | null, showCents = false): string {
   if (!Number.isSafeInteger(micros)) return 'amount not readable';
-  const amount = centsFromIntegerMicros(BigInt(micros));
+  const amount = centsFromIntegerMicros(BigInt(micros), showCents);
   if (currency && /^[A-Za-z]{3}$/.test(currency)) return `${amount} ${currency.toUpperCase()}`;
   return `${amount} unspecified`;
+}
+
+function rateRowHasCents(row: unknown): boolean {
+  if (!row || typeof row !== 'object') return false;
+  const item = row as { role?: string; rateMicros?: number };
+  if (!item.role || item.rateMicros == null || !Number.isSafeInteger(item.rateMicros)) return false;
+  return roundedAbsCents(BigInt(item.rateMicros)) % 100n !== 0n;
+}
+
+/** One extracted list. A cent on any rate makes every rate in that list show two decimals. */
+export function formatExtractedRowList(rows: readonly unknown[]): string {
+  const showCents = rows.some(rateRowHasCents);
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return JSON.stringify(row);
+      const item = row as {
+        name?: string;
+        role?: string;
+        rateMicros?: number;
+        unit?: string;
+        currency?: string | null;
+      };
+      if (item.role && item.rateMicros != null) {
+        return `${item.role}: ${formatExtractedMicros(item.rateMicros, item.currency, showCents)} / ${item.unit ?? 'day'}`;
+      }
+      if (item.name) return item.name;
+      return JSON.stringify(row);
+    })
+    .join(' · ');
 }
 
 function cite(field: MsaExtractedField): string {
@@ -47,25 +80,7 @@ function display(field: MsaExtractedField): string {
     const cap = field.value as { amountMicros?: number; currency?: string };
     if (cap.amountMicros != null) return formatExtractedMicros(cap.amountMicros, cap.currency);
   }
-  if (Array.isArray(field.value)) {
-    return field.value
-      .map((row) => {
-        if (!row || typeof row !== 'object') return JSON.stringify(row);
-        const item = row as {
-          name?: string;
-          role?: string;
-          rateMicros?: number;
-          unit?: string;
-          currency?: string;
-        };
-        if (item.role && item.rateMicros != null) {
-          return `${item.role}: ${formatExtractedMicros(item.rateMicros, item.currency)} / ${item.unit ?? 'day'}`;
-        }
-        if (item.name) return item.name;
-        return JSON.stringify(row);
-      })
-      .join(' · ');
-  }
+  if (Array.isArray(field.value)) return formatExtractedRowList(field.value);
   return JSON.stringify(field.value);
 }
 
