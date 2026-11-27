@@ -19,6 +19,7 @@ import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useAgreementLeverage } from '@/hooks/useMsaLeverage';
 import { useMsaDetail, useMsaDownloadUrl, useMsaTimeline } from '@/hooks/useMsa';
+import { agreementTimelineRead } from './agreement-timeline-read';
 import { ApiError } from '@/lib/api';
 import { actionLabel, fmtBytes, fmtDate, fmtDays, fmtMoneyMicros, KIND_LABEL, urgency } from '@/lib/msa/labels';
 import type { MsaDetail, MsaFileVersion } from '@/lib/msa/types';
@@ -129,6 +130,11 @@ export default function AgreementDetailPage() {
   const disabledReason = sample
     ? 'Uploading is off in this Sample preview. It turns on once the Agreements service is live on this server.'
     : !canWrite ? 'You can view this agreement but not change it. Ask an admin for the "Agreements: edit" permission.' : undefined;
+  const timelineRead = agreementTimelineRead({
+    isLoading: timeline.isLoading,
+    isError: timeline.isError,
+    events: timeline.data?.data,
+  });
   const terms: Array<[string, string]> = [
     ['Type', KIND_LABEL[a.kind]],
     ['Reference', a.reference],
@@ -243,9 +249,14 @@ export default function AgreementDetailPage() {
       <section className="agr-section" aria-labelledby="agr-timeline">
         <h2 id="agr-timeline">Timeline and audit</h2>
         <p className="agr-caption">Changes, uploads and downloads, plus upcoming dates.</p>
-        {timeline.isLoading ? <LoadingSkeleton rows={3} /> : (timeline.data?.data ?? []).length === 0 ? <p className="drill-empty">No activity yet.</p> : (
+        {timelineRead.state === 'loading' ? <LoadingSkeleton rows={3} /> : timelineRead.state === 'unread' ? (
+          <div role="alert" className="drill-empty" data-testid="agreement-timeline-unread">
+            <span>Could not load this timeline. The activity has not arrived.</span>
+            <Button variant="secondary" size="sm" onClick={() => void timeline.refetch()}>Retry</Button>
+          </div>
+        ) : timelineRead.state === 'empty' ? <p className="drill-empty">No activity yet.</p> : (
           <ol className="agr-timeline" data-testid="agreement-timeline">
-            {(timeline.data?.data ?? []).map((e) => (
+            {timelineRead.events.map((e) => (
               <li key={e.id} data-future={Date.parse(e.at) > now ? 'true' : undefined}>
                 <time dateTime={e.at}>{fmtDate(e.at)}</time>
                 <span>
