@@ -7,10 +7,12 @@ import { motion } from 'framer-motion';
 import { useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Badge, stageTone } from '@/components/ui/Badge';
+import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/cn';
 
 import type { PipelineStage } from '@bidstack/shared';
+
+import { opportunityStageChipTone } from './opportunity-stage-chips';
 
 // ── StageCell ────────────────────────────────────────────────────────────────
 
@@ -36,7 +38,7 @@ export function StageCell({
   const value = stage?.id ?? '';
   const stageName = stage?.name ?? t('oppInlineEditCells.unknownStage', 'Unknown');
   if (!canEdit) {
-    return <Badge tone={stageTone(stage?.name ?? '')}>{stageName}</Badge>;
+    return <Badge tone={opportunityStageChipTone(stage)}>{stageName}</Badge>;
   }
   if (!editing) {
     return (
@@ -63,7 +65,7 @@ export function StageCell({
           transition={{ type: 'spring', stiffness: 360, damping: 22 }}
           className="inline-block"
         >
-          <Badge tone={stageTone(stage?.name ?? '')}>{stageName}</Badge>
+          <Badge tone={opportunityStageChipTone(stage)}>{stageName}</Badge>
         </motion.span>
       </button>
     );

@@ -26,13 +26,11 @@ import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
 import {
-  getPipelineStages,
   isLegacyOpportunityStage,
   isPipelineStageIdUuid,
-  resolvePipelineStage,
 } from '@/lib/pipeline-stages';
 
-import type { Opportunity, PipelineStage } from '@bidstack/shared';
+import type { Opportunity } from '@bidstack/shared';
 
 import { Row } from './opportunities/OpportunityRow';
 import { OpportunitiesTableHead } from './opportunities/OpportunitiesTableHead';
@@ -45,6 +43,10 @@ import {
   type DueQuickFilter,
 } from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
+import {
+  opportunityListStageChips,
+  opportunityRowStage,
+} from './opportunities/opportunity-stage-chips';
 
 export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
@@ -102,38 +104,26 @@ export function OpportunitiesPage() {
   // rows, so headline totals must come from the server, not data.items.
   const orgSummary = useOrgSummary();
   const configuredStages = usePipelineStages();
-  const configuredStageOptions = useMemo<PipelineStage[]>(
-    () =>
-      configuredStages.data?.items.map((stage) => ({
-        id: stage.id,
-        name: stage.name,
-        probability: stage.probability,
-        color: stage.color,
-        isWon: stage.isWon,
-        isLost: stage.isLost,
-      })) ?? [],
-    [configuredStages.data?.items],
-  );
 
   // Sortable. Default = none (server returns by recent activity); user clicks
-  // a column header to override. Stage sorts by canonical funnel order rather
-  // than alphabetically — that's what users mean when they sort by stage.
+  // a column header to override. Stage sorts by the name on the chip.
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+  const stageCatalog = configuredStages.data?.items;
   const stageOptions = useMemo(
-    () => getPipelineStages(rawItems, configuredStageOptions),
-    [configuredStageOptions, rawItems],
+    () => opportunityListStageChips(rawItems, stageCatalog ?? []),
+    [rawItems, stageCatalog],
   );
   const accessors = useMemo(
     () => ({
       code: (o: Opportunity) => o.code,
       name: (o: Opportunity) => o.name,
       customer: (o: Opportunity) => o.customer,
-      stage: (o: Opportunity) => resolvePipelineStage(o).name,
+      stage: (o: Opportunity) => opportunityRowStage(o, stageOptions).name,
       value: (o: Opportunity) => o.value,
       probability: (o: Opportunity) => o.probability,
       dueDate: (o: Opportunity) => o.dueDate,
     }),
-    [],
+    [stageOptions],
   );
 
   // Persist sort in the URL — same format as Contacts ("?sort=value.desc").
