@@ -4,7 +4,7 @@
  *
  * WHY its own query: the card previously rendered the first 5 companies from
  * CRM dashboard data, which was not a ranking at all (demo-feedback M5). It
- * now self-fetches the curated global top-10 (or the auto pipeline-value
+ * now self-fetches the curated ranking (or the auto pipeline-value
  * leaderboard fallback) and labels which source it is showing.
  */
 import { Link } from 'react-router-dom';
@@ -19,6 +19,13 @@ import { TopAccountBadge } from '@/components/company/AccountTierBadges';
 import { useTopAccounts } from '@/hooks/useTopAccounts';
 import { springSoft } from '@/lib/motion';
 import { isSyntheticAccountName } from '@/pages/accountsPage/testDataFilter';
+
+import {
+  LEADERBOARD_CURATED_CAPTION,
+  LEADERBOARD_LOADING_CAPTION,
+  leaderboardRankLabel,
+  leaderboardRowDetail,
+} from './leaderboard-caption';
 
 // ─── TopAccountsCard ─────────────────────────────────────────────────────────
 
@@ -41,7 +48,7 @@ export function TopAccountsCard() {
           {!accounts.isLoading && !accounts.isError ? (
             <Badge tone={source === 'curated' ? 'amber' : 'gray'}>
               {source === 'curated'
-                ? t('topAccounts.sourceCurated', 'Curated top 10')
+                ? t('topAccounts.leaderboardCurated', LEADERBOARD_CURATED_CAPTION)
                 : t('topAccounts.sourceAuto', 'Auto-ranked')}
             </Badge>
           ) : null}
@@ -52,13 +59,21 @@ export function TopAccountsCard() {
       </div>
 
       {accounts.isLoading ? (
-        <div className="space-y-2" aria-hidden>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-12 animate-pulse rounded-lg bg-[var(--surface-sunken)]" />
-          ))}
+        <div role="status" aria-busy="true">
+          <p className="text-xs text-[var(--fg-secondary)]">
+            {t('topAccounts.leaderboardLoading', LEADERBOARD_LOADING_CAPTION)}
+          </p>
+          <div className="mt-2 space-y-2" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded-lg bg-[var(--surface-sunken)]" />
+            ))}
+          </div>
         </div>
       ) : accounts.isError ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5">
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5"
+        >
           <span className="text-xs text-[var(--fg-secondary)]">{t('topAccounts.errorMessage', "Couldn't load top accounts.")}</span>
           <button
             type="button"
@@ -69,10 +84,10 @@ export function TopAccountsCard() {
           </button>
         </div>
       ) : items.length === 0 ? (
-        <p className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5 text-xs text-[var(--fg-secondary)]">
+        <p role="status" className="rounded-lg bg-[var(--surface-sunken)] px-3 py-2.5 text-xs text-[var(--fg-secondary)]">
           {t(
             'topAccounts.empty',
-            'No ranked accounts yet — add opportunity values or curate the Top 10 in Settings.',
+            'No ranked accounts yet. Add opportunity values or curate a ranking in Settings.',
           )}
         </p>
       ) : (
@@ -89,7 +104,13 @@ export function TopAccountsCard() {
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-[var(--surface-hover)] transition-colors group"
                 style={{ textDecoration: 'none', color: 'inherit' }}
               >
-                <span className="w-5 shrink-0 text-center text-xs font-bold text-[var(--fg-tertiary)]">
+                <span
+                  className="w-5 shrink-0 text-center text-xs font-bold text-[var(--fg-tertiary)]"
+                  aria-label={t(
+                    'topAccounts.leaderboardRank',
+                    leaderboardRankLabel(account.topAccountRank ?? i + 1),
+                  )}
+                >
                   {account.topAccountRank ?? i + 1}
                 </span>
                 <CompanyLogo name={account.name} companyId={account.id} domain={account.domain} size={36} />
@@ -101,11 +122,8 @@ export function TopAccountsCard() {
                     {source === 'curated' ? <TopAccountBadge /> : null}
                   </div>
                   <div className="truncate text-xs text-[var(--fg-tertiary)]">
-                    {account.industry && account.industry !== 'Unknown industry'
-                      ? account.industry
-                      : account.domain
-                        ? account.domain
-                        : t('topAccounts.portfolioAccount', 'Portfolio account')}
+                    {leaderboardRowDetail(account) ??
+                      t('topAccounts.portfolioAccount', 'Portfolio account')}
                   </div>
                 </div>
                 <Icon
