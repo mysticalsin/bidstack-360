@@ -25,7 +25,10 @@ import {
 import { useIsAdmin } from '@/lib/auth';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { RolesSection } from '@/components/settings/RolesSection';
+import { usePermissions, useRoles } from '@/hooks/useRoles';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -129,6 +132,32 @@ function Legend() {
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
 type Tab = 'matrix' | 'custom';
+
+// A custom-role panel is one read of the role list and the permission catalog.
+// Idle and paused reads have no payload and isLoading is false, so the section
+// would say "No roles yet" or offer New role against a blank catalog. That
+// sentence is for a list that arrived empty.
+type ListRead = {
+  data: unknown;
+  isError: boolean;
+  refetch: () => Promise<unknown>;
+};
+
+type CustomListHold =
+  | 'roles-error'
+  | 'permissions-error'
+  | 'roles-unread'
+  | 'permissions-unread'
+  | 'ready';
+
+function customListHold(roles: ListRead, permissions: ListRead): CustomListHold {
+  if (roles.data == null && roles.isError) return 'roles-error';
+  if (permissions.data == null && permissions.isError) return 'permissions-error';
+  if (roles.data == null) return 'roles-unread';
+  if (permissions.data == null) return 'permissions-unread';
+  return 'ready';
+}
+
 const ROLE_TABS: Array<{ id: Tab; labelKey: string; labelDefault: string; adminOnly?: boolean }> = [
   { id: 'matrix', labelKey: 'roles.tabs.matrix', labelDefault: 'System Roles Matrix' },
   { id: 'custom', labelKey: 'roles.tabs.custom', labelDefault: 'Custom Roles', adminOnly: true },
@@ -140,6 +169,14 @@ export function RolesPage() {
   const isAdmin = useIsAdmin();
   const { t } = useTranslation('crm');
   const [tab, setTab] = useState<Tab>('matrix');
+  const customOpen = isAdmin && tab === 'custom';
+  const roles = useRoles({ enabled: customOpen });
+  const permissions = usePermissions({ enabled: customOpen });
+  const hold = customListHold(roles, permissions);
+  const retryLists = () => {
+    void roles.refetch();
+    void permissions.refetch();
+  };
 
   return (
     <div className="space-y-6">
@@ -316,7 +353,44 @@ export function RolesPage() {
           role="tabpanel"
           aria-labelledby="tab-custom"
         >
-          <RolesSection />
+          {hold === 'ready' ? (
+            <RolesSection />
+          ) : hold === 'roles-error' ? (
+            <ErrorState
+              title={t('roles.loadErrorTitle', 'Could not load roles')}
+              message={t(
+                'roles.loadErrorMessage',
+                'This is not an empty role list. Retry the list before creating a role.',
+              )}
+              action={
+                <Button size="sm" variant="secondary" onClick={retryLists}>
+                  {t('roles.retry', 'Retry')}
+                </Button>
+              }
+            />
+          ) : hold === 'permissions-error' ? (
+            <ErrorState
+              title={t('roles.permissionsLoadErrorTitle', 'Could not load permissions')}
+              message={t(
+                'roles.permissionsLoadErrorMessage',
+                'This is not an empty permission list. Retry before choosing permissions.',
+              )}
+              action={
+                <Button size="sm" variant="secondary" onClick={retryLists}>
+                  {t('roles.retry', 'Retry')}
+                </Button>
+              }
+            />
+          ) : (
+            <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+              {hold === 'permissions-unread'
+                ? t(
+                    'roles.checkingPermissions',
+                    'Checking permissions. They have not arrived.',
+                  )
+                : t('roles.checkingRoles', 'Checking roles. They have not arrived.')}
+            </p>
+          )}
         </section>
       )}
     </div>

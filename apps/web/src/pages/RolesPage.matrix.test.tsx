@@ -5,6 +5,18 @@ import { MATRIX_RESOURCES } from '@bidstack/shared';
 
 vi.mock('@/lib/auth', () => ({ useIsAdmin: () => false }));
 vi.mock('@/components/settings/RolesSection', () => ({ RolesSection: () => null }));
+vi.mock('@/hooks/useRoles', () => ({
+  useRoles: () => ({
+    data: undefined,
+    isError: false,
+    refetch: () => Promise.resolve(),
+  }),
+  usePermissions: () => ({
+    data: undefined,
+    isError: false,
+    refetch: () => Promise.resolve(),
+  }),
+}));
 
 import { RolesPage } from './RolesPage';
 
