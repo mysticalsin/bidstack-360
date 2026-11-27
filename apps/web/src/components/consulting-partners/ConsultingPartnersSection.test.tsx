@@ -65,10 +65,14 @@ describe('ConsultingPartnersSection', () => {
     Object.assign(state, { data: summary, isLoading: false, canWrite: true });
   });
 
-  it('renders a skeleton first while the summary loads', () => {
+  it('says the list has not arrived while the summary is still loading', () => {
+    // WHY: an in-flight read has no rows yet. A skeleton alone is not a
+    // settled scan that found no consulting partners.
     Object.assign(state, { data: undefined, isLoading: true });
     view();
-    expect(screen.getByTestId('partners-skeleton').getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByText('Checking consulting partners. The list has not arrived.')).toBeTruthy();
+    expect(screen.queryByTestId('partners-skeleton')).toBeNull();
+    expect(screen.queryByTestId('partners-empty')).toBeNull();
   });
 
   it('shows partner tiles with monogram, relationship tags and domain chips', () => {
