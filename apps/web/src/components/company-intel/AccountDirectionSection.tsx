@@ -105,7 +105,16 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
     tabRefs.current[j]?.focus();
   };
 
-  const sample = Boolean(direction.data?.sample || hiring.data?.sample || financials.data?.sample || news.data?.sample);
+  // The chip follows the open tab. CI Financial's hiring fixtures are sample
+  // while its filings tab is empty. A section-wide Sample mark made "No filed
+  // figures" read as demo data.
+  const open = {
+    direction: direction.data,
+    hiring: hiring.data,
+    financials: financials.data,
+    news: news.data,
+  }[tab];
+  const sample = Boolean(open?.sample);
   const active = { direction, hiring, financials, news }[tab];
 
   return (
