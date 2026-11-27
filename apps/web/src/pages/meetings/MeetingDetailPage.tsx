@@ -8,10 +8,11 @@ import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/Button';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { useFlagMeeting, useMeeting, usePatchMeeting } from '@/hooks/useMeetingIntel';
-import { ApiError } from '@/lib/api';
 import { fmtMeetingDate, SENIOR_LEVELS, SENIORITY_LABEL, SOURCE_LABEL, type MeetingIntelDetail } from '@/lib/meeting-intel/client';
+
+import { meetingDetailReadPhase } from './meeting-detail-read';
 
 function ListBlock({ title, items, testId }: { title: string; items: string[]; testId?: string }) {
   if (!items.length) return null;
@@ -66,11 +67,22 @@ export default function MeetingDetailPage() {
   const flagView = flagId ? viaFlag.data : undefined;
   const patch = usePatchMeeting(id ?? '');
   const [showTranscript, setShowTranscript] = useState(false);
-  if (q.isLoading) return <LoadingSkeleton rows={6} />;
-  if (q.error instanceof ApiError && q.error.status === 404) {
+  // A missing payload is not a missing meeting. isLoading is false while a
+  // read is paused, so that flag alone still said the load failed.
+  const phase = meetingDetailReadPhase(q);
+  if (phase === 'unread') {
+    return (
+      <p className="mi-caption" role="status">
+        Checking this meeting. The record has not arrived.
+      </p>
+    );
+  }
+  if (phase === 'missing') {
     return <ErrorState title="Meeting not found" message="It may be archived, or visible only to its account team." action={<Link className="mi-link" to="/meetings">Back to meetings</Link>} />;
   }
-  if (q.isError || !q.data) return <ErrorState title="Couldn't load this meeting" action={<Button variant="secondary" onClick={() => void q.refetch()}>Retry</Button>} />;
+  if (phase === 'failed' || !q.data) {
+    return <ErrorState title="Couldn't load this meeting" action={<Button variant="secondary" onClick={() => void q.refetch()}>Retry</Button>} />;
+  }
   const m = q.data;
   const nothingLearned = !m.challenges.length && !m.opportunities.length && !m.similarProjects.length && !m.nextSteps.length;
   return (
