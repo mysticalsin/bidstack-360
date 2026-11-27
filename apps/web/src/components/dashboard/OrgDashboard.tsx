@@ -255,6 +255,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
             onDrill={setDrill}
             rowsPending={opps.isLoading}
             feedPending={feed.isLoading}
+            feedFailed={feed.isError && !feed.data}
+            onFeedRetry={() => void feed.refetch()}
           />
           <NeedsYou
             rows={oppRows}
