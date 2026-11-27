@@ -56,10 +56,16 @@ export function serializeWidget(w: DbWidget, latestRunId?: string): AnalyticsWid
   };
 }
 
+/** Owner or org admin. Shared by the canEdit field and requireDashboardEditor. */
+export function canEditDashboard(ownerId: string, userId: string, isAdmin: boolean): boolean {
+  return ownerId === userId || isAdmin;
+}
+
 export function serializeDashboard(
   d: DbDashboard,
-  widgets?: DbWidget[],
-  latestRunByReport?: Map<string, string>,
+  widgets: DbWidget[] | undefined,
+  latestRunByReport: Map<string, string> | undefined,
+  canEdit: boolean,
 ): AnalyticsDashboard {
   return {
     id: d.id,
@@ -68,6 +74,7 @@ export function serializeDashboard(
     description: d.description ?? undefined,
     ownerId: d.ownerId,
     isShared: d.isShared,
+    canEdit,
     widgets: widgets?.map((w) =>
       serializeWidget(w, w.reportId ? latestRunByReport?.get(w.reportId) : undefined),
     ),

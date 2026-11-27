@@ -31,6 +31,7 @@ import { seedTechStacks } from './seed-tech-stack.js';
 import { seedBidChartDemo } from './seed-bid-charts.js';
 import { demoWinLoss, fixtureClosedDeals } from './seed-data.bid-charts.js';
 import { seedConsultingPartners } from './seed-consulting-partners.js';
+import { seedAnalyticsCommandCenter } from './seed-analytics-dashboard.js';
 
 // PERMISSION_SEEDS, ROLE_SEEDS, LEGACY_ROLE_ASSIGNMENTS, helper functions,
 // and seedRolesAndPermissions() extracted to ./seed.rbac.ts (BS-R1)
@@ -820,66 +821,10 @@ async function main() {
   console.log(`  ✓ references: ${fixtureReferences.length}`);
 
   // ─── Analytics dashboard (F9) ──────────────────────────────────────────────
-  // GET /api/v1/dashboards is org-scoped and (for non-admins) filtered to shared
-  // or owned dashboards. No dashboard is seeded, so the /analytics door opens
-  // empty. Seed one shared dashboard with two widgets so it is alive on first
-  // open. Widget `type` values match the AnalyticsWidgetType enum the strict GET
-  // response schema validates. Idempotent: upsert by stable id.
-  const dashboardId = 'da5b0000-0000-4000-8000-000000000001';
-  await prisma.analyticsDashboard.upsert({
-    where: { id: dashboardId },
-    create: {
-      id: dashboardId,
-      orgId: org.id,
-      ownerId: seedUserId,
-      name: 'Pre-sales Command Center',
-      description: 'Pipeline health, win rate, and bid coverage at a glance.',
-      isShared: true,
-    },
-    update: {
-      name: 'Pre-sales Command Center',
-      description: 'Pipeline health, win rate, and bid coverage at a glance.',
-      isShared: true,
-    },
-  });
-  const dashboardWidgets: Array<{
-    id: string;
-    title: string;
-    type: string;
-    config: Prisma.InputJsonValue;
-    position: Prisma.InputJsonValue;
-  }> = [
-    {
-      id: 'da5b0000-0000-4000-8000-000000000011',
-      title: 'Weighted Pipeline',
-      type: 'kpi',
-      config: { format: 'currency', subtitle: 'Open opportunities, probability-weighted' },
-      position: { x: 0, y: 0, w: 3, h: 2 },
-    },
-    {
-      id: 'da5b0000-0000-4000-8000-000000000012',
-      title: 'Pipeline by Stage',
-      type: 'bar',
-      config: { subtitle: 'Open opportunity value grouped by sales stage' },
-      position: { x: 3, y: 0, w: 6, h: 4 },
-    },
-  ];
-  for (const w of dashboardWidgets) {
-    await prisma.analyticsDashboardWidget.upsert({
-      where: { id: w.id },
-      create: {
-        id: w.id,
-        orgId: org.id,
-        dashboardId,
-        title: w.title,
-        type: w.type,
-        config: w.config,
-        position: w.position,
-      },
-      update: { title: w.title, type: w.type, config: w.config, position: w.position },
-    });
-  }
-  console.log(`  ✓ analytics dashboard: 1 (+${dashboardWidgets.length} widgets)`);
+  // One shared command center, owned by the seed user. Its two cards point at
+  // synthetic opportunity reports (open-pipeline sum, deal count by stage).
+  const dashboardWidgets = await seedAnalyticsCommandCenter(prisma, org.id, seedUserId);
+  console.log(`  ✓ analytics dashboard: 1 (+${dashboardWidgets} widgets, 2 reports)`);
 
   const intelRows = await seedAccountIntel(prisma, org.id);
   console.log(`  ✓ account intel samples: ${intelRows}`);

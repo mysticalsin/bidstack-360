@@ -219,6 +219,9 @@ export const AnalyticsDashboard = z.object({
   description: z.string().optional(),
   ownerId: z.string().uuid(),
   isShared: z.boolean(),
+  // Computed for this caller. True for the owner and for an org admin.
+  // Not stored, and not a permission change: mutations still enforce the same rule.
+  canEdit: z.boolean(),
   widgets: z.array(AnalyticsWidget).optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -244,7 +247,9 @@ export const AnalyticsDashboardPatch = z
 export type AnalyticsDashboardPatch = z.infer<typeof AnalyticsDashboardPatch>;
 
 export const AnalyticsWidgetCreate = z.object({
-  reportId: z.string().uuid().nullable().optional(),
+  // A widget with no report cannot draw. The modal already refuses that save;
+  // the API must refuse it too, or a client that skips the modal stores an empty card.
+  reportId: z.string().uuid(),
   title: z.string().min(1).max(255),
   type: AnalyticsWidgetType,
   config: z.record(z.unknown()).default({}),

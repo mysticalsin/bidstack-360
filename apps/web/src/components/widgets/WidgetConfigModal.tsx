@@ -4,14 +4,22 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/lib/cn';
 import { fadeScale } from '@/lib/motion';
 import type { CreateWidgetInput, WidgetType } from '@/hooks/useDashboards';
-import { useAnalyticsReportsList } from '@/hooks/useAnalyticsReports';
+import { useAnalyticsReportsList, type Report } from '@/hooks/useAnalyticsReports';
+
+function axisDefaults(report: { query?: Report['query'] } | undefined): { xKey: string; yKey: string } {
+  const xKey = report?.query?.groupBy?.[0]?.field || 'name';
+  const aggregate = report?.query?.aggregates?.[0];
+  const yKey =
+    aggregate?.alias || (aggregate && aggregate.field !== '*' ? aggregate.field : '') || 'value';
+  return { xKey, yKey };
+}
 
 const WIDGET_TYPES: { type: WidgetType; label: string; description: string }[] = [
   { type: 'kpi', label: 'KPI Card', description: 'Single metric with trend' },
@@ -33,9 +41,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   initial?: Partial<CreateWidgetInput>;
   onSave: (config: CreateWidgetInput) => void | Promise<void>;
+  /** The control that opened the dialog. Escape returns focus here. */
+  triggerRef?: { current: HTMLButtonElement | null };
 }
 
-export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props) {
+export function WidgetConfigModal({ open, onOpenChange, initial, onSave, triggerRef }: Props) {
   const { t } = useTranslation('crm');
   const { data: reports = [] } = useAnalyticsReportsList();
 
@@ -45,23 +55,40 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
   const [xKey, setXKey] = useState('name');
   const [yKey, setYKey] = useState('value');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
 
-  // onSave (handleAddWidget in the parent) is async and can reject — e.g. a
-  // 403 from a role without reports:write, or a transient network error. Await
-  // it and only close on success; on failure the caller has already surfaced a
-  // toast, so just keep the modal open with the user's input intact for retry.
+  useEffect(() => {
+    if (saveError && !saving) saveRef.current?.focus();
+  }, [saveError, saving]);
+
+  // A widget with no report cannot draw. Refuse that save here, and keep a
+  // rejected save (403, network) on screen with the reason. The caller still toasts.
   const handleSave = async () => {
+    if (!reportId) {
+      setSaveError(
+        reports.length === 0
+          ? t('widgetConfig.noReports', 'Create a report before adding a widget.')
+          : t('widgetConfig.reportRequired', 'Choose a report for this widget.'),
+      );
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
     try {
       await onSave({
         title: title || (WIDGET_TYPES.find((w) => w.type === type)?.label ?? type),
         type,
-        reportId: reportId || undefined,
+        reportId,
         config: { xKey, yKey },
       });
       onOpenChange(false);
-    } catch {
-      // handled by the caller's toast
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : t('widgetConfig.saveError', 'Could not save this widget.');
+      setSaveError(message);
     } finally {
       setSaving(false);
     }
@@ -81,6 +108,12 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
         <Dialog.Content
           asChild
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onCloseAutoFocus={(event) => {
+            const trigger = triggerRef?.current;
+            if (!trigger) return;
+            event.preventDefault();
+            trigger.focus();
+          }}
         >
           <motion.div
             variants={fadeScale}
@@ -97,6 +130,9 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               <Dialog.Title className="text-base font-semibold text-[var(--fg-primary)]">
                 {t('widgetConfig.title', 'Configure Widget')}
               </Dialog.Title>
+              <Dialog.Description className="sr-only">
+                {t('widgetConfig.description', 'Choose a report, a title, and a chart type.')}
+              </Dialog.Description>
               <Dialog.Close asChild>
                 <button
                   aria-label={t('widgetConfig.closeAriaLabel', 'Close')}
@@ -115,10 +151,14 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
             <div className="space-y-5">
               {/* Title */}
               <div>
-                <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
+                <label
+                  htmlFor="widget-config-title"
+                  className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5"
+                >
                   {t('widgetConfig.titleLabel', 'Title')}
                 </label>
                 <input
+                  id="widget-config-title"
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -127,18 +167,31 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                 />
               </div>
 
-              {/* Report */}
+              {/* Report — required. There is no static widget. */}
               {reports.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
+                  <label
+                    htmlFor="widget-config-report"
+                    className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5"
+                  >
                     {t('widgetConfig.dataSourceLabel', 'Data source (report)')}
                   </label>
                   <select
+                    id="widget-config-report"
                     value={reportId}
-                    onChange={(e) => setReportId(e.target.value)}
+                    aria-describedby={!reportId && saveError ? 'widget-config-error' : undefined}
+                    aria-invalid={!reportId && saveError ? true : undefined}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setReportId(nextId);
+                      setSaveError(null);
+                      const next = axisDefaults(reports.find((report) => report.id === nextId));
+                      setXKey(next.xKey);
+                      setYKey(next.yKey);
+                    }}
                     className={inputCls}
                   >
-                    <option value="">{t('widgetConfig.dataSourceNone', '— None (static demo) —')}</option>
+                    <option value="">{t('widgetConfig.dataSourcePlaceholder', 'Select a report')}</option>
                     {reports.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
@@ -178,10 +231,14 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
               {!['kpi', 'gauge', 'heatmap'].includes(type) && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
+                    <label
+                      htmlFor="widget-config-x"
+                      className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5"
+                    >
                       {t('widgetConfig.xAxisLabel', 'X-axis field')}
                     </label>
                     <input
+                      id="widget-config-x"
                       type="text"
                       value={xKey}
                       onChange={(e) => setXKey(e.target.value)}
@@ -190,10 +247,14 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5">
+                    <label
+                      htmlFor="widget-config-y"
+                      className="block text-xs font-medium text-[var(--fg-secondary)] mb-1.5"
+                    >
                       {t('widgetConfig.yAxisLabel', 'Y-axis field')}
                     </label>
                     <input
+                      id="widget-config-y"
                       type="text"
                       value={yKey}
                       onChange={(e) => setYKey(e.target.value)}
@@ -203,6 +264,12 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                   </div>
                 </div>
               )}
+
+              {saveError ? (
+                <p id="widget-config-error" role="alert" className="text-sm text-[var(--danger)]">
+                  {saveError}
+                </p>
+              ) : null}
 
               {/* Footer */}
               <div className="flex justify-end gap-2 pt-2">
@@ -218,8 +285,10 @@ export function WidgetConfigModal({ open, onOpenChange, initial, onSave }: Props
                   </button>
                 </Dialog.Close>
                 <button
+                  ref={saveRef}
                   onClick={handleSave}
                   disabled={saving}
+                  aria-describedby={reportId && saveError ? 'widget-config-error' : undefined}
                   className={cn(
                     'px-4 py-2 rounded-lg text-sm font-medium text-white',
                     'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)]',

@@ -10,7 +10,7 @@
 import type { ReactNode } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -30,12 +30,23 @@ vi.mock('react-i18next', () => ({
 const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));
 vi.mock('@/hooks/useCapabilities', () => capabilitiesMocks);
 
+const modalMocks = vi.hoisted(() => ({ useReal: false }));
+const reportMocks = vi.hoisted(() => ({
+  useAnalyticsReportsList: vi.fn(() => ({ data: [] as Array<{ id: string; name: string }> })),
+}));
+vi.mock('@/hooks/useAnalyticsReports', () => ({
+  useAnalyticsReportsList: reportMocks.useAnalyticsReportsList,
+}));
+
 const dashboard = {
   id: 'd-1',
   orgId: 'org-1',
   name: 'Pipeline Overview',
   ownerId: 'owner-1',
   isShared: true,
+  // Server-computed: true for the owner and for an org admin. The default
+  // fixture is that caller, so the reports:write tests keep a visible editor.
+  canEdit: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -78,10 +89,32 @@ vi.mock('@/components/widgets/WidgetRenderer', () => ({
   ),
 }));
 
-vi.mock('@/components/widgets/WidgetConfigModal', () => ({
-  WidgetConfigModal: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="widget-config-modal" /> : null,
-}));
+type WidgetConfigModalProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (config: {
+    title: string;
+    type: string;
+    reportId?: string;
+    config?: Record<string, unknown>;
+  }) => void | Promise<void>;
+};
+
+vi.mock('@/components/widgets/WidgetConfigModal', async () => {
+  const actual = (await vi.importActual('@/components/widgets/WidgetConfigModal')) as {
+    WidgetConfigModal: (props: WidgetConfigModalProps) => ReactNode;
+  };
+  return {
+    WidgetConfigModal: (props: WidgetConfigModalProps) =>
+      modalMocks.useReal ? (
+        <actual.WidgetConfigModal {...props} />
+      ) : (
+        // Mounted even while closed, so a test can tell "the page never
+        // offered the modal" from "the modal is closed".
+        <div data-testid="widget-config-modal" data-open={props.open ? 'true' : 'false'} />
+      ),
+  };
+});
 
 import { AnalyticsDashboardPage } from './AnalyticsDashboardPage';
 
@@ -206,5 +239,109 @@ describe('AnalyticsDashboardPage states', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('AnalyticsDashboardPage — who may add a widget', () => {
+  afterEach(() => {
+    cleanup();
+    modalMocks.useReal = false;
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    dashboardsMocks.useDashboards.mockImplementation(() => ({
+      data: [dashboard],
+      isLoading: false,
+    }));
+    dashboardsMocks.useDashboardWidgets.mockImplementation(() => ({
+      data: [widget],
+      isLoading: false,
+      error: null,
+    }));
+    dashboardsMocks.useAddWidget.mockImplementation(() => ({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    }));
+  });
+
+  function renderSharedBoard(caller: { name: string; canEdit: boolean }) {
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    dashboardsMocks.useDashboards.mockImplementation(() => ({
+      data: [{ ...dashboard, name: caller.name, isShared: true, canEdit: caller.canEdit }],
+      isLoading: false,
+    }));
+    dashboardsMocks.useDashboardWidgets.mockImplementation(() => ({
+      data: [],
+      isLoading: false,
+      error: null,
+    }));
+    renderPage();
+  }
+
+  it('hides Add widget, the empty-state CTA, and the modal from a reports:write user who neither owns the shared dashboard nor is an admin, and shows them to the owner and to an admin', () => {
+    // canEdit is the server's owner-or-admin answer on this shared dashboard.
+    renderSharedBoard({ name: 'Owned by me', canEdit: true });
+    expect(screen.getByRole('button', { name: /Switch dashboard/i }).textContent).toContain(
+      'Owned by me',
+    );
+    expect(screen.getAllByRole('button', { name: /Add widget/i })).toHaveLength(2);
+    expect(screen.getByTestId('widget-config-modal')).toBeTruthy();
+
+    cleanup();
+    renderSharedBoard({ name: 'Shared, visible to an admin', canEdit: true });
+    expect(screen.getByRole('button', { name: /Switch dashboard/i }).textContent).toContain(
+      'Shared, visible to an admin',
+    );
+    expect(screen.getAllByRole('button', { name: /Add widget/i })).toHaveLength(2);
+    expect(screen.getByTestId('widget-config-modal')).toBeTruthy();
+
+    cleanup();
+    renderSharedBoard({ name: 'Shared team board', canEdit: false });
+    expect(screen.getByRole('button', { name: /Switch dashboard/i }).textContent).toContain(
+      'Shared team board',
+    );
+    expect(screen.queryAllByRole('button', { name: /Add widget/i })).toHaveLength(0);
+    expect(screen.queryByTestId('widget-config-modal')).toBeNull();
+    expect(screen.getByText('Empty dashboard')).toBeTruthy();
+    // The add prompt with no button tells a non-editor to do something they cannot.
+    expect(screen.queryByText(/Add your first widget/i)).toBeNull();
+    expect(screen.getByText(/no widgets yet/i)).toBeTruthy();
+  });
+
+  it('returns focus to the Add widget button after Escape', async () => {
+    modalMocks.useReal = true;
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    renderPage();
+
+    const trigger = screen.getByRole('button', { name: /Add widget/i });
+    fireEvent.click(trigger);
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('shows the rejected save reason inline in the modal and leaves the dialog open', async () => {
+    modalMocks.useReal = true;
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    const reportId = '11111111-1111-4111-8111-111111111111';
+    reportMocks.useAnalyticsReportsList.mockReturnValue({
+      data: [{ id: reportId, name: 'Open pipeline' }],
+    });
+    const mutateAsync = vi.fn().mockRejectedValue(
+      new Error('Only the owner or an admin can modify this dashboard'),
+    );
+    dashboardsMocks.useAddWidget.mockImplementation(() => ({ mutateAsync, isPending: false }));
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Add widget/i }));
+    fireEvent.change(await screen.findByLabelText(/Data source/i), { target: { value: reportId } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Save widget' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('Only the owner or an admin can modify this dashboard');
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save widget' })).toBeTruthy();
+    expect(mutateAsync).toHaveBeenCalled();
   });
 });
