@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { useAuth, useUser } from '@/lib/auth';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
@@ -27,15 +28,27 @@ export function QuickStartPage() {
     useOnboardingStore();
 
   // Steps backed by real workspace state reflect reality instead of a click, so
-  // the progress bar stops being theatre. The rest stay click-acknowledged —
-  // they kick off an action with no cheap "is it done" signal.
+  // the progress bar stops being theatre. Profile follows the name the profile
+  // card already shows. The rest stay click-acknowledged: they kick off an
+  // action with no cheap "is it done" signal.
   const summary = useOrgSummary();
   const users = useUsers();
+  const { isLoaded } = useAuth();
+  const { user } = useUser();
   const derived: Partial<Record<ChecklistItem, boolean>> = {
     first_lead: (summary.data?.leads ?? 0) > 0,
     first_deal: (summary.data?.opportunities ?? 0) > 0,
     invite_team: (users.data?.length ?? 0) > 1,
   };
+  // A loaded user is a settled profile read. A name finishes the step. A blank
+  // name reopens a stored click. While the session is still loading, or it has
+  // no user, the read has not settled, so a stored click stays.
+  if (isLoaded && user) {
+    // Same fallback the profile card uses: full name, then first name.
+    // A whitespace-only value is not a name teammates can read.
+    const shown = (user.fullName ?? user.firstName ?? '').trim();
+    derived.profile = shown.length > 0;
+  }
   const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
 
   const ITEMS: ChecklistItemDef[] = [
@@ -173,9 +186,12 @@ export function QuickStartPage() {
                 type="button"
                 onClick={() => {
                   item.action();
-                  // Only click-acknowledge non-derived steps; derived ones
-                  // (lead/deal/team) follow the real workspace, not the click.
-                  if (!(item.key in derived) && !done) markChecklistItem(item.key);
+                  // Profile is never finished by the click. The profile card is
+                  // read-only, so the click only opens Profile and Security.
+                  // Other non-derived steps stay click-acknowledged.
+                  if (item.key !== 'profile' && !(item.key in derived) && !done) {
+                    markChecklistItem(item.key);
+                  }
                 }}
                 className={cn(
                   'group flex w-full items-start gap-4 rounded-xl border p-4 text-left transition-all',
