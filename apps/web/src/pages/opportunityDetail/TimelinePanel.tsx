@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { useOpportunity } from '@/hooks/useOpportunities';
 import { useOpportunityTimeline } from '@/hooks/useOpportunityTimeline';
 import { formatDate, relativeTime } from '@/lib/format';
 
+import { dealTimelineEmptyKind } from './deal-timeline-empty';
 import { opportunityTimelineCaption, shownOpportunityTimeline } from './opportunity-timeline-caption';
 
 // Timeline kind → icon. Covers the three legacy sources (audit/task/comment)
@@ -44,8 +46,11 @@ function iconFor(kind: string): IconName {
 export function TimelinePanel({ oppId }: { oppId: string }) {
   const { t } = useTranslation('crm');
   const timeline = useOpportunityTimeline(oppId);
+  const deal = useOpportunity(oppId);
 
-  if (timeline.isLoading) return <LoadingSkeleton />;
+  // isPending covers a fetch that has not started. isLoading is false then,
+  // and the tab would paint an empty list before the rows arrive.
+  if (timeline.isPending) return <LoadingSkeleton />;
   if (timeline.isError)
     return (
       <ErrorState
@@ -62,7 +67,39 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
   const loaded = timeline.data?.items ?? [];
   const page = shownOpportunityTimeline(loaded, timeline.data?.timelineContinues);
   const items = page.items;
-  if (items.length === 0)
+  if (items.length === 0) {
+    // Wait for the deal record before choosing the sentence, so a closed
+    // deal does not flash "No activity yet" and then correct itself.
+    if (deal.isPending) return <LoadingSkeleton />;
+    const kind = dealTimelineEmptyKind(deal.data);
+    if (kind === 'won') {
+      return (
+        <EmptyState
+          title={t(
+            'opportunityDetail.timelineClosedWonEmptyTitle',
+            'This deal is already closed won',
+          )}
+          message={t(
+            'opportunityDetail.timelineClosedEmptyMessage',
+            'The activity list has no stage move or note.',
+          )}
+        />
+      );
+    }
+    if (kind === 'lost') {
+      return (
+        <EmptyState
+          title={t(
+            'opportunityDetail.timelineClosedLostEmptyTitle',
+            'This deal is already closed lost',
+          )}
+          message={t(
+            'opportunityDetail.timelineClosedEmptyMessage',
+            'The activity list has no stage move or note.',
+          )}
+        />
+      );
+    }
     return (
       <EmptyState
         title={t('opportunityTabs.activityEmptyTitle', 'No activity yet')}
@@ -72,6 +109,7 @@ export function TimelinePanel({ oppId }: { oppId: string }) {
         )}
       />
     );
+  }
 
   return (
     <Card>
