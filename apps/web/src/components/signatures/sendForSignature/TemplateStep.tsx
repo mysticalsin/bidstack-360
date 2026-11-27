@@ -5,7 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { useDocumentTemplates, useDocumentTemplate } from '@/hooks/useDocumentTemplates';
 import type { TemplateKind } from '@bidstack/shared';
 import { cn } from '@/lib/cn';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { FieldLabel, inputClass } from './signatureModalShared';
+import { documentTemplateCatalogPhase } from './document-template-catalog-read';
 
 interface Props {
   selectedId: string;
@@ -24,9 +26,12 @@ export function TemplateStep({
 }: Props) {
   const { t } = useTranslation('signatures');
   const [kindFilter, setKindFilter] = useState<TemplateKind | ''>('');
-  const { data: page, isLoading } = useDocumentTemplates(
+  const templates = useDocumentTemplates(
     kindFilter ? { kind: kindFilter as TemplateKind } : {},
   );
+  // A missing payload is not an empty catalog. Empty is only a settled read.
+  const phase = documentTemplateCatalogPhase(templates);
+  const page = templates.data;
   const { data: template } = useDocumentTemplate(selectedId);
 
   const kinds: Array<TemplateKind | ''> = ['', 'QUOTE', 'MSA', 'SOW', 'NDA', 'PROPOSAL', 'CUSTOM'];
@@ -60,26 +65,47 @@ export function TemplateStep({
 
       {/* Template list */}
       <div>
-        <FieldLabel htmlFor="template-select" required>
-          {t('templateStep.documentTemplateLabel', 'Document template')}
-        </FieldLabel>
-        {isLoading ? (
-          <div className="h-10 animate-pulse rounded-lg bg-[var(--surface-sunken)]" />
+        {phase === 'failed' ? (
+          <ErrorState
+            title={t('templateStep.loadErrorTitle', 'Could not load document templates')}
+            message={
+              (templates.error as Error | undefined)?.message ??
+              t('templateStep.tryAgain', 'Please try again.')
+            }
+          />
+        ) : phase === 'unread' ? (
+          <>
+            <p role="status" className="text-sm text-[var(--fg-secondary)]">
+              {t(
+                'templateStep.unread',
+                'Checking document templates. The list has not arrived.',
+              )}
+            </p>
+            <div
+              className="mt-2 h-10 animate-pulse rounded-lg bg-[var(--surface-sunken)]"
+              aria-hidden
+            />
+          </>
         ) : (
-          <select
-            id="template-select"
-            value={selectedId}
-            onChange={(e) => onSelectTemplate(e.target.value)}
-            className={inputClass}
-            required
-          >
-            <option value="">{t('templateStep.selectTemplatePlaceholder', 'Select a template…')}</option>
-            {page?.items.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.kind})
-              </option>
-            ))}
-          </select>
+          <>
+            <FieldLabel htmlFor="template-select" required>
+              {t('templateStep.documentTemplateLabel', 'Document template')}
+            </FieldLabel>
+            <select
+              id="template-select"
+              value={selectedId}
+              onChange={(e) => onSelectTemplate(e.target.value)}
+              className={inputClass}
+              required
+            >
+              <option value="">{t('templateStep.selectTemplatePlaceholder', 'Select a template…')}</option>
+              {page?.items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} ({item.kind})
+                </option>
+              ))}
+            </select>
+          </>
         )}
       </div>
 
