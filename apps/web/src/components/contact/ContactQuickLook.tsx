@@ -1,6 +1,7 @@
 // macOS Finder-style Quick Look. Pressing Space on a focused contact row
 // in the Contacts table opens this overlay — a peek at the full record
 // without committing to the edit dialog. Esc or Space again closes it.
+// The name opens the record. A full address mails. A spaced demo phone dials.
 //
 // Distinct from ContactDialog (which mutates) — Quick Look is read-only,
 // fast to open/close, and keyboard-driven.
@@ -8,11 +9,24 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { useFocusRestore } from '@/hooks/useFocusRestore';
 import { springModal } from '@/lib/motion';
 import type { Contact, Sentiment } from '@bidstack/shared';
+
+import {
+  contactPeekDialHref,
+  contactPeekMailHref,
+  contactPeekRecordPath,
+} from './contact-peek-href';
+
+// Dark mode keeps fill green (--brand-primary) off text and uses the
+// foreground accent (--brand-deep). The name, the email, and the phone are
+// how the peek reaches the person, so the hit area is 44px.
+const REACH =
+  'inline-flex min-h-[44px] items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]';
 
 const SENTIMENT_TONE: Record<Sentiment, BadgeTone> = {
   hot: 'tomato',
@@ -35,6 +49,9 @@ export function ContactQuickLook({ contact, onClose }: Props) {
   // hook captures pre-open focus and puts it back on close so j/k
   // navigation stays alive.
   useFocusRestore(open);
+  const recordPath = contact ? contactPeekRecordPath(contact.id) : null;
+  const mail = contact ? contactPeekMailHref(contact.email) : null;
+  const dial = contact ? contactPeekDialHref(contact.phone) : null;
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <AnimatePresence>
@@ -62,9 +79,15 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                 </Dialog.Title>
                 <div className="space-y-3 p-5">
                   <div>
-                    <div className="text-lg font-semibold text-[var(--fg-primary)]">
-                      {contact.name}
-                    </div>
+                    {recordPath ? (
+                      <Link to={recordPath} className={`text-lg font-semibold ${REACH}`}>
+                        {contact.name}
+                      </Link>
+                    ) : (
+                      <div className="text-lg font-semibold text-[var(--fg-primary)]">
+                        {contact.name}
+                      </div>
+                    )}
                     {contact.role ? (
                       <div className="text-sm text-[var(--fg-secondary)]">{contact.role}</div>
                     ) : null}
@@ -80,12 +103,13 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                           {t('contactQuickLook.fieldEmail', 'Email')}
                         </dt>
                         <dd>
-                          <a
-                            href={`mailto:${contact.email}`}
-                            className="text-[var(--brand-primary)] hover:underline"
-                          >
-                            {contact.email}
-                          </a>
+                          {mail ? (
+                            <a href={mail} className={REACH}>
+                              {contact.email}
+                            </a>
+                          ) : (
+                            contact.email
+                          )}
                         </dd>
                       </>
                     ) : null}
@@ -94,7 +118,15 @@ export function ContactQuickLook({ contact, onClose }: Props) {
                         <dt className="text-[var(--fg-tertiary)]">
                           {t('contactQuickLook.fieldPhone', 'Phone')}
                         </dt>
-                        <dd className="text-[var(--fg-primary)]">{contact.phone}</dd>
+                        <dd className="text-[var(--fg-primary)]">
+                          {dial ? (
+                            <a href={dial} className={REACH}>
+                              {contact.phone}
+                            </a>
+                          ) : (
+                            contact.phone
+                          )}
+                        </dd>
                       </>
                     ) : null}
                     {contact.influence !== null ? (
