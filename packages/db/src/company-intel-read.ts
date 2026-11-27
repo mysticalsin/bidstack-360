@@ -27,7 +27,7 @@ type Db = Pick<PrismaClient, 'company' | 'accountFinancialPeriod' | 'companyJobP
 const DAY = 86_400_000;
 const SOURCE_PRIORITY: Record<string, number> = { sec_edgar: 0, esef: 1, brreg: 2, fr_rne: 3, fixture: 9 };
 const POST_LABEL: Record<string, string> = { newsroom: 'Company newsroom', sitemap: 'Company news sitemap', ir_feed: 'Investor relations feed', fixture: 'Sample data' };
-const NEWS_LABEL: Record<string, string> = { gdelt: 'GDELT news', google_news: 'Google News', company_rss: 'Company press feed', ir_feed: 'IR feed', sec_edgar: 'SEC EDGAR', companies_house: 'Companies House', fixture: 'Sample data' };
+const NEWS_LABEL: Record<string, string> = { gdelt: 'GDELT news', google_news: 'Google News', company_rss: 'Company press feed', ir_feed: 'IR feed', sec_edgar: 'SEC EDGAR', companies_house: 'Companies House', fixture: 'Sample data', sample: 'Sample data' };
 const LEDGER_LABEL: Record<string, string> = {
   ...FINANCIAL_SOURCE_LABEL,
   gleif: 'GLEIF',
@@ -153,7 +153,7 @@ export async function loadCompanyIntel(db: Db, orgId: string, companyId: string,
     publishedAt: e.occurredAt.toISOString(),
     source: e.source,
     sourceLabel: NEWS_LABEL[e.source] ?? e.source,
-    sample: e.source === 'fixture',
+    sample: e.source === 'fixture' || e.source === 'sample',
     evidenceId: `news:${e.id}`,
     excerpt: e.summary,
     fetchedAt: e.detectedAt,
