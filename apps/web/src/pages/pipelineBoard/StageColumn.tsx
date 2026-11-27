@@ -22,8 +22,11 @@ interface StageColumnProps {
   stageColor: string | null;
   items: Opportunity[];
   total: number;
-  /** % of opps that have advanced past this stage (excludes closed_lost). */
-  conversion: number | null;
+  /**
+   * Win probability of the bids in this column. Null when the column is
+   * empty or the page is not the whole book.
+   */
+  winProbability: number | null;
   isHoverTarget: boolean;
   draggingId: string | null;
   focusedId: string | null;
@@ -49,7 +52,7 @@ export const StageColumn = memo(function StageColumn({
   stageColor: _stageColor,
   items,
   total,
-  conversion,
+  winProbability,
   isHoverTarget,
   draggingId,
   focusedId,
@@ -83,14 +86,13 @@ export const StageColumn = memo(function StageColumn({
       <div className="flex items-center justify-between mb-2 px-1">
         <div className="flex items-center gap-1.5">
           <Badge tone={stageTone(stageName)}>{stageName}</Badge>
-          {conversion !== null ? (
+          {winProbability !== null ? (
             <span
-              title={`${conversion}% of opps in this stage or later have advanced past it`}
-              aria-label={`Conversion rate: ${conversion}%`}
+              title={`Win probability of the bids in this column: ${winProbability}%`}
+              aria-label={`${winProbability}% probability`}
               className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1.5 py-0.5 text-xs font-semibold tabular-nums text-[var(--fg-secondary)]"
             >
-              <span aria-hidden>→</span>
-              {conversion}%
+              {winProbability}% probability
             </span>
           ) : null}
         </div>

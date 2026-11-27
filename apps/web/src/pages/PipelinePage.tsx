@@ -34,6 +34,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import { columnWinProbability } from './pipelineBoard/column-probability';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -356,24 +357,16 @@ export function PipelinePage() {
           }
         >
           {visibleStages.map((stage) => {
-            const stageIdx = stages.findIndex((s) => s.id === stage.id);
             const items = byStage.get(stage.id) ?? [];
             const total = items.reduce((acc, o) => acc + o.value, 0);
             const isHover = hoverStageId === stage.id;
-            // Funnel ratio: how many opps advanced past this stage into any
-            // later one. We exclude closed_lost from the "advanced" pool so
-            // it isn't counted as forward progress — losses are terminal.
-            // The closed_* stages themselves get no chip (no "next" stage).
-            const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
-            const advanced = nextStages.reduce(
-              (acc, s) => acc + (byStage.get(s.id)?.length ?? 0),
-              0,
+            // The percent beside the column is the win probability of the
+            // bids in it. A funnel ratio printed 50 on Negotiation while
+            // IKEA is 75, and 75 on Proposal Sent while Sanofi is 40.
+            const winProbability = columnWinProbability(
+              items.map((item) => ({ value: item.value, probability: item.probability })),
+              pageContinues,
             );
-            const totalReached = items.length + advanced;
-            const conversion =
-              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
-                ? null
-                : Math.round((advanced / totalReached) * 100);
             return (
               <StageColumn
                 key={stage.id}
@@ -382,7 +375,7 @@ export function PipelinePage() {
                 stageColor={stage.color}
                 items={items}
                 total={total}
-                conversion={conversion}
+                winProbability={winProbability}
                 pageContinues={pageContinues}
                 latest={latest}
                 isHoverTarget={isHover}
