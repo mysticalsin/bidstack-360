@@ -40,6 +40,7 @@ vi.mock('@bidstack/db', () => ({
     $transaction: vi.fn(),
   },
   seedOrgData: vi.fn(),
+  seedTechStacks: vi.fn(),
   // Only the shape `provisionDemoSession` narrows on (P2002 race handling).
   Prisma: {
     PrismaClientKnownRequestError: class extends Error {
