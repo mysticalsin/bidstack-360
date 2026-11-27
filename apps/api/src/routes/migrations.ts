@@ -502,6 +502,16 @@ export const migrationRoutes: FastifyPluginAsyncZod = async (server) => {
             { migrationJobId: job.id, orgId, from: current?.status ?? null, to: 'RUNNING' },
             'illegal migration transition',
           );
+          // The rows were stored before this claim, and a lost claim does not
+          // enqueue. The key is this job id. RUNNING means the claim that won
+          // still reads it, so this loser must leave that key alone.
+          if (current?.status !== 'RUNNING') {
+            try {
+              await server.redis.del(redisKey);
+            } catch (err) {
+              req.log.warn({ err, migrationJobId: job.id }, 'import row delete failed');
+            }
+          }
           throw server.httpErrors.conflict('Migration job is no longer pending');
         }
 
