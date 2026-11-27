@@ -96,6 +96,9 @@ export async function searchLocalCompanies(
 ): Promise<CompanySuggestion[]> {
   const q = query.q?.trim();
   const domain = normalizeDomain(query.domain);
+  // Opportunity customers have no domain column. A domain-only lookup that
+  // reads them lists the demo book, including customers that are not the domain.
+  const domainOnly = Boolean(domain) && !q;
   const where: Prisma.CompanyEnrichmentWhereInput = { orgId };
   const clauses: Prisma.CompanyEnrichmentWhereInput[] = [];
   if (q) {
@@ -114,21 +117,23 @@ export async function searchLocalCompanies(
       orderBy: { updatedAt: 'desc' },
       take: query.limit,
     }),
-    prisma.opportunity.findMany({
-      where: {
-        orgId,
-        ...(q
-          ? {
-              OR: [
-                { customer: { contains: q, mode: 'insensitive' } },
-                { name: { contains: q, mode: 'insensitive' } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: query.limit * 2,
-    }),
+    domainOnly
+      ? Promise.resolve([])
+      : prisma.opportunity.findMany({
+          where: {
+            orgId,
+            ...(q
+              ? {
+                  OR: [
+                    { customer: { contains: q, mode: 'insensitive' } },
+                    { name: { contains: q, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: query.limit * 2,
+        }),
   ]);
 
   const dataItems = dataRows.map((row) => ({
