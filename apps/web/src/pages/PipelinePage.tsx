@@ -194,10 +194,15 @@ export function PipelinePage() {
             {t('pipeline.heading', 'Pipeline')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t(
-              'pipeline.subtitle',
-              'Drag a card between columns, or focus a card and use ← / → to move stages.',
-            )}
+            {canWrite
+              ? t(
+                  'pipeline.subtitle',
+                  'Drag a card between columns, or focus a card and use ← / → to move stages.',
+                )
+              : t(
+                  'pipeline.subtitleReadOnly',
+                  'Open a card to review the bid. Moving a stage needs permission to edit opportunities.',
+                )}
           </p>
         </div>
         <div className="flex items-center gap-2">

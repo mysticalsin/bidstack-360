@@ -1210,6 +1210,7 @@
   "pipeline": {
     "heading": "Pipeline aberto",
     "subtitle": "Arraste um cartão entre colunas, ou selecione um e use ← / → para mudar de etapa.",
+    "subtitleReadOnly": "Abra um cartão para rever a proposta. Mover uma etapa requer permissão para editar oportunidades.",
     "stageFilterLabel": "Etapa",
     "stageFilterAriaLabel": "Filtrar o pipeline por etapa",
     "stageFilterAllOption": "Todas",

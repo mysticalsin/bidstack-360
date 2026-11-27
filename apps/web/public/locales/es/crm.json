@@ -101,6 +101,7 @@
     "totalValue": "Valor total",
     "heading": "Cartera abierta",
     "subtitle": "Arrastra una tarjeta entre columnas o selecciona una y usa ← / → para cambiar de etapa.",
+    "subtitleReadOnly": "Abre una tarjeta para revisar la oferta. Mover una etapa requiere permiso para editar oportunidades.",
     "stageFilterLabel": "Etapa",
     "stageFilterAriaLabel": "Filtrar el embudo por etapa",
     "stageFilterAllOption": "Todas",
