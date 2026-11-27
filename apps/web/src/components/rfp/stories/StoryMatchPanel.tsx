@@ -5,11 +5,15 @@ import { LoadingSkeleton, EmptyState } from '@/components/ui/StateMessages';
 import { useRfpStoryMatches } from '@/hooks/rfp/useRfpStoryMatches';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { StoryCard } from './StoryCard';
+import { storyMatchPhase } from './story-match-read';
 
 export function StoryMatchPanel() {
   const { t } = useTranslation('rfp');
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
-  const { data, isLoading, isError, error } = useRfpStoryMatches(bidWorkspaceId);
+  const storyQuery = useRfpStoryMatches(bidWorkspaceId);
+  const { data, error } = storyQuery;
+  // A missing payload is not an empty catalog. Empty is only a settled read.
+  const phase = storyMatchPhase(storyQuery);
 
   return (
     <Card>
@@ -24,25 +28,28 @@ export function StoryMatchPanel() {
         </div>
       </div>
 
-      {isLoading && (
+      {phase === 'unread' ? (
         <div className="p-4">
+          <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+            {t('stories.unread', 'Checking matched stories. The list has not arrived.')}
+          </p>
           <LoadingSkeleton rows={3} />
         </div>
-      )}
+      ) : null}
 
-      {isError && (
+      {phase === 'failed' ? (
         <div className="p-4">
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {error instanceof Error ? error.message : t('states.error')}
           </p>
         </div>
-      )}
+      ) : null}
 
-      {!isLoading && !isError && (!data || data.items.length === 0) && (
+      {phase === 'ready' && data && data.items.length === 0 ? (
         <div className="p-6">
           <EmptyState title={t('stories.emptyTitle')} message={t('stories.emptyMessage')} />
         </div>
-      )}
+      ) : null}
 
       {data && data.items.length > 0 && (
         <ul
