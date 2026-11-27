@@ -18,6 +18,8 @@ import { useTopAccounts, useUpdateTopAccountList } from '@/hooks/useTopAccounts'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { TOP_ACCOUNTS_MAX } from '@bidstack/shared';
 
+import { topAccountsWorkspaceCaption } from './top-accounts-workspace-caption';
+
 interface PickedCompany {
   id: string;
   name: string;
@@ -106,9 +108,8 @@ export function TopAccountsSection() {
           </div>
           <p className="mt-1 text-xs text-[var(--fg-secondary)]">
             {t(
-              'topAccounts.subtitle',
-              'Hand-pick and order up to {{count}} accounts for the Mantu global Top 10. This is separate from Key Accounts (regional strategic accounts flagged per company). Saving an empty list reverts the Top Accounts page to the automatic pipeline-value ranking.',
-              { count: TOP_ACCOUNTS_MAX },
+              'topAccounts.subtitleWorkspace',
+              topAccountsWorkspaceCaption(TOP_ACCOUNTS_MAX),
             )}
           </p>
         </div>
