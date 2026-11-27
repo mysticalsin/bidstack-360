@@ -99,4 +99,68 @@ describe('pipeline stage normalization', () => {
     expect(getOpportunityStageBusinessKey(legacyS2)).toBe('s2_sent');
     expect(getOpportunityStageBusinessKey(canonicalS2)).toBe('s2_sent');
   });
+
+  it('files an enum-only demo bid in the short-named column and does not open a second one', () => {
+    // WHY: the demo book names the column Technical Iteration and keeps the
+    // key s3_technical_iteration. Siemens is seeded with that enum and no
+    // pipeline stage row. Matching the display name files the bid into a
+    // duplicate S3 Technical Iteration column and leaves Technical Iteration
+    // empty. A bid that already points at the column id must stay on that
+    // one column too.
+    const technical: PipelineStage & { key: string } = {
+      id: '44444444-4444-4444-8444-444444444444',
+      key: 's3_technical_iteration',
+      name: 'Technical Iteration',
+      probability: 65,
+      color: '#06b6d4',
+      isWon: false,
+      isLost: false,
+    };
+    const negotiation: PipelineStage & { key: string } = {
+      id: '55555555-5555-4555-8555-555555555555',
+      key: 's4_negotiation',
+      name: 'Negotiation',
+      probability: 80,
+      color: '#f59e0b',
+      isWon: false,
+      isLost: false,
+    };
+    const siemens: Opportunity = {
+      ...baseOpportunity,
+      id: '88888888-8888-4888-8888-888888888888',
+      code: 'OP-0001',
+      customer: 'Siemens',
+      name: 'Global ERP Modernization',
+      stage: 's3_technical_iteration',
+      pipelineStageId: null,
+      pipelineStage: null,
+      value: 1_200_000,
+    };
+    const ikeaStage: PipelineStage = {
+      id: negotiation.id,
+      name: negotiation.name,
+      probability: negotiation.probability,
+      color: negotiation.color,
+      isWon: false,
+      isLost: false,
+    };
+    const ikea: Opportunity = {
+      ...baseOpportunity,
+      id: '99999999-9999-4999-8999-999999999999',
+      code: 'OP-0002',
+      customer: 'IKEA',
+      name: 'Cloud Migration & FinOps',
+      stage: 'Negotiation',
+      pipelineStageId: negotiation.id,
+      pipelineStage: ikeaStage,
+      value: 850_000,
+    };
+
+    const stages = getPipelineStages([siemens, ikea], [technical, negotiation]);
+
+    expect(getPipelineStageBusinessKey(technical)).toBe('s3_technical_iteration');
+    expect(getOpportunityStageBusinessKey(siemens)).toBe('s3_technical_iteration');
+    expect(stages.map((stage) => stage.name)).toEqual(['Technical Iteration', 'Negotiation']);
+    expect(stages.map((stage) => stage.id)).toEqual([technical.id, negotiation.id]);
+  });
 });
