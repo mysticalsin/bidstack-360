@@ -23,20 +23,26 @@ export function TechCoverageLine({ coverage }: { coverage: TechnicalStackCoverag
     .map((l) => `${OPEN_TECH_LANE_LABELS[l.lane]}: ${l.detail}`)
     .join('\n');
   const checked = formatCheckedDate(coverage.checkedAt);
+  const apollo = coverage.apolloFallback === 'queued' ? ' Apollo asked to fill gaps.' : '';
+  // Demo seed backdates a fixture and marks unused lanes empty. Those are not
+  // a detector run, so the line does not quote a check date or an empty lane.
+  const sentence = coverage.sample
+    ? `Sample data, not a live check.${apollo}`
+    : [
+        parts.found ? `Coverage: ${parts.found}.` : 'Coverage: no open data found yet.',
+        parts.nothing ? ` Nothing found in ${parts.nothing}.` : '',
+        parts.notChecked ? ` Not checked: ${parts.notChecked}.` : '',
+        parts.failed ? ` Could not reach: ${parts.failed}.` : '',
+        apollo,
+      ].join('');
   return (
     <p
       data-testid="tech-coverage-line"
       className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-[var(--fg-secondary)]"
       title={details || undefined}
     >
-      <span>
-        {parts.found ? `Coverage: ${parts.found}.` : 'Coverage: no open data found yet.'}
-        {parts.nothing ? ` Nothing found in ${parts.nothing}.` : ''}
-        {parts.notChecked ? ` Not checked: ${parts.notChecked}.` : ''}
-        {parts.failed ? ` Could not reach: ${parts.failed}.` : ''}
-        {coverage.apolloFallback === 'queued' ? ' Apollo asked to fill gaps.' : ''}
-      </span>
-      {checked ? <span className="text-[var(--fg-tertiary)]">Checked {checked}</span> : null}
+      <span>{sentence}</span>
+      {checked && !coverage.sample ? <span className="text-[var(--fg-tertiary)]">Checked {checked}</span> : null}
       {coverage.sample ? (
         <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2 text-xs font-semibold text-[var(--fg-tertiary)]">
           Sample
@@ -91,7 +97,7 @@ export function TechEvidenceChip({ item }: { item: TechnicalStackItemType }) {
           </p>
           {item.evidence?.record ? <p className="mt-2 break-words text-[var(--fg-primary)]">{item.evidence.record}</p> : null}
           {!item.evidence ? <p className="mt-2 text-[var(--fg-tertiary)]">No stored evidence for this source.</p> : null}
-          {seen ? <p className="mt-1 text-[var(--fg-tertiary)]">Seen {seen}</p> : null}
+          {seen && !item.sample ? <p className="mt-1 text-[var(--fg-tertiary)]">Seen {seen}</p> : null}
           {item.evidence?.url ? (
             <a
               href={item.evidence.url}
