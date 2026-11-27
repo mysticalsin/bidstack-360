@@ -16,6 +16,7 @@ import {
   useTestTeamsWebhook,
   useUpdateNotificationChannels,
 } from '@/hooks/useNotificationChannels';
+import { notificationDeliveryPhase } from './notification-delivery-read';
 
 const GROUPS: { key: NotificationKindGroup; label: string; desc: string }[] = [
   {
@@ -113,6 +114,30 @@ export function NotificationDeliverySection() {
   const update = useUpdateNotificationChannels();
 
   if (channels.isLoading) return <LoadingSkeleton rows={3} />;
+
+  const phase = notificationDeliveryPhase({
+    data: channels.data,
+    isError: channels.isError,
+    status: channels.status,
+  });
+  if (phase === 'unread') {
+    return (
+      <p role="status">
+        {t(
+          'notificationPrefs.delivery.checking',
+          'Checking delivery settings. The channels have not arrived.',
+        )}
+      </p>
+    );
+  }
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        {t('notificationPrefs.delivery.error', 'Could not load delivery settings.')}
+      </p>
+    );
+  }
+
   if (!channels.data) return null;
   const settings = channels.data;
 
