@@ -236,33 +236,48 @@ function RoutingRuleDialogForm({
             {t('routingRule.roundRobinTeamLabel', 'Round-robin team members')}
           </label>
           <div className="max-h-40 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-sunken)] p-2 space-y-1">
-            {users.data?.map((u) => {
-              const isChecked = selectedUserIds.includes(u.id);
-              return (
-                <label
-                  key={u.id}
-                  className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--surface-hover)] rounded-md cursor-pointer text-sm text-[var(--fg-secondary)] transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedUserIds([...selectedUserIds, u.id]);
-                      } else {
-                        setSelectedUserIds(selectedUserIds.filter((id) => id !== u.id));
-                      }
-                    }}
-                    className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
-                  />
-                  <span className="truncate">{u.name ?? u.email}</span>
-                </label>
-              );
-            })}
-            {(!users.data || users.data.length === 0) && (
+            {users.isPending ? (
               <div className="text-xs text-[var(--fg-tertiary)] italic p-2">
-                {t('routingRule.noUsersAvailable', 'No users available')}
+                {t('routingRule.usersChecking', 'Checking users.')}
               </div>
+            ) : users.isError ? (
+              <div className="text-xs text-[var(--fg-tertiary)] italic p-2" role="alert">
+                {t(
+                  'routingRule.usersFailed',
+                  'Could not load users. The saved users have not arrived.',
+                )}
+              </div>
+            ) : (
+              <>
+                {users.data?.map((u) => {
+                  const isChecked = selectedUserIds.includes(u.id);
+                  return (
+                    <label
+                      key={u.id}
+                      className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--surface-hover)] rounded-md cursor-pointer text-sm text-[var(--fg-secondary)] transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedUserIds([...selectedUserIds, u.id]);
+                          } else {
+                            setSelectedUserIds(selectedUserIds.filter((id) => id !== u.id));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
+                      />
+                      <span className="truncate">{u.name ?? u.email}</span>
+                    </label>
+                  );
+                })}
+                {(!users.data || users.data.length === 0) && (
+                  <div className="text-xs text-[var(--fg-tertiary)] italic p-2">
+                    {t('routingRule.noUsersAvailable', 'No users available')}
+                  </div>
+                )}
+              </>
             )}
           </div>
           <p className="text-xs text-[var(--fg-tertiary)]">
