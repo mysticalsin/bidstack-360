@@ -46,6 +46,11 @@ const ALL: Category[] = ['company', 'market', 'procurement', 'logo', 'people', '
 export function ConnectorsSection() {
   const { t } = useTranslation('integrations');
   const { data, isLoading, isError, error, refetch } = useConnectorCatalog();
+  const userIntegrations = useUserIntegrationsStatus();
+  const slackLinked =
+    userIntegrations.data?.integrations.some(
+      (row) => row.provider === 'slack' && row.status === 'CONNECTED',
+    ) ?? false;
   const [filter, setFilter] = useState<Category | 'all'>('all');
   // Gmail and Microsoft 365 live on WorkspaceAccountsCard, one card per provider.
   const items = useMemo(
@@ -81,9 +86,18 @@ export function ConnectorsSection() {
       down: 0,
       disabled: 0,
     };
-    for (const connector of items) acc[connector.status]++;
+    for (const connector of items) {
+      // A server credential makes the Slack catalog row "healthy" before any
+      // workspace is linked. That is not a live connection, so it stays out
+      // of the healthy total until this org is actually connected.
+      const status =
+        connector.id === 'slack' && connector.status === 'healthy' && !slackLinked
+          ? 'disabled'
+          : connector.status;
+      acc[status]++;
+    }
     return acc;
-  }, [items]);
+  }, [items, slackLinked]);
   const credentialCount = items.filter((connector) => connector.requiresCredential).length;
 
   return (
@@ -223,15 +237,25 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
     'You need integrations write access to disconnect the shared Slack workspace.',
   );
 
-  // Connect mutation
+  const slackAppReady = connector.id !== 'slack' || connector.status !== 'disabled';
+  const slackNotSetUpHint = t(
+    'connectors.row.slackNotSetUpHint',
+    'An admin must add the Slack app first.',
+  );
+  const slackConnectWriteHint = t(
+    'connectors.row.slackConnectWriteHint',
+    'You need integrations write access to connect the shared Slack workspace.',
+  );
+
+  // Connect mutation. A missing Slack app or a reader must not leave the page,
+  // and a start response with no consent URL is a failure, not a success.
   const connectMutation = useMutation({
     mutationFn: async () => {
-      if (connector.id !== 'slack') return;
-      const startUrl = '/api/integrations/slack/oauth/start';
-      const res = await api<{ authUrl: string }>(startUrl);
-      if (res.authUrl) {
-        window.location.href = res.authUrl;
-      }
+      if (connector.id !== 'slack' || !slackAppReady || !canDisconnectSlack) return;
+      const res = await api<{ authUrl?: string }>('/api/integrations/slack/oauth/start');
+      const authUrl = typeof res?.authUrl === 'string' ? res.authUrl.trim() : '';
+      if (!authUrl) throw new Error('Slack connect returned no consent URL');
+      window.location.assign(authUrl);
     },
   });
 
@@ -254,6 +278,13 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
     : null;
 
   const isConnected = match ? match.status === 'CONNECTED' : false;
+  const slackConnectHint = !isUserIntegration || isConnected
+    ? undefined
+    : !slackAppReady
+      ? slackNotSetUpHint
+      : !canDisconnectSlack
+        ? slackConnectWriteHint
+        : undefined;
   const status = match
     ? match.status === 'CONNECTED'
       ? 'healthy'
@@ -287,8 +318,27 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
             {connector.kind.replace('_', ' ')}
           </Badge>
         </div>
-        {connector.message ? (
+        {isUserIntegration && !isConnected ? (
+          <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
+            {match?.status === 'ERROR' && match.errorMessage
+              ? match.errorMessage
+              : !slackAppReady
+                ? slackNotSetUpHint
+                : t(
+                    'connectors.row.slackNotLinked',
+                    'This workspace is not connected. Connect to send alerts.',
+                  )}
+          </p>
+        ) : connector.message ? (
           <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">{connector.message}</p>
+        ) : null}
+        {connectMutation.isError ? (
+          <p className="mt-1 text-xs text-[var(--danger)]" role="alert">
+            {t(
+              'connectors.row.slackConnectFailed',
+              'Could not start the Slack connection. Try again.',
+            )}
+          </p>
         ) : null}
         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[var(--fg-tertiary)]">
           <span>
@@ -343,7 +393,13 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
                 tone="primary"
                 size="sm"
                 onClick={() => connectMutation.mutate()}
-                disabled={connectMutation.isPending}
+                disabled={connectMutation.isPending || Boolean(slackConnectHint)}
+                title={slackConnectHint}
+                aria-label={
+                  slackConnectHint
+                    ? `${t('connectors.row.connect', 'Connect')}. ${slackConnectHint}`
+                    : undefined
+                }
               >
                 {connectMutation.isPending
                   ? t('connectors.row.connecting', 'Connecting...')
@@ -356,7 +412,15 @@ function ConnectorRow({ connector }: { connector: CrmConnector }) {
         ) : (
           <Badge tone="blue">{t('connectors.row.open', 'open')}</Badge>
         )}
-        <StatusBadge status={status} />
+        {isUserIntegration && !isConnected && match?.status !== 'ERROR' ? (
+          <Badge tone={slackAppReady ? 'gray' : 'amber'}>
+            {slackAppReady
+              ? t('connectors.row.notConnected', 'Not connected')
+              : t('connectors.row.notSetUp', 'Not set up')}
+          </Badge>
+        ) : (
+          <StatusBadge status={status} />
+        )}
       </div>
     </li>
   );
