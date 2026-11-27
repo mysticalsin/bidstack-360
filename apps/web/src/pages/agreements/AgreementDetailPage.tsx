@@ -7,7 +7,6 @@ import '@/components/agreements/agreements.css';
 import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
-import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
@@ -22,6 +21,8 @@ import { useMsaDetail, useMsaDownloadUrl, useMsaTimeline } from '@/hooks/useMsa'
 import { ApiError } from '@/lib/api';
 import { actionLabel, fmtBytes, fmtDate, fmtDays, fmtMoneyMicros, KIND_LABEL, urgency } from '@/lib/msa/labels';
 import type { MsaDetail, MsaFileVersion } from '@/lib/msa/types';
+
+import { AgreementLeverageSlot } from './AgreementLeverageSlot';
 
 function usePdfBlob(url: string | undefined, enabled: boolean) {
   // The download response is `attachment` with a sandbox CSP, so an iframe on
@@ -171,7 +172,7 @@ export default function AgreementDetailPage() {
         <Button variant="secondary" onClick={() => setUploadOpen(true)} data-testid="agreement-upload-version"><Icon name="upload" size={16} /> Upload new version</Button>
       </header>
       {sample ? <SampleBanner what="details" /> : null}
-      {!sample && leverage.data?.flag ? <LeverageFlag flag={leverage.data.flag} /> : null}
+      <AgreementLeverageSlot sample={sample} agreementId={a.id} query={leverage} />
 
       <section className="agr-section" aria-labelledby="agr-terms">
         <h2 id="agr-terms">Key terms</h2>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { evaluateLeverage } from './leverage.js';
+import { evaluateLeverage, leverageFlagForAgreement } from './leverage.js';
 
 const hemaMsa = {
   msaId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -38,6 +38,15 @@ describe('evaluateLeverage', () => {
     expect(flag!.scopeNeedsAmendment).toBe(true);
     expect(flag!.scopeAllowsOtherServices).toBe(false);
     expect(flag!.scopeCitation?.clause).toBe('Clause 3');
+  });
+
+  it('does not pin a sibling HEMA flag on a different agreement', () => {
+    // WHY: Demo Northwind has the HEMA MSA. A SOW or another agreement on that
+    // account is not that MSA. Showing the HEMA headline there tells the rep
+    // this file is the way into IT.
+    const hema = { msaId: 'hema-msa' };
+    expect(leverageFlagForAgreement('sow-under-hema', [hema])).toBeNull();
+    expect(leverageFlagForAgreement('hema-msa', [hema, { msaId: 'other' }])?.msaId).toBe('hema-msa');
   });
 
   it('does not flag when the account already has IT business', () => {
