@@ -196,7 +196,12 @@ export async function pullMicrosoftIncremental(
       '@odata.nextLink'?: string;
       '@odata.deltaLink'?: string;
     };
-    const items = body.value ?? [];
+    // A missing list is not an empty calendar. Saving the delta link here
+    // would skip the window on every later pull.
+    if (!body || !Array.isArray(body.value)) {
+      throw new Error('The calendar event list has not arrived.');
+    }
+    const items = body.value;
     count += items.length;
     const { failed, settled, captureHeld } = await upsertMicrosoftEvents(items, orgId, userId, ownerEmail, log);
     const bridge = noteActivityBridgeFailures(deltaState, url, failed, new Date().toISOString(), settled, true, undefined, 'calendar');
