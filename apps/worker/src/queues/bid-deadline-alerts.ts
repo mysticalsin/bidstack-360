@@ -38,8 +38,14 @@ import type pino from 'pino';
 import { prisma, OpportunityStage, Prisma } from '@bidstack/db';
 
 import {
+  fixtureBidsMissingFromAlertWindow,
+  fixtureBidsOutsideAlertWindow,
+  projectFixtureBidAlertDue,
+} from './bid-deadline-alerts.fixture-due.js';
+import {
   DEADLINE_THRESHOLD_DAYS,
   OVERDUE_DEDUPE_THRESHOLD,
+  OVERDUE_LOOKBACK_DAYS,
   daysUntilDue,
   deadlineDedupeUrl,
   dueInLabel,
@@ -61,18 +67,6 @@ const SCAN_INTERVAL_MINUTES = 60;
  * is paged consistently scan-to-scan.
  */
 const SCAN_BATCH_SIZE = 1000;
-
-/**
- * How far past its due date the scan still looks for a NOT-YET-ALERTED overdue
- * opportunity. Bounded (not unbounded) so a large tenant's old, still-open,
- * long-overdue backlog can't grow the scan query without limit; 30 days covers
- * the realistic window in which a missed-deadline nudge is still actionable —
- * an opp overdue longer than that has almost certainly already been
- * renegotiated, closed, or otherwise handled outside this alert. Once alerted,
- * the existence check makes re-scanning a within-window overdue row cheap
- * regardless (indexed by notifications_deadline_dedupe_uq).
- */
-const OVERDUE_LOOKBACK_DAYS = 30;
 
 /** BullMQ job options — local mirror of the shared QueueConfig shape. */
 const JOB_OPTIONS = {
@@ -184,8 +178,13 @@ async function alertOverdueIfNew(opp: ScannedOpp, daysUntil: number): Promise<bo
   }
 }
 
-async function scanDeadlines(log: pino.Logger): Promise<void> {
-  const now = new Date();
+export async function scanBidDeadlineAlerts(
+  now: Date,
+  log: pino.Logger,
+  // Omitted mode matches getPoloDataMode: only exact `real` stays on the stored
+  // date. An explicit other spelling is passed through and does not slide.
+  mode: string | undefined = process.env.POLO_DATA_MODE === 'real' ? 'real' : 'demo',
+): Promise<number> {
   const maxThreshold = Math.max(...DEADLINE_THRESHOLD_DAYS);
   // dueDate is a Postgres `date`, so bound on the UTC day to match
   // daysUntilDue's basis. windowStart reaches OVERDUE_LOOKBACK_DAYS into the
@@ -196,12 +195,29 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
   const windowStart = new Date(todayUTC.getTime() - OVERDUE_LOOKBACK_DAYS * 86_400_000);
   const windowEnd = new Date(todayUTC.getTime() + maxThreshold * 86_400_000);
 
+  // Aged fixture rows sit before windowStart, so the date predicate never
+  // returns them. Pull in the ones whose demo due date is inside this window,
+  // and leave out the ones the slide carries past it so they do not fill the
+  // batch. A live bid, and a fixture row whose date was edited, stays on dueDate.
+  const missingFixture = fixtureBidsMissingFromAlertWindow(now, mode, windowStart, windowEnd);
+  const outsideFixture = fixtureBidsOutsideAlertWindow(now, mode, windowStart, windowEnd);
+  const dateWindow = { dueDate: { gte: windowStart, lte: windowEnd } };
   const opps = await prisma.opportunity.findMany({
     where: {
       deletedAt: null,
       stage: { notIn: CLOSED_STAGES },
       ownerId: { not: null },
-      dueDate: { gte: windowStart, lte: windowEnd },
+      ...(missingFixture.length > 0
+        ? {
+            OR: [
+              dateWindow,
+              ...missingFixture.map((row) => ({ code: row.code, dueDate: row.dueDate })),
+            ],
+          }
+        : dateWindow),
+      ...(outsideFixture.length > 0
+        ? { NOT: { OR: outsideFixture.map((row) => ({ code: row.code, dueDate: row.dueDate })) } }
+        : {}),
     },
     // Deterministic order: soonest deadlines first so a >batch backlog never
     // starves the most-urgent alerts.
@@ -210,10 +226,13 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
     select: {
       id: true,
       orgId: true,
+      code: true,
       name: true,
       customer: true,
       dueDate: true,
       ownerId: true,
+      stage: true,
+      pipelineStage: { select: { isWon: true, isLost: true } },
     },
   });
 
@@ -221,6 +240,28 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
   for (const opp of opps) {
     // ownerId is non-null by the WHERE filter, but the select types it nullable.
     if (!opp.dueDate || !opp.ownerId) continue;
+    const dueDate = projectFixtureBidAlertDue(
+      {
+        code: opp.code,
+        stage: opp.stage,
+        dueDate: opp.dueDate,
+        pipelineStage: opp.pipelineStage,
+      },
+      now,
+      mode,
+    );
+    // A row we did not slide is only in this batch when its stored date is
+    // inside the window. The fixture OR can still return a seeded code that
+    // a won or lost pipeline stage keeps on the old day. That day is outside
+    // the lookback, so it is not an overdue alert.
+    if (dueDate === opp.dueDate) {
+      const storedDay = Date.UTC(
+        opp.dueDate.getUTCFullYear(),
+        opp.dueDate.getUTCMonth(),
+        opp.dueDate.getUTCDate(),
+      );
+      if (storedDay < windowStart.getTime() || storedDay > windowEnd.getTime()) continue;
+    }
     const scanned: ScannedOpp = {
       id: opp.id,
       orgId: opp.orgId,
@@ -233,7 +274,7 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
     // at once (an opp first seen already due tomorrow) would fire 7d+3d+1d
     // together. daysUntil only decreases, so a later scan crossing into a tighter
     // bucket fires that bucket via its own dedupe key → the intended 7→3→1 cadence.
-    const daysUntil = daysUntilDue(scanned.dueDate, now);
+    const daysUntil = daysUntilDue(dueDate, now);
     const threshold = nearestCrossedThreshold(daysUntil);
     // Overdue opps fall outside every 7/3/1 bucket (threshold === null) but
     // still need the single, distinct once-ever overdue alert — see the
@@ -252,6 +293,7 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
   }
 
   log.info({ scanned: opps.length, created }, 'bid-deadline scan complete');
+  return created;
 }
 
 export async function startBidDeadlineAlerts(
@@ -265,7 +307,7 @@ export async function startBidDeadlineAlerts(
 
   const worker = new Worker(
     QUEUE_NAME,
-    (_job: Job) => scanDeadlines(log.child({ worker: QUEUE_NAME })),
+    (_job: Job) => scanBidDeadlineAlerts(new Date(), log.child({ worker: QUEUE_NAME })),
     { connection, concurrency: 1 },
   );
 
@@ -282,6 +324,8 @@ export async function startBidDeadlineAlerts(
     { repeat: { every: SCAN_INTERVAL_MINUTES * 60_000 }, jobId: 'bid-deadline-scan' },
   );
 
-  log.info({ queue: QUEUE_NAME, intervalMinutes: SCAN_INTERVAL_MINUTES },
-    'bid-deadline alert worker started (repeatable scan registered)');
+  log.info(
+    { queue: QUEUE_NAME, intervalMinutes: SCAN_INTERVAL_MINUTES },
+    'bid-deadline alert worker started (repeatable scan registered)',
+  );
 }
