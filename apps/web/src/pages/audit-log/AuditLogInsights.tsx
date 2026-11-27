@@ -6,7 +6,8 @@
  * (buildActivityBuckets, buildStats, buildEvidenceHealth) and collectively form
  * a visual unit that sits between the hero and the filter bar.
  */
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
+import { QueryClientContext, type QueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import type { AuditLogEntry } from '@bidstack/shared';
@@ -16,6 +17,11 @@ import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 
+import {
+  AUDIT_LOG_QUERY_KEY,
+  auditPayloadArrived,
+  type AuditQuerySnapshot,
+} from './audit-log-arrival';
 import type { EvidenceHealth } from './audit-log-helpers';
 import {
   actorLabel,
@@ -28,8 +34,26 @@ import {
 
 // ─── AuditInsightStrip ────────────────────────────────────────────────────────
 
+function readAuditQueries(client: QueryClient): AuditQuerySnapshot[] {
+  return client
+    .getQueryCache()
+    .findAll({ queryKey: AUDIT_LOG_QUERY_KEY })
+    .map((query) => ({
+      data: query.state.data,
+      dataUpdatedAt: query.state.dataUpdatedAt,
+      errorUpdatedAt: query.state.errorUpdatedAt,
+      fetchStatus: query.state.fetchStatus,
+    }));
+}
+
 export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
   const { t } = useTranslation('crm');
+  // No provider means there is no cache to contradict the rows. Production
+  // always mounts QueryClientProvider. An empty row list with a live cache
+  // still has to ask whether the page arrived.
+  const queryClient = useContext(QueryClientContext);
+  const pageArrived =
+    rows.length > 0 || queryClient == null || auditPayloadArrived(readAuditQueries(queryClient));
   const buckets = useMemo(() => buildActivityBuckets(rows), [rows]);
   const stats = useMemo(() => buildStats(rows), [rows]);
   const evidenceHealth = useMemo(() => buildEvidenceHealth(rows), [rows]);
@@ -41,6 +65,21 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
   const maxBucket = Math.max(...buckets.map((bucket) => bucket.count), 1);
   const riskTotal = stats.security + stats.destructive;
   const riskRatio = rows.length === 0 ? 0 : Math.round((riskTotal / rows.length) * 100);
+
+  if (!pageArrived) {
+    return (
+      <section className="grid gap-3" aria-busy="true">
+        <Card className="border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4">
+          <h2 className="text-base font-semibold text-[var(--text-primary)]">
+            {t('auditLogInsights.activityCadenceTitle', 'Activity cadence')}
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
+            {t('auditLogInsights.notLoaded', 'Audit entries are not loaded')}
+          </p>
+        </Card>
+      </section>
+    );
+  }
 
   return (
     <section className="grid gap-3 xl:grid-cols-[1.35fr_0.95fr_0.95fr]">
@@ -108,7 +147,10 @@ export function AuditInsightStrip({ rows }: { rows: AuditLogEntry[] }) {
               {t('auditLogInsights.forensicWatchlistTitle', 'Forensic watchlist')}
             </h2>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {t('auditLogInsights.forensicWatchlistSubtitle', 'Fast triage from the loaded evidence set.')}
+              {t(
+                'auditLogInsights.forensicWatchlistSubtitle',
+                'Fast triage from the loaded evidence set.',
+              )}
             </p>
           </div>
           <span className="grid size-9 place-items-center rounded-2xl bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
@@ -165,7 +207,10 @@ function EvidenceHealthCard({ health }: { health: EvidenceHealth }) {
             {t('auditLogInsights.evidenceQualityTitle', 'Evidence quality')}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            {t('auditLogInsights.evidenceQualitySubtitle', 'Coverage signals that make audits defensible.')}
+            {t(
+              'auditLogInsights.evidenceQualitySubtitle',
+              'Coverage signals that make audits defensible.',
+            )}
           </p>
         </div>
         <Badge tone={health.score >= 85 ? 'jade' : health.score >= 65 ? 'amber' : 'tomato'}>
