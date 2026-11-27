@@ -49,7 +49,7 @@ export const PipelineCard = memo(function PipelineCard({
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
   const stageName = getStageName(opp);
-  // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
+  // Derived from the chip's calendar-day urgency — NOT a UTC-midnight
   // compare, which flagged "due today" as overdue for the whole day while the
   // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
   const isStalled =

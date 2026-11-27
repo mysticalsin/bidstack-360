@@ -8,6 +8,8 @@
  */
 import { zonedWallTimeToUtc } from '@bidstack/shared';
 
+import { addPlainDays, formatPlainDateDisplay, parsePlainDate, weekdayIndexMonday } from '@/lib/plain-date';
+
 import type { CalendarEvent } from './types';
 
 export const TORONTO_TZ = 'America/Toronto';
@@ -58,18 +60,13 @@ export function dayKey(d: Date, tz: string): string {
   return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
 }
 
-function keyToUtcDate(key: string): Date {
-  const [y, m, d] = key.split('-').map(Number);
-  return new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1));
-}
-
 export function addDays(key: string, n: number): string {
-  return new Date(keyToUtcDate(key).getTime() + n * DAY_MS).toISOString().slice(0, 10);
+  return addPlainDays(key, n) ?? key;
 }
 
 /** 0 = Monday ... 6 = Sunday. */
 export function weekdayIndex(key: string): number {
-  return (keyToUtcDate(key).getUTCDay() + 6) % 7;
+  return weekdayIndexMonday(key) ?? 0;
 }
 
 export function weekKeys(anchor: string): string[] {
@@ -251,7 +248,9 @@ export function formatTime(iso: string, tz: string): string {
 }
 
 export function formatDayLabel(key: string, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat(undefined, { ...opts, timeZone: 'UTC' }).format(keyToUtcDate(key));
+  if (!parsePlainDate(key)) return key;
+  const { timeZone: _zone, ...rest } = opts;
+  return formatPlainDateDisplay(key, undefined, rest);
 }
 
 export function timeZoneLabel(tz: string): string {

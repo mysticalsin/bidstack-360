@@ -7,6 +7,12 @@
 // WHY: hardcoded 'en-US' throughout the codebase broke FR/ES locales —
 // numbers, dates, and currency symbols all rendered in English format regardless
 // of the user's selected language. Switched to Intl with explicit locale param.
+//
+// Date-only strings (YYYY-MM-DD) are calendar dates, not instants. They go
+// through plain-date so a due date does not render as the previous day west
+// of UTC. Timestamps stay on the instant path below.
+
+import { daysUntilPlainDate, formatPlainDateDisplay, isDateOnlyString } from './plain-date';
 
 const DEFAULT_LOCALE = 'en';
 const DEFAULT_CURRENCY = 'EUR';
@@ -60,6 +66,7 @@ export function formatMoney(value: number, currency?: string, locale?: string): 
 export function formatDate(iso: string | null | undefined, locale?: string): string {
   if (!iso) return '—';
   const resolvedLocale = locale ?? detectLocale();
+  if (isDateOnlyString(iso)) return formatPlainDateDisplay(iso, resolvedLocale);
   return new Date(iso).toLocaleDateString(resolvedLocale, {
     month: 'short',
     day: 'numeric',
@@ -67,9 +74,10 @@ export function formatDate(iso: string | null | undefined, locale?: string): str
   });
 }
 
-export function daysUntil(iso: string | null | undefined): number | null {
+export function daysUntil(iso: string | null | undefined, now: Date = new Date()): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
+  if (isDateOnlyString(iso)) return daysUntilPlainDate(iso, now);
+  const ms = new Date(iso).getTime() - now.getTime();
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
@@ -147,6 +155,14 @@ export function formatPercent(
 
 export function relativeTime(iso: string, locale?: string): string {
   const resolvedLocale = locale ?? detectLocale();
+  if (isDateOnlyString(iso)) {
+    const days = daysUntilPlainDate(iso);
+    if (days === null) return '—';
+    if (Math.abs(days) < 30) {
+      return new Intl.RelativeTimeFormat(resolvedLocale, { numeric: 'auto' }).format(days, 'day');
+    }
+    return formatPlainDateDisplay(iso, resolvedLocale, { month: 'short', day: 'numeric' });
+  }
   const diffMs = Date.now() - new Date(iso).getTime();
   const sec = Math.floor(diffMs / 1000);
   const rtf = new Intl.RelativeTimeFormat(resolvedLocale, { numeric: 'auto' });

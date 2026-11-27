@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { buildApiUrl } from '@/lib/api';
 import { cn } from '@/lib/cn';
+import { formatPlainDate, plainDateFromLocalDate } from '@/lib/plain-date';
 
 interface AvailabilityResponse {
   slots: string[];
@@ -16,7 +17,7 @@ interface AvailabilityResponse {
 function isoDate(offsetDays: number) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+  return formatPlainDate(plainDateFromLocalDate(d));
 }
 
 function formatSlot(iso: string) {
