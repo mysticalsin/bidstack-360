@@ -27,20 +27,43 @@ interface Props {
   domain?: string | null;
 }
 
+// Cockpit routes use the company id. A note saved with only the legacy
+// account string never joins Company.notes, so the company tab stays empty.
+const COMPANY_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function companyIdForAccount(accountId: string): string | undefined {
+  return COMPANY_UUID.test(accountId) ? accountId : undefined;
+}
+
+// A whitespace body is not a body. Saving it used to leave a blank line
+// under the title that reads as a broken note.
+function noteBody(raw: string): string {
+  return raw.trim();
+}
+
 export function NotesPanel({ accountId, companyName, domain }: Props) {
   const { t } = useTranslation('crm');
   const list = useNotes(accountId);
   const [composing, setComposing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The create round-trip closes the editor before the list refetch lands.
+  // Hold the saved note so the panel does not fall through to "No notes yet".
+  const [held, setHeld] = useState<Note | null>(null);
 
   // Filter out auto-generated meeting import notes with numeric timestamps
-  // (e.g. "Meeting Import 1778695956797") — these are noise in the UI.
-  const filteredNotes =
-    list.data?.items.filter((note) => {
-      if (!note.title) return true;
-      const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
-      return !isNumericImport;
-    }) ?? [];
+  // (e.g. "Meeting Import 1778695956797"). These are noise in the UI.
+  const rawNotes = list.data?.items ?? [];
+  const filteredNotes = rawNotes.filter((note) => {
+    if (!note.title) return true;
+    const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
+    return !isNumericImport;
+  });
+  // Drop the held copy once the list itself has the row, including when the
+  // numeric-import filter will hide it. A delete of the held row clears it.
+  const pendingSave =
+    held && !rawNotes.some((note) => note.id === held.id) ? held : null;
+  const shownNotes = pendingSave ? [pendingSave, ...filteredNotes] : filteredNotes;
 
   return (
     <Card>
@@ -74,7 +97,10 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
         {composing && accountId ? (
           <NoteEditor
             accountId={accountId}
-            onDone={() => setComposing(false)}
+            onDone={(saved) => {
+              setHeld(saved);
+              setComposing(false);
+            }}
             onCancel={() => setComposing(false)}
           />
         ) : null}
@@ -95,14 +121,14 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
                 : t('notes.unknownError', 'Unknown error')
             }
           />
-        ) : filteredNotes.length === 0 ? (
+        ) : shownNotes.length === 0 ? (
           <EmptyState
             title={t('notes.emptyTitle', 'No notes yet')}
             message={t('notes.emptyMessage', 'Capture a meeting summary or context.')}
           />
         ) : (
           <ul className="divide-y divide-[var(--border-subtle)]">
-            {filteredNotes.map((note) =>
+            {shownNotes.map((note) =>
               editingId === note.id ? (
                 <li key={note.id} className="py-3">
                   <NoteEditor
@@ -118,6 +144,9 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
                   note={note}
                   accountId={accountId}
                   onEdit={() => setEditingId(note.id)}
+                  onRemoved={() =>
+                    setHeld((current) => (current?.id === note.id ? null : current))
+                  }
                 />
               ),
             )}
@@ -132,12 +161,14 @@ interface RowProps {
   note: Note;
   accountId: string;
   onEdit: () => void;
+  onRemoved: () => void;
 }
 
-function NoteRow({ note, accountId, onEdit }: RowProps) {
+function NoteRow({ note, accountId, onEdit, onRemoved }: RowProps) {
   const { t } = useTranslation('crm');
   const update = useUpdateNote(accountId);
   const remove = useDeleteNote(accountId);
+  const body = noteBody(note.bodyMd);
   const togglePin = () => update.mutate({ id: note.id, patch: { pinned: !note.pinned } });
   const onDelete = async () => {
     // Rule 13 — destructive op needs explicit acknowledgement. The custom
@@ -154,7 +185,10 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
     });
     if (!ok) return;
     remove.mutate(note.id, {
-      onSuccess: () => toast.success(t('notes.deleteSuccess', 'Note deleted')),
+      onSuccess: () => {
+        onRemoved();
+        toast.success(t('notes.deleteSuccess', 'Note deleted'));
+      },
       onError: (err) =>
         toast.error(t('notes.deleteErrorTitle', 'Delete failed'), {
           description:
@@ -175,9 +209,11 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
             </h4>
             {note.pinned ? <Badge tone="amber">{t('notes.pinnedBadge', 'Pinned')}</Badge> : null}
           </div>
-          <div className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-3">
-            <SafeMarkdownPreview text={note.bodyMd} />
-          </div>
+          {body ? (
+            <div className="mt-1 text-xs text-[var(--fg-secondary)] line-clamp-3">
+              <SafeMarkdownPreview text={body} />
+            </div>
+          ) : null}
           <div className="mt-1.5 text-[11px] text-[var(--fg-tertiary)]">
             {note.authorEmail ?? t('notes.unknownAuthor', 'Unknown')} ·{' '}
             {relativeTime(note.createdAt)}
@@ -227,7 +263,7 @@ function NoteRow({ note, accountId, onEdit }: RowProps) {
 interface EditorProps {
   accountId: string;
   initial?: Note;
-  onDone: () => void;
+  onDone: (saved: Note) => void;
   onCancel: () => void;
 }
 
@@ -247,13 +283,21 @@ function NoteEditor({ accountId, initial, onDone, onCancel }: EditorProps) {
       setError(t('notes.titleRequired', 'Title is required'));
       return;
     }
+    const cleanBody = noteBody(bodyMd);
+    const companyId = companyIdForAccount(accountId);
     try {
-      if (initial) {
-        await update.mutateAsync({ id: initial.id, patch: { title: cleanTitle, bodyMd } });
-      } else {
-        await create.mutateAsync({ title: cleanTitle, bodyMd, pinned: false });
-      }
-      onDone();
+      const saved = initial
+        ? await update.mutateAsync({
+            id: initial.id,
+            patch: { title: cleanTitle, bodyMd: cleanBody },
+          })
+        : await create.mutateAsync({
+            title: cleanTitle,
+            bodyMd: cleanBody,
+            pinned: false,
+            ...(companyId ? { companyId } : {}),
+          });
+      onDone(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('notes.saveFailed', 'Save failed'));
     }
