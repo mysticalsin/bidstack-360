@@ -49,7 +49,7 @@ describe('ApiKeysSection', () => {
 
     render(<ApiKeysSection />);
 
-    expect(screen.getByText("Couldn't load API keys")).toBeTruthy();
+    expect(screen.getByText('API keys did not load.')).toBeTruthy();
     expect(screen.getByText('Requires permission: settings:read')).toBeTruthy();
     expect(screen.queryByText('No API keys yet')).toBeNull();
   });
