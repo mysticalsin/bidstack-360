@@ -27,10 +27,12 @@ import { cn } from '@/lib/cn';
 import { springModal } from '@/lib/motion';
 
 import {
+  clampPaletteIndex,
   fuzzyMatch,
   groupAriaLabel,
   groupItemsByRun,
   groupTag,
+  nextPaletteIndex,
   type Item,
 } from './commandPaletteUtils';
 import { buildAskCopilotItem, CopilotPanel, type CopilotKeyHandler } from './CopilotPanel';
@@ -160,13 +162,14 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
   // class before we measure.
   useEffect(() => {
     if (!listRef.current) return;
-    const safe = displayItems.length === 0 ? 0 : Math.min(activeIdx, displayItems.length - 1);
+    const safe = clampPaletteIndex(activeIdx, displayItems.length);
     const node = listRef.current.querySelector<HTMLElement>(`[data-cmdk-idx="${safe}"]`);
     node?.scrollIntoView({ block: 'nearest' });
   }, [activeIdx, displayItems.length]);
 
-  // Clamp activeIdx when the result set shrinks (user typed more specifically).
-  const safeIdx = displayItems.length === 0 ? 0 : Math.min(activeIdx, displayItems.length - 1);
+  // Keep the painted row on a real index when the result set shrinks, and
+  // when an earlier ArrowDown ran while the list was empty.
+  const safeIdx = clampPaletteIndex(activeIdx, displayItems.length);
 
   // Activate focused list item with Enter / Space for screen-reader users
   // who arrow directly into the listbox via VoiceOver/JAWS gestures.
@@ -237,10 +240,10 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
             }
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setActiveIdx((i) => Math.min(displayItems.length - 1, i + 1));
+              setActiveIdx((i) => nextPaletteIndex(i, displayItems.length, 1));
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
-              setActiveIdx((i) => Math.max(0, i - 1));
+              setActiveIdx((i) => nextPaletteIndex(i, displayItems.length, -1));
             } else if (e.key === 'Enter') {
               e.preventDefault();
               const directRoute = findDirectNavTarget(
