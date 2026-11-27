@@ -7,6 +7,8 @@ import { useWebhookDeliveries, type WebhookDeliveryRecord } from '@/hooks/useWeb
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 
+import { webhookDeliveryStatusCopy } from './webhook-delivery-status';
+
 export function DeliveryHistoryPanel({
   subscriptionId,
   id,
@@ -81,6 +83,7 @@ export function DeliveryHistoryPanel({
 function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
   const { t } = useTranslation('crm');
   const [showError, setShowError] = useState(false);
+  const status = webhookDeliveryStatusCopy(delivery.statusCode);
 
   return (
     <>
@@ -101,7 +104,9 @@ function DeliveryRow({ delivery }: { delivery: WebhookDeliveryRecord }) {
             )}
           >
             <Icon name={delivery.success ? 'check' : 'x'} size={9} />
-            {delivery.statusCode ?? t('deliveryHistory.statusTimeout', 'timeout')}
+            {status.kind === 'http'
+              ? status.statusCode
+              : t('deliveryHistory.statusNoResponse', 'No response')}
           </span>
         </td>
         <td className="px-3 py-2 tabular-nums text-[var(--fg-secondary)]">
