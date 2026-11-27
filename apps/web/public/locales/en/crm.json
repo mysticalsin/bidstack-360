@@ -253,6 +253,7 @@
     "filters": {
       "groupLabel": "Filter tasks",
       "all": "All",
+      "mine": "Mine",
       "today": "Today",
       "overdue": "Overdue"
     },
@@ -282,6 +283,8 @@
     "empty": {
       "title": "No tasks yet",
       "filteredTitle": "No tasks match this filter",
+      "mineTitle": "None of these follow-ups are yours",
+      "mineUnknown": "Couldn't tell which follow-ups are yours.",
       "message": "Create a follow-up to get started."
     },
     "reorder": {

@@ -253,6 +253,7 @@
     "filters": {
       "groupLabel": "筛选任务",
       "all": "全部",
+      "mine": "我的",
       "today": "今天",
       "overdue": "逾期"
     },
@@ -282,6 +283,8 @@
     "empty": {
       "title": "暂无任务",
       "filteredTitle": "没有任务匹配此筛选条件",
+      "mineTitle": "这些跟进都不是你的",
+      "mineUnknown": "无法判断哪些跟进是你的。",
       "message": "创建一个跟进以开始。"
     },
     "reorder": {

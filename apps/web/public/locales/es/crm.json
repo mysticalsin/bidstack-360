@@ -262,6 +262,7 @@
     "filters": {
       "groupLabel": "Filtrar tareas",
       "all": "Todas",
+      "mine": "Mías",
       "today": "Hoy",
       "overdue": "Atrasadas"
     },
@@ -291,6 +292,8 @@
     "empty": {
       "title": "Aún no hay tareas",
       "filteredTitle": "Ninguna tarea coincide con este filtro",
+      "mineTitle": "Ninguno de estos seguimientos es tuyo",
+      "mineUnknown": "No se pudo saber cuáles seguimientos son tuyos.",
       "message": "Crea un seguimiento para empezar."
     },
     "reorder": {

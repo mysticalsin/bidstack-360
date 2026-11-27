@@ -20,6 +20,7 @@
  */
 import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
+import { DEMO_FOLLOW_UPS, DEMO_VISITOR_ASSIGNEE } from './demo-follow-up-owners.js';
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
@@ -474,54 +475,6 @@ const LEADS: LeadSpec[] = [
   },
 ];
 
-type TaskStatusLit = 'open' | 'in_progress' | 'done' | 'blocked';
-
-interface TaskSpec {
-  oppCode: string;
-  title: string;
-  status: TaskStatusLit;
-  dueInDays: number;
-  assignee: string;
-}
-
-const TASKS: TaskSpec[] = [
-  {
-    oppCode: 'OP-0001',
-    title: 'Finalize technical volume for Siemens ERP',
-    status: 'in_progress',
-    dueInDays: 5,
-    assignee: 'SA',
-  },
-  {
-    oppCode: 'OP-0002',
-    title: 'Prepare pricing annex for IKEA',
-    status: 'open',
-    dueInDays: 3,
-    assignee: 'MB',
-  },
-  {
-    oppCode: 'OP-0003',
-    title: 'Schedule discovery workshop with Sanofi CMIO',
-    status: 'open',
-    dueInDays: 7,
-    assignee: 'PN',
-  },
-  {
-    oppCode: 'OP-0004',
-    title: 'Security questionnaire response — HSBC',
-    status: 'in_progress',
-    dueInDays: 4,
-    assignee: 'SA',
-  },
-  {
-    oppCode: 'OP-0005',
-    title: 'Kickoff handover to delivery — Stellantis',
-    status: 'done',
-    dueInDays: -2,
-    assignee: 'MB',
-  },
-];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function eur(value: number): bigint {
@@ -590,7 +543,7 @@ async function seedUsers(
       role: 'admin',
     },
   });
-  byInitials.set('ME', visitor.id);
+  byInitials.set(DEMO_VISITOR_ASSIGNEE, visitor.id);
 
   for (const t of TEAMMATES) {
     const u = await prisma.user.create({
@@ -852,7 +805,7 @@ async function seedTasks(
   byInitials: Map<string, string>,
   oppByCode: Map<string, string>,
 ): Promise<void> {
-  for (const t of TASKS) {
+  for (const t of DEMO_FOLLOW_UPS) {
     await prisma.task.create({
       data: {
         orgId,

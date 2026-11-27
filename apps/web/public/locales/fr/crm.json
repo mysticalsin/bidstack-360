@@ -262,6 +262,7 @@
     "filters": {
       "groupLabel": "Filtrer les tâches",
       "all": "Toutes",
+      "mine": "Les miennes",
       "today": "Aujourd'hui",
       "overdue": "En retard"
     },
@@ -291,6 +292,8 @@
     "empty": {
       "title": "Aucune tâche pour le moment",
       "filteredTitle": "Aucune tâche ne correspond à ce filtre",
+      "mineTitle": "Aucun de ces suivis n'est à vous",
+      "mineUnknown": "Impossible de savoir quels suivis sont à vous.",
       "message": "Créez une relance pour commencer."
     },
     "reorder": {
