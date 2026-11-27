@@ -187,6 +187,107 @@ describe('CompanyTechStackSection', () => {
     expect(screen.getByTestId('tech-coverage-line').textContent).toContain('Nothing found in GitHub.');
   });
 
+  it('marks a demo sample technology on the wall and leaves a detected technology unmarked', () => {
+    // WHY: demo seeds store Microsoft 365 as sample fixture data. The wall
+    // still showed the name with a DNS confidence chip, so the fixture read
+    // as a detection. A technology the user recorded does not wear that mark.
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          {
+            label: 'Collaboration',
+            items: [
+              {
+                name: 'Microsoft 365',
+                source: 'open_data:dns',
+                confidence: 0.95,
+                sample: true,
+                evidence: {
+                  url: null,
+                  record: 'Sample: MX points to Microsoft 365',
+                  observedAt: CHECKED,
+                },
+              },
+            ],
+          },
+          { label: 'Cloud', items: [{ name: 'Azure', source: 'manual', confidence: 1 }] },
+        ],
+        coverage: {
+          checkedAt: CHECKED,
+          openItems: 1,
+          apolloFallback: 'not_configured',
+          apolloThreshold: 5,
+          sample: true,
+          lanes: [{ lane: 'dns', status: 'found', count: 1, detail: null, checkedAt: CHECKED }],
+        },
+      },
+    });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    const wall = screen.getByTestId('tech-stack-wall');
+    const sampleRow = wall.querySelector('[data-tech-item="Microsoft 365"]');
+    const detectedRow = wall.querySelector('[data-tech-item="Azure"]');
+    expect(sampleRow?.textContent).toContain('Sample');
+    expect(detectedRow?.textContent ?? '').not.toContain('Sample');
+  });
+
+  it('does not store a demo sample stack when edit is saved unchanged', () => {
+    // WHY: Edit copies the fixture into the draft. Save then writes it as the
+    // account override, so the sample names stay after a later check.
+    canWrite.value = true;
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          {
+            label: 'Collaboration',
+            items: [{ name: 'Microsoft 365', source: 'open_data:dns', confidence: 0.95, sample: true }],
+          },
+        ],
+      },
+    });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(saveStack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('tech-stack-editor')).toBeNull();
+  });
+
+  it('saves a technology the user added and leaves the sample fixture out', async () => {
+    canWrite.value = true;
+    saveStack.mockResolvedValue({});
+    stackHook.mockReturnValue({
+      isLoading: false,
+      data: {
+        effectiveStack: [
+          {
+            label: 'Collaboration',
+            items: [{ name: 'Microsoft 365', source: 'open_data:dns', confidence: 0.95, sample: true }],
+          },
+        ],
+      },
+    });
+
+    render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add category' }));
+    fireEvent.change(screen.getByLabelText('Category 1 name'), { target: { value: 'HR' } });
+    fireEvent.change(screen.getByLabelText('Add technology to category 1'), { target: { value: 'Workday' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(saveStack).toHaveBeenCalledTimes(1));
+    expect(saveStack).toHaveBeenCalledWith([
+      { label: 'HR', items: [{ name: 'Workday', source: 'manual', confidence: 1 }] },
+    ]);
+    expect(JSON.stringify(saveStack.mock.calls[0]?.[0])).not.toContain('Microsoft 365');
+  });
+
   it('shows a plain error with a retry', () => {
     const refetch = vi.fn();
     stackHook.mockReturnValue({ data: undefined, isLoading: false, isError: true, refetch });
