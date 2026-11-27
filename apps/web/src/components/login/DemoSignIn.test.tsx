@@ -135,6 +135,73 @@ describe('DemoSignIn', () => {
     expect(localStorage.getItem('demo-signed-out')).toBeNull();
   });
 
+  it('does not open the demo door when the session check fails', async () => {
+    // WHY: a 503 from /__auth/me is a failed session read. The email form is
+    // the settled door for "no gate". Offering Enter the demo on that failure
+    // says the session check is ready when the payload has not arrived.
+    route(
+      '/__auth/me',
+      jsonResponse(503, { message: 'unavailable' }),
+      jsonResponse(503, { message: 'unavailable' }),
+    );
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.queryByText('Checking your session…')).toBeNull();
+    });
+    expect(screen.getByRole('status').textContent).toContain('Could not check sign-in.');
+    expect(screen.queryByText(/Signing in as/)).toBeNull();
+
+    fireEvent.change(await screen.findByLabelText('Work email'), {
+      target: { value: 'ada.visitor@example.test' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Enter the demo/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Could not check sign-in. Check your connection and try again.',
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('does not open the demo door when a failed session check is not JSON', async () => {
+    // WHY: the HTML fallback is only a settled 200 from a host with no gate.
+    // A 502 page is still a failed read, even when the body is HTML.
+    const failed = new Response('<html>unavailable</html>', {
+      status: 502,
+      headers: { 'content-type': 'text/html' },
+    });
+    route('/__auth/me', failed, failed.clone());
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.queryByText('Checking your session…')).toBeNull();
+    });
+    expect(screen.getByRole('status').textContent).toContain('Could not check sign-in.');
+    fireEvent.change(screen.getByLabelText('Work email'), {
+      target: { value: 'ada.visitor@example.test' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Enter the demo/ }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Could not check sign-in. Check your connection and try again.',
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the demo door closed while the session check has not arrived', async () => {
+    // WHY: an unread gate is not a settled "no session". The form must not
+    // say the visitor can enter, and it must not say they are already signed in.
+    fetchMock.mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Checking your session…')).toBeTruthy();
+    expect(screen.queryByLabelText('Work email')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Enter the demo/ })).toBeNull();
+    expect(screen.queryByText(/Signing in as/)).toBeNull();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
   it('treats a failed gate check as unknown and rechecks before choosing the flow', async () => {
     let calls = 0;
     fetchMock.mockImplementation(async (url: string) => {
