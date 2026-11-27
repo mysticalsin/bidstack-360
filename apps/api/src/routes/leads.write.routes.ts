@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma, type Prisma, type LeadPriority, type LeadStatus } from '@bidstack/db';
 import { foreignCustomFieldDefinitions } from '../lib/custom-field-ownership.js';
 import { pushLeadToDust } from '../lib/dust-push.js';
+import { convertOpportunityName } from '../services/leads/convert-opportunity-name.js';
 import { mintOpportunityTx, withOpportunityCodeRetry } from '../services/opportunities/mint.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { dispatchWorkflowEvent } from '../queues/workflow-dispatch.js';
@@ -322,7 +323,10 @@ export const leadRoutesWrite: FastifyPluginAsyncZod = async (server) => {
         const opp = await mintOpportunityTx(tx, {
           orgId: req.auth.orgId,
           customer: lead.companyName,
-          name: body.opportunityName ?? `${lead.companyName} — ${lead.title ?? 'Opportunity'}`,
+          name: convertOpportunityName({
+            opportunityName: body.opportunityName,
+            companyName: lead.companyName,
+          }),
           valueMicros: BigInt(Math.round(body.opportunityValueMicros ?? 0)),
           ownerId: lead.ownerId,
           pipelineStageId: body.pipelineStageId,
