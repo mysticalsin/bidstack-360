@@ -6,8 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
-
 import { DataResidencySection } from '@/components/settings/DataResidencySection';
+import { configuredWorkspaceId } from './workspace-id';
 
 export function SecuritySection() {
   const { t } = useTranslation('settings');
@@ -16,7 +16,7 @@ export function SecuritySection() {
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
   const ssoDomains = import.meta.env.VITE_SSO_ALLOWED_EMAIL_DOMAINS ?? 'any';
   const microsoftEnabled = import.meta.env.VITE_SSO_MICROSOFT_ENABLED === 'true';
-  const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
+  const workspaceId = configuredWorkspaceId(import.meta.env.VITE_BIDSTACK_WORKSPACE_ID);
 
   return (
     <div className="space-y-6">
@@ -58,7 +58,13 @@ export function SecuritySection() {
             </span>
           </DetailRow>
           <DetailRow label={t('security.workspace.label', 'Workspace')}>
-            <code className="font-mono text-xs">{workspaceId}</code>
+            {workspaceId ? (
+              <code className="font-mono text-xs">{workspaceId}</code>
+            ) : (
+              <span className="text-[var(--fg-tertiary)]">
+                {t('security.workspace.notConfigured', 'Not configured')}
+              </span>
+            )}
           </DetailRow>
         </dl>
       </Card>

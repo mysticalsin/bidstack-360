@@ -8,12 +8,13 @@ import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useAuth, useUser } from '@/lib/auth';
+import { configuredWorkspaceId } from './workspace-id';
 
 export function WorkspaceSection() {
   const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
-  const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
+  const workspaceId = configuredWorkspaceId(import.meta.env.VITE_BIDSTACK_WORKSPACE_ID);
   const env = (import.meta.env.MODE ?? 'development').toLowerCase();
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
@@ -28,7 +29,13 @@ export function WorkspaceSection() {
       />
       <dl className="divide-y divide-[var(--border-subtle)] text-sm">
         <Row label={t('workspaceSection.original.workspaceIdLabel', 'Workspace ID')}>
-          <code className="font-mono text-xs text-[var(--fg-primary)]">{workspaceId}</code>
+          {workspaceId ? (
+            <code className="font-mono text-xs text-[var(--fg-primary)]">{workspaceId}</code>
+          ) : (
+            <span className="text-[var(--fg-tertiary)]">
+              {t('workspaceSection.original.workspaceIdMissing', 'Not configured')}
+            </span>
+          )}
         </Row>
         <Row label={t('workspaceSection.original.environmentLabel', 'Environment')}>
           <Badge tone={env === 'production' ? 'jade' : env === 'staging' ? 'amber' : 'gray'}>
