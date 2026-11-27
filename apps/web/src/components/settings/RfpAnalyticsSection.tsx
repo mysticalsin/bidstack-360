@@ -18,6 +18,7 @@ import {
   proposalStatusLabel,
   proposalStatusTone,
 } from '@/components/rfp/shared/ProposalStatusChip';
+import { rfpPipelineAmount } from './rfp-analytics-amount';
 
 interface OwnerRow {
   ownerId: string | null;
@@ -32,18 +33,6 @@ interface RfpAnalytics {
   totalValueMicros: string;
   byStatus: Array<{ status: string; count: number }>;
   byOwner: OwnerRow[];
-}
-
-// Money is stored + transported in micros (CLAUDE.md convention). Format to a
-// whole-euro currency string at the edge for display.
-function formatEur(micros: string): string {
-  const eur = Number(micros) / 1e6;
-  if (!Number.isFinite(eur)) return '—';
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 0,
-  }).format(eur);
 }
 
 export function RfpAnalyticsSection() {
@@ -82,7 +71,7 @@ export function RfpAnalyticsSection() {
         />
         <KpiTile
           label={t('rfpAnalytics.kpiPipelineLabel', 'Pipeline value')}
-          value={q.isLoading ? '…' : formatEur(q.data?.totalValueMicros ?? '0')}
+          value={q.isLoading ? '…' : rfpPipelineAmount(q.data?.totalValueMicros ?? '0')}
           detail={t('rfpAnalytics.kpiPipelineDetail', 'linked opportunity value')}
           icon="dollar"
         />
@@ -208,7 +197,7 @@ export function RfpAnalyticsSection() {
                       {o.count}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-[var(--fg-secondary)]">
-                      {formatEur(o.totalValueMicros)}
+                      {rfpPipelineAmount(o.totalValueMicros)}
                     </td>
                   </tr>
                 ))}
