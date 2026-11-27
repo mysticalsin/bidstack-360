@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
+import { dateChipAheadEmpty } from '@/components/task/task-list-ahead';
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
@@ -140,6 +141,12 @@ export function TasksPage() {
     // STATUS_ORDER is a literal-shaped constant, no need to depend on it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredItems, sort, ordinalOf]);
+
+  // Today and Overdue are cuts of the loaded page. A fresh demo's open
+  // follow-ups are still a few days out, so both chips are empty while the
+  // rows remain on All. Name the next one. A late book stays on the generic
+  // filter title.
+  const aheadEmpty = dateChipAheadEmpty(filter, items.length, data?.items ?? []);
 
   const moveTask = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -337,9 +344,16 @@ export function TasksPage() {
               <EmptyState
                 icon={filter === 'all' ? 'tasks' : 'search'}
                 title={
-                  filter === 'all'
-                    ? t('tasks.empty.headline', 'Nothing on the bid clock')
-                    : t('tasks.empty.filteredTitle', 'No tasks match this filter')
+                  aheadEmpty
+                    ? t(aheadEmpty.titleKey, aheadEmpty.titleFallback)
+                    : filter === 'all'
+                      ? t('tasks.empty.headline', 'Nothing on the bid clock')
+                      : t('tasks.empty.filteredTitle', 'No tasks match this filter')
+                }
+                message={
+                  aheadEmpty
+                    ? t(aheadEmpty.messageKey, aheadEmpty.messageFallback, aheadEmpty.vars)
+                    : undefined
                 }
                 action={filter === 'all' && canWrite ? <CreateTaskDialog /> : null}
               />

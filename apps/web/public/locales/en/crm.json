@@ -282,6 +282,12 @@
     "empty": {
       "title": "No tasks yet",
       "filteredTitle": "No tasks match this filter",
+      "todayAheadTitle": "Nothing is due today",
+      "overdueClearTitle": "Nothing is overdue",
+      "nextTomorrow": "Next is {{title}}, tomorrow.",
+      "nextDays": "Next is {{title}}, in {{count}} days.",
+      "overdueClearMany": "{{count}} open follow-ups in this list are still ahead. Next is {{title}}, in {{days}} days.",
+      "overdueClearManyTomorrow": "{{count}} open follow-ups in this list are still ahead. Next is {{title}}, tomorrow.",
       "message": "Create a follow-up to get started."
     },
     "reorder": {
