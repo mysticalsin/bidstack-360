@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { useWebhookDeliveries, type WebhookDeliveryRecord } from '@/hooks/useWebhookSubscriptions';
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
@@ -16,6 +16,14 @@ export function DeliveryHistoryPanel({
 }) {
   const { t } = useTranslation('crm');
   const deliveries = useWebhookDeliveries(subscriptionId);
+  // A read that has not arrived is not an empty history. A paused read has
+  // no payload and isLoading is false, so the empty sentence would say this
+  // endpoint already has no deliveries. An in-flight read is the same unread
+  // history. A failed read with no payload keeps the error. A later failure
+  // keeps attempts already on screen. A payload that arrived empty still says
+  // no deliveries were recorded.
+  const historyHold: 'unread' | 'failed' | 'ready' =
+    deliveries.data == null ? (deliveries.isError ? 'failed' : 'unread') : 'ready';
 
   return (
     <div
@@ -33,9 +41,11 @@ export function DeliveryHistoryPanel({
         ) : null}
       </div>
 
-      {deliveries.isLoading ? (
-        <LoadingSkeleton rows={3} />
-      ) : deliveries.isError ? (
+      {historyHold === 'unread' ? (
+        <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+          {t('deliveryHistory.checking', 'Checking delivery history. It has not arrived.')}
+        </p>
+      ) : historyHold === 'failed' ? (
         <ErrorState
           title={t('deliveryHistory.errorTitle', 'Failed to load')}
           message={t('deliveryHistory.errorMessage', 'Could not load delivery history.')}
