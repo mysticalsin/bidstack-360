@@ -9,8 +9,10 @@ import {
   buildIntelSummary,
   classifyPost,
   CompanyIntelSummary,
+  fixtureClockMode,
   IntelImportBatchView,
   IntelPostKind,
+  projectFixturePostings,
   type IntelSummaryInput,
   type IntelSummaryRuns,
 } from '@bidstack/shared';
@@ -201,7 +203,7 @@ export async function loadIntelSummaryInput(
       headcount: metric(p.metrics, 'headcount'),
       fetchedAt: iso(p.updatedAt),
     })),
-    postings: postings.rows.map((p) => ({ ...p, fetchedAt: iso(p.fetchedAt) })),
+    postings: projectFixturePostings(postings.rows, opts.now, fixtureClockMode(process.env.POLO_DATA_MODE)).map((p) => ({ ...p, fetchedAt: iso(p.fetchedAt) })),
     postingsTruncated: postings.truncated,
     posts: [
       ...posts.map((p) => ({

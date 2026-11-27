@@ -11,3 +11,4 @@ export * from './investment.js';
 export * from './direction.js';
 export * from './compose.js';
 export * from './summary.js';
+export * from './fixture-clock.js';
