@@ -20,6 +20,7 @@ import {
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
+import { openPipelinePastClose } from './open-pipeline-past-close';
 
 /** Opens the bid drill-down sheet with a starting filter. */
 export type OnDrill = (f: OppDrillFilter) => void;
@@ -45,12 +46,19 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
+  // Hold the split until the bid rows settle. An empty list while loading is
+  // not a clean book, and a loaded list with no past-close value stays quiet.
+  const pastClose = rowsPending ? null : openPipelinePastClose(rows, now);
+  const pastCloseLabel = pastClose && pastClose.value > 0 ? `${fmtCompact(pastClose.value)} past close` : '';
+  const openPipelineLabel = pastCloseLabel
+    ? `Open pipeline ${fmtCompact(openValue)}, ${pastCloseLabel}: show the open bids`
+    : `Open pipeline ${fmtCompact(openValue)}: show the open bids`;
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
+      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}${pastCloseLabel ? `, ${pastCloseLabel}` : ''}. Won so far this year ${fmtCompact(wonTotal)}.`}
       table={{
         columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
         rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
@@ -59,9 +67,10 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       interactive
     >
       <div className="dash-hero-figs">
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
+        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={openPipelineLabel}>
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
+          {pastCloseLabel ? <div className="viz-meta viz-meta--neg">{pastCloseLabel}</div> : null}
         </HeroFig>
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
           <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />

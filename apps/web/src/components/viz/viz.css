@@ -26,6 +26,7 @@
 .viz-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
 .viz-title { margin: 0; font-size: 16px; font-weight: 500; color: var(--viz-ink); letter-spacing: -0.01em; }
 .viz-meta { font-size: 13px; color: var(--viz-muted); font-variant-numeric: tabular-nums; }
+.viz-meta--neg { color: var(--viz-neg); }
 .viz-tools { display: inline-flex; align-items: center; gap: 8px; flex: none; }
 .viz-sample {
   font-size: 11px; font-weight: 500; line-height: 1; padding: 4px 6px; border-radius: 4px;
