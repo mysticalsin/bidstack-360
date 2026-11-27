@@ -553,6 +553,8 @@
     "failedToLoad": "Failed to load",
     "retry": "Retry",
     "noTerritories": "No territories",
+    "listChecking": "Checking territories. They have not arrived.",
+    "listFailed": "Could not read territories.",
     "active": "Active",
     "inactive": "Inactive",
     "global": "Global",

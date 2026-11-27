@@ -370,7 +370,7 @@ export function TerritoriesPage() {
         />
         <TerritoryListPanel
           items={tItems}
-          isLoading={territories.isLoading}
+          payloadArrived={territories.data != null}
           isError={territories.isError}
           errorMessage={territories.error?.message}
           onRetry={() => territories.refetch()}
