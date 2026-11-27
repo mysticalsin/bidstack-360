@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { usePipelineReport } from '@/hooks/usePipelineReport';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
 import { springSoft } from '@/lib/motion';
+
+import { pipelineStageAmount } from './pipeline-stage-amount';
 
 interface Props {
   report: ReturnType<typeof usePipelineReport>['data'];
@@ -17,7 +18,6 @@ interface Props {
 
 export const PipelineByStageCard = memo(function PipelineByStageCard({ report }: Props) {
   const reducedMotion = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
   const { t } = useTranslation('crm');
   const maxValue = report ? Math.max(1, ...report.byStage.map((stage) => stage.valueSum)) : 1;
   return (
@@ -45,7 +45,7 @@ export const PipelineByStageCard = memo(function PipelineByStageCard({ report }:
                     <AnimatedMetric value={s.count.toLocaleString()} />
                   </div>
                   <div style={{ fontSize: 10.5, color: 'var(--fg-tertiary)' }}>
-                    <AnimatedMetric value={formatMoney(s.valueSum, 'EUR')} />
+                    <AnimatedMetric value={pipelineStageAmount(s.valueSum)} />
                   </div>
                 </div>
               </div>
