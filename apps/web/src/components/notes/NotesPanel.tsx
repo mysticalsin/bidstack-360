@@ -20,6 +20,7 @@ import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks/u
 import { relativeTime } from '@/lib/format';
 import type { Note } from '@bidstack/shared';
 import { MeetingNotesImportDialog } from './MeetingNotesImportDialog';
+import { notesListRead, notesListReadMessage } from './notes-list-read';
 
 interface Props {
   accountId: string | undefined;
@@ -41,6 +42,19 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
       const isNumericImport = /Meeting\s*Import\s*\d{10,}/i.test(note.title);
       return !isNumericImport;
     }) ?? [];
+
+  // A paused read leaves isLoading false and no payload. That is not an empty
+  // account, and a failed read is not an unknown note.
+  const arrived = list.data != null && !list.isPending && !list.isLoading && !list.isError;
+  const read = notesListRead({
+    isError: list.isError,
+    isPending: !arrived,
+    count: arrived ? filteredNotes.length : null,
+  });
+  const readMessage =
+    read === 'unread' || read === 'failed'
+      ? t(read === 'unread' ? 'notes.checking' : 'notes.loadFailed', notesListReadMessage(read))
+      : null;
 
   return (
     <Card>
@@ -84,17 +98,16 @@ export function NotesPanel({ accountId, companyName, domain }: Props) {
             title={t('notes.noAccountTitle', 'Select an account to view notes')}
             message={t('notes.noAccountMessage', 'Notes are attached to a customer account.')}
           />
-        ) : list.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : list.isError ? (
-          <ErrorState
-            title={t('notes.loadErrorTitle', "Couldn't load notes")}
-            message={
-              list.error instanceof Error
-                ? list.error.message
-                : t('notes.unknownError', 'Unknown error')
-            }
-          />
+        ) : read === 'failed' ? (
+          <ErrorState title={readMessage ?? notesListReadMessage('failed')} />
+        ) : read === 'unread' ? (
+          list.isLoading ? (
+            <LoadingSkeleton rows={3} />
+          ) : (
+            <p role="status" className="px-1 py-6 text-center text-sm text-[var(--fg-secondary)]">
+              {readMessage}
+            </p>
+          )
         ) : filteredNotes.length === 0 ? (
           <EmptyState
             title={t('notes.emptyTitle', 'No notes yet')}
