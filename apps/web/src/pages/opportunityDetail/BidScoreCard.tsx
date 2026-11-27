@@ -18,6 +18,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { useBidScoreLatest } from '@/hooks/useBidScore';
 
 import { CATEGORY_INFO } from '../bidNoBid/bidNoBidTypes';
+import { opportunityBidScorePhase } from './opportunity-bid-score-read';
 
 const REC_TONE = { bid: 'jade', no_bid: 'tomato', proceed_with_caution: 'amber' } as const;
 
@@ -88,9 +89,20 @@ function CategoryScores({ categoryScores }: { categoryScores: Record<string, num
 
 export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
   const { t } = useTranslation('crm');
-  const { data, isLoading, isError, error } = useBidScoreLatest(opportunityId);
-  // 404 = "not scored yet" (empty state); anything else is a real failure.
-  const notFound = (error as { status?: number } | null)?.status === 404;
+  const score = useBidScoreLatest(opportunityId);
+  const { data, isLoading } = score;
+  // A pause reports isLoading false, so the old order fell through to the
+  // unscored sentence before any score had arrived. A 404 stays a settled
+  // miss. Any other error stays a failed read.
+  const phase = opportunityBidScorePhase({
+    data,
+    isError: score.isError,
+    isLoading,
+    isPending: score.isPending,
+    fetchStatus: score.fetchStatus,
+    status: score.status,
+    error: score.error,
+  });
 
   const REC_LABEL = {
     bid: t('bidScore.recBid', 'Bid'),
@@ -102,17 +114,25 @@ export function BidScoreCard({ opportunityId }: { opportunityId: string }) {
     <Card>
       <SectionHeader title={t('bidScore.title', 'Bid/No-Bid Score')} />
       <div className="p-5 flex flex-col justify-between h-[calc(100%-48px)] min-h-[140px]">
-        {isLoading ? (
+        {phase === 'unread' ? (
           <div className="space-y-3">
-            <div className="h-8 w-24 bg-[var(--surface-sunken)] animate-pulse rounded" />
-            <div className="h-4 w-32 bg-[var(--surface-sunken)] animate-pulse rounded" />
-            <div className="h-16 w-full bg-[var(--surface-sunken)] animate-pulse rounded" />
+            <p role="status" className="text-xs text-[var(--fg-secondary)]">
+              {t('bidScore.checkingTitle', 'Checking the bid score')}.{' '}
+              {t('bidScore.checkingMessage', 'The score has not arrived.')}
+            </p>
+            {isLoading ? (
+              <div aria-hidden="true" className="space-y-3">
+                <div className="h-8 w-24 bg-[var(--surface-sunken)] animate-pulse rounded" />
+                <div className="h-4 w-32 bg-[var(--surface-sunken)] animate-pulse rounded" />
+                <div className="h-16 w-full bg-[var(--surface-sunken)] animate-pulse rounded" />
+              </div>
+            ) : null}
           </div>
-        ) : isError && !notFound ? (
+        ) : phase === 'failed' ? (
           <p role="alert" className="text-xs text-[var(--danger)]">
             {t('bidScore.loadError', 'Could not load the bid score. Refresh to try again.')}
           </p>
-        ) : data ? (
+        ) : phase === 'ready' && data ? (
           <div className="space-y-4 flex flex-col justify-between h-full">
             <div className="space-y-3">
               <div className="flex items-baseline gap-2">
