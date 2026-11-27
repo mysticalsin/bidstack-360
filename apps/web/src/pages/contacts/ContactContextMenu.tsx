@@ -20,9 +20,12 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { toast } from '@/components/ui/Toast';
 import type { Contact } from '@bidstack/shared';
+
+import { contactMenuDialHref, contactMenuMailHref, contactMenuRecordPath } from './contact-menu-href';
 
 export function ContactContextMenu({
   x,
@@ -70,10 +73,14 @@ export function ContactContextMenu({
     };
   }, [onClose]);
 
-  // Clamp to viewport — assume a 220×200 menu, never let the click open a
-  // menu that immediately falls off-screen.
-  const MENU_W = 220;
-  const MENU_H = 200;
+  const recordPath = contactMenuRecordPath(contact.id);
+  const mail = contactMenuMailHref(contact.email);
+  const dial = contactMenuDialHref(contact.phone);
+
+  // Clamp to viewport. Open, mail, and call sit above edit and delete, and
+  // each row is a 44px target, so the menu is taller than the old line box.
+  const MENU_W = 320;
+  const MENU_H = 360;
   const left = Math.min(x, window.innerWidth - MENU_W - 8);
   const top = Math.min(y, window.innerHeight - MENU_H - 8);
 
@@ -89,6 +96,9 @@ export function ContactContextMenu({
   };
 
   const handleKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
+    // The contacts table also listens on window for ArrowDown. Stopping here
+    // keeps that cursor still while focus moves inside the menu.
+    e.stopPropagation();
     const menuitems = Array.from(
       menuRef.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? [],
     );
@@ -128,11 +138,26 @@ export function ContactContextMenu({
       animate={{ opacity: 1, scale: 1 }}
       transition={reduced ? { duration: 0.15 } : { type: 'spring', stiffness: 280, damping: 26 }}
       style={{ left, top }}
-      className="fixed z-[200] w-[220px] overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 text-sm shadow-[var(--shadow-lg)]"
+      className="fixed z-[200] w-[320px] overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] py-1 text-sm shadow-[var(--shadow-lg)]"
       // Catch clicks inside so the document-level mousedown doesn't close
       // the menu before the item's onClick fires.
       onMouseDown={(e) => e.stopPropagation()}
     >
+      {recordPath ? (
+        <ContextItem href={recordPath} onClick={onClose}>
+          {t('contactContextMenu.openContact', 'Open {{name}}', { name: contact.name })}
+        </ContextItem>
+      ) : null}
+      {mail ? (
+        <ContextItem href={mail} onClick={onClose}>
+          {t('contactContextMenu.emailContact', 'Email {{address}}', { address: contact.email })}
+        </ContextItem>
+      ) : null}
+      {dial ? (
+        <ContextItem href={dial} onClick={onClose}>
+          {t('contactContextMenu.callContact', 'Call {{phone}}', { phone: contact.phone })}
+        </ContextItem>
+      ) : null}
       <ContextItem onClick={() => onEdit(contact)}>
         {t('contactContextMenu.editContact', 'Edit contact')}
       </ContextItem>
@@ -159,23 +184,39 @@ export function ContactContextMenu({
 
 function ContextItem({
   onClick,
+  href,
   tone,
   children,
 }: {
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
   tone?: 'danger';
   children: ReactNode;
 }) {
+  const className = `flex min-h-11 w-full items-center px-3 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:focus-visible:ring-[var(--brand-deep)] ${
+    tone === 'danger' ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
+  }`;
+  if (href?.startsWith('/')) {
+    return (
+      <li role="none">
+        <Link to={href} role="menuitem" onClick={onClick} className={className}>
+          {children}
+        </Link>
+      </li>
+    );
+  }
+  if (href) {
+    return (
+      <li role="none">
+        <a href={href} role="menuitem" onClick={onClick} className={className}>
+          {children}
+        </a>
+      </li>
+    );
+  }
   return (
     <li role="none">
-      <button
-        type="button"
-        role="menuitem"
-        onClick={onClick}
-        className={`flex w-full items-center px-3 py-1.5 text-left hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] ${
-          tone === 'danger' ? 'text-[var(--danger)]' : 'text-[var(--fg-primary)]'
-        }`}
-      >
+      <button type="button" role="menuitem" onClick={onClick} className={className}>
         {children}
       </button>
     </li>
