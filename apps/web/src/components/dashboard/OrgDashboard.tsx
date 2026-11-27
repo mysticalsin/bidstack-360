@@ -16,6 +16,7 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 import { useWatchdogFeed } from '@/hooks/useWatchdogFeed';
 import { springSoft } from '@/lib/motion';
+import { readPhase } from '@/lib/read-phase';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from './unspecified-currency';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fmtCompact } from '@/components/viz/viz-data';
@@ -176,8 +177,9 @@ export const OrgDashboard = memo(function OrgDashboard() {
   // Exactly one H1 per state: the visible page title in the main view, an
   // sr-only one while loading, on error and in the empty-org state.
   const srTitle = <h1 className="sr-only">{t('orgDashboard.pageTitle', 'Dashboard')}</h1>;
+  const summaryPhase = readPhase(summary);
   if (summary.isLoading) return <>{srTitle}<DashboardSkeleton /></>;
-  if (summary.isError) {
+  if (summaryPhase === 'error') {
     return (
       <>
       {srTitle}
@@ -194,6 +196,16 @@ export const OrgDashboard = memo(function OrgDashboard() {
           </button>
         }
       />
+      </>
+    );
+  }
+  if (summaryPhase === 'unread') {
+    return (
+      <>
+        {srTitle}
+        <p className="text-sm text-[var(--fg-secondary)]" role="status">
+          {t('orgDashboard.checking', 'Checking the workspace')}
+        </p>
       </>
     );
   }

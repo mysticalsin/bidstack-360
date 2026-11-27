@@ -28,6 +28,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useBulkSelection } from '@/hooks/useBulkSelection';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
+import { readPhase } from '@/lib/read-phase';
 
 import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 
@@ -404,7 +405,7 @@ export function CompaniesPage() {
 
       {companies.isLoading ? (
         <LoadingSkeleton rows={8} />
-      ) : companies.isError ? (
+      ) : readPhase(companies) === 'error' ? (
         <ErrorState
           title={t('companies.error.title', 'Failed to load companies')}
           message={
@@ -413,7 +414,11 @@ export function CompaniesPage() {
               : t('companies.error.fallback', 'Something went wrong')
           }
         />
-      ) : !companies.data || companies.data.items.length === 0 ? (
+      ) : readPhase(companies) === 'unread' || !companies.data ? (
+        <p className="text-sm text-[var(--fg-secondary)]" role="status">
+          {t('companies.checking', 'Checking companies')}
+        </p>
+      ) : companies.data.items.length === 0 ? (
         <EmptyState
           icon={searchTerm ? 'search' : 'building'}
           title={

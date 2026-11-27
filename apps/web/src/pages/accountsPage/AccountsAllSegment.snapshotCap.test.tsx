@@ -213,6 +213,21 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
   // dashboard endpoint still returns a (valid, empty) snapshot, not an error.
   // That must read as a first-run empty state with a create CTA, not the
   // filter-miss copy (which implies accounts exist but none matched).
+  it('does not treat an unread dashboard as an empty account list', () => {
+    // WHY: a paused cockpit read has isLoading false and no payload. That is
+    // not a first-run org. "No accounts yet" would hide the seeded companies.
+    dashboardState.current = {
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+    };
+    renderSegment();
+
+    expect(screen.queryByText('No accounts yet')).toBeNull();
+    expect(screen.getByText('Checking accounts')).toBeTruthy();
+  });
+
   it('shows a first-run empty state (not the filter-miss copy) when the org truly has zero accounts', () => {
     setDashboard(0);
     renderSegment();

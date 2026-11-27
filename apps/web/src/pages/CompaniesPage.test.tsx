@@ -129,3 +129,44 @@ describe('CompaniesPage — companies:write gating', () => {
     expect(screen.queryByRole('button', { name: /New company/i })).toBeNull();
   });
 });
+
+describe('CompaniesPage — unread list', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useHasAdminPermission).mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('does not treat an unread company list as an empty radar', () => {
+    // WHY: a paused read has isLoading false and no payload. "No accounts on
+    // the radar" would tell a demo the seeded companies are gone.
+    mockCompanies({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.queryByText('No accounts on the radar')).toBeNull();
+    expect(screen.getByText('Checking companies')).toBeTruthy();
+  });
+
+  it('still says the radar is empty when the list has settled with no rows', () => {
+    mockCompanies({
+      data: { items: [], nextCursor: undefined },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.getByText('No accounts on the radar')).toBeTruthy();
+    expect(screen.queryByText('Checking companies')).toBeNull();
+  });
+});

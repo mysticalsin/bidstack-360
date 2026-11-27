@@ -13,6 +13,7 @@ import type { KeyNumber } from '@bidstack/shared';
 import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { useAccountKeyNumbers } from '@/hooks/useAccountPositioning';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { readPhase } from '@/lib/read-phase';
 
 import { directionOf, formatDelta, formatValue, sparkPoints, toneOf, type MicrosFormatter } from './positioning-format';
 
@@ -109,14 +110,22 @@ export function KeyNumbersStrip({ companyId }: { companyId: string }) {
   // Pipeline micros are EUR at rest; show them in the user's display currency like the rest of the page.
   const fmtMicros: MicrosFormatter = (m) => money.formatMoneyMicros(m, 'EUR', { compact: true });
   const q = useAccountKeyNumbers(companyId);
+  const phase = readPhase(q);
   if (q.isLoading) return <div className="kn" aria-busy="true"><div className="sg-skel" style={{ minHeight: 196 }} /></div>;
-  if (q.isError || !q.data) {
+  if (phase === 'error') {
     return (
       <section className="kn sg-surface">
         <p className="sg-empty" role="alert">
           <span>Couldn&apos;t load the key numbers</span>
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
         </p>
+      </section>
+    );
+  }
+  if (phase === 'unread' || !q.data) {
+    return (
+      <section className="kn">
+        <p className="sg-empty" role="status">Checking key numbers</p>
       </section>
     );
   }
