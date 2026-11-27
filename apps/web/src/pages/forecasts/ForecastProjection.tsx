@@ -23,12 +23,25 @@ import {
 } from '@/components/ui/Table';
 import { forecastPeriodBars } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
 type FormatMoney = (micros: number, currency?: string) => string;
+
+const FORECAST_PROJECTION_BASIS_ID = 'forecast-projection-currency-basis';
+
+// Opportunity rows do not store a currency. These sums are the recorded
+// amounts. The euro converter would invent a forecast, and a display
+// currency would change the number.
+function recordedBidAmount(micros: number): string {
+  return formatUnspecifiedAmount(micros / 1_000_000);
+}
 
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
@@ -88,8 +101,20 @@ export function ForecastProjection() {
             </TabsList>
           </Tabs>
 
-          <ProjectionTotals period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />
-          <ProjectionOwnerTable period={activePeriod} formatMoneyMicros={formatMoneyMicros} t={t} />
+          <ProjectionTotals
+            period={activePeriod}
+            formatMoneyMicros={formatMoneyMicros}
+            basisId={FORECAST_PROJECTION_BASIS_ID}
+            t={t}
+          />
+          <p id={FORECAST_PROJECTION_BASIS_ID} className="text-xs text-[var(--fg-tertiary)]">
+            {t('forecastProjection.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
+          </p>
+          <ProjectionOwnerTable
+            period={activePeriod}
+            basisId={FORECAST_PROJECTION_BASIS_ID}
+            t={t}
+          />
         </div>
       )}
     </Card>
@@ -99,10 +124,11 @@ export function ForecastProjection() {
 interface SubProps {
   period: ForecastProjectionPeriod;
   formatMoneyMicros: FormatMoney;
+  basisId: string;
   t: (key: string, defaultValue: string) => string;
 }
 
-function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
+function ProjectionTotals({ period, formatMoneyMicros, basisId, t }: SubProps) {
   const cards = [
     {
       key: 'weighted',
@@ -135,8 +161,9 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
             className={`mt-1 text-lg font-bold tabular-nums ${
               c.accent ? 'text-[var(--brand-primary)] dark:text-[var(--brand-deep)]' : 'text-[var(--fg-primary)]'
             }`}
+            aria-describedby={basisId}
           >
-            {formatMoneyMicros(c.value, 'EUR')}
+            {recordedBidAmount(c.value)}
           </div>
         </div>
       ))}
@@ -144,7 +171,7 @@ function ProjectionTotals({ period, formatMoneyMicros, t }: SubProps) {
   );
 }
 
-function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
+function ProjectionOwnerTable({ period, basisId, t }: Omit<SubProps, 'formatMoneyMicros'>) {
   if (period.byOwner.length === 0) {
     return (
       <p className="px-1 py-4 text-sm text-[var(--fg-tertiary)]">
@@ -154,7 +181,10 @@ function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
   }
   return (
     <TableScrollArea>
-      <Table aria-label={t('forecastProjection.ownerTableLabel', 'Weighted pipeline by owner')}>
+      <Table
+        aria-label={t('forecastProjection.ownerTableLabel', 'Weighted pipeline by owner')}
+        aria-describedby={basisId}
+      >
         <TableHeader>
           <TableRow>
             <TableHead>{t('forecastProjection.colOwner', 'Owner')}</TableHead>
@@ -174,13 +204,13 @@ function ProjectionOwnerTable({ period, formatMoneyMicros, t }: SubProps) {
                 <span className="text-sm font-medium text-[var(--fg-primary)]">{o.ownerName}</span>
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.openMicros, 'EUR')}
+                {recordedBidAmount(o.openMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums font-semibold text-[var(--fg-primary)]">
-                {formatMoneyMicros(o.weightedMicros, 'EUR')}
+                {recordedBidAmount(o.weightedMicros)}
               </TableCell>
               <TableCell className="text-right tabular-nums text-[var(--fg-secondary)]">
-                {formatMoneyMicros(o.wonMicros, 'EUR')}
+                {recordedBidAmount(o.wonMicros)}
               </TableCell>
             </TableRow>
           ))}
