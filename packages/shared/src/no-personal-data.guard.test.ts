@@ -9,12 +9,15 @@ import { syntheticRut, syntheticRutBody, SYNTHETIC_RUT_SEED } from './public-sec
 
 /**
  * Fails the build when tracked files contain the banned company-email domain,
- * a consumer gmail address, or a checksum-valid Chile RUT outside
+ * any other email domain that is not RFC 2606 reserved or example, a consumer
+ * gmail address, or a checksum-valid Chile RUT outside
  * scripts/synthetic-pii-allowlist.json. Reports path and count only.
+ * The unreserved-domain check does not name a person or a company.
  */
 
 interface Allowlist {
   description?: string;
+  fixtureEmailDomains: string[];
   gmailAddresses: string[];
   mantuPaths: string[];
   rutBodies: number[];
@@ -25,6 +28,7 @@ interface HitCounts {
   mantu: number;
   gmail: number;
   ruts: number;
+  unreserved: number;
 }
 
 const REWRITTEN = [
@@ -47,6 +51,44 @@ const QUOTED_PLAIN_RUT = /["'](\d{7,8}[\dkK])["']/gi;
 const BANNED_EMAIL_DOMAIN = '@' + 'mantu.com';
 const GMAIL = new RegExp('[a-z0-9._%+-]+@' + 'gmail.com', 'gi');
 const MANTU = new RegExp(BANNED_EMAIL_DOMAIN.replace('.', '\\.'), 'gi');
+const RESERVED_TLDS = new Set(['test', 'example', 'invalid', 'localhost']);
+const RESERVED_APEX = new Set(['example.com', 'example.net', 'example.org']);
+const FULL_EMAIL = /[a-z0-9._%+-]+@((?:[a-z0-9-]+\.)+[a-z]{2,})/gi;
+const BARE_DOMAIN = /(^|[^a-z0-9._%+-])@((?:[a-z0-9-]+\.)+[a-z]{2,})/gi;
+
+/** RFC 2606 reserved zones, plus any domain that uses the example label. */
+export function isReservedOrExampleDomain(domain: string): boolean {
+  const labels = domain.toLowerCase().replace(/\.+$/, '').split('.').filter(Boolean);
+  if (labels.length < 2) return false;
+  if (labels.includes('example')) return true;
+  const tld = labels[labels.length - 1] ?? '';
+  if (RESERVED_TLDS.has(tld)) return true;
+  const apex = labels.slice(-2).join('.');
+  return RESERVED_APEX.has(apex);
+}
+
+function unreservedDomains(text: string, allow: Allowlist): number {
+  const ok = new Set(allow.fixtureEmailDomains.map((domain) => domain.toLowerCase()));
+  const seen = new Set<number>();
+  let count = 0;
+  const take = (at: number, domain: string) => {
+    if (seen.has(at)) return;
+    seen.add(at);
+    const normalized = domain.toLowerCase();
+    if (normalized === 'gmail.com' || normalized.endsWith('.gmail.com')) return;
+    if (isReservedOrExampleDomain(normalized) || ok.has(normalized)) return;
+    count += 1;
+  };
+  for (const match of text.matchAll(FULL_EMAIL)) {
+    const at = (match.index ?? 0) + match[0].lastIndexOf('@');
+    take(at, match[1] ?? '');
+  }
+  for (const match of text.matchAll(BARE_DOMAIN)) {
+    const at = (match.index ?? 0) + (match[1]?.length ?? 0);
+    take(at, match[2] ?? '');
+  }
+  return count;
+}
 
 const SKIP_EXT = new Set([
   '.png',
@@ -72,6 +114,7 @@ function repoRoot(): string {
 function loadAllowlist(root: string): Allowlist {
   const raw = JSON.parse(readFileSync(join(root, 'scripts/synthetic-pii-allowlist.json'), 'utf8')) as Allowlist;
   return {
+    fixtureEmailDomains: (raw.fixtureEmailDomains ?? []).map((domain) => domain.toLowerCase()),
     gmailAddresses: raw.gmailAddresses.map((e) => e.toLowerCase()),
     mantuPaths: raw.mantuPaths,
     rutBodies: raw.rutBodies,
@@ -155,7 +198,8 @@ function directIdSchemes(text: string): Map<number, string | null> {
 }
 
 export function scanText(text: string, rel: string, allow: Allowlist, plainRuts: boolean): HitCounts {
-  const hits: HitCounts = { mantu: 0, gmail: 0, ruts: 0 };
+  const hits: HitCounts = { mantu: 0, gmail: 0, ruts: 0, unreserved: 0 };
+  hits.unreserved = unreservedDomains(text, allow);
   if (!allow.mantuPaths.includes(rel)) {
     hits.mantu = [...text.matchAll(MANTU)].length;
   }
@@ -200,7 +244,7 @@ function scanRepo(root: string, allow: Allowlist): Map<string, HitCounts> {
     const text = buf.toString('latin1');
     const plainRuts = !rel.endsWith('.csv');
     const hits = scanText(text, rel, allow, plainRuts);
-    if (hits.mantu || hits.gmail || hits.ruts) report.set(rel, hits);
+    if (hits.mantu || hits.gmail || hits.ruts || hits.unreserved) report.set(rel, hits);
   }
   return report;
 }
@@ -211,19 +255,24 @@ function formatReport(report: Map<string, HitCounts>): string {
   let mantu = 0;
   let gmail = 0;
   let ruts = 0;
+  let unreserved = 0;
   for (const rel of keys) {
     const hit = report.get(rel)!;
     mantu += hit.mantu;
     gmail += hit.gmail;
     ruts += hit.ruts;
+    unreserved += hit.unreserved;
     const parts = [
       hit.mantu ? `banned-domain=${hit.mantu}` : '',
+      hit.unreserved ? `unreserved=${hit.unreserved}` : '',
       hit.gmail ? `gmail=${hit.gmail}` : '',
       hit.ruts ? `rut=${hit.ruts}` : '',
     ].filter(Boolean);
     lines.push(`${rel}: ${parts.join(' ')}`);
   }
-  lines.push(`totals banned-domain=${mantu} gmail=${gmail} rut=${ruts} files=${keys.length}`);
+  lines.push(
+    `totals banned-domain=${mantu} unreserved=${unreserved} gmail=${gmail} rut=${ruts} files=${keys.length}`,
+  );
   return lines.join('\n');
 }
 
@@ -245,12 +294,28 @@ describe('synthetic RUT generator', () => {
 });
 
 describe('personal-data guard', () => {
-  const empty: Allowlist = { gmailAddresses: [], mantuPaths: [], rutBodies: [], rutPaths: [] };
+  const empty: Allowlist = {
+    fixtureEmailDomains: [],
+    gmailAddresses: [],
+    mantuPaths: [],
+    rutBodies: [],
+    rutPaths: [],
+  };
 
   it('flags the banned company domain, a consumer gmail address, and a checksum-valid RUT when nothing is allowlisted', () => {
     const sample = ['user@', 'gmail.com', ' ', '@', 'mantu.com', ' ', syntheticRut(3, 'company').formatted].join('');
     const hits = scanText(sample, 'sample.txt', empty, true);
-    expect(hits).toEqual({ mantu: 1, gmail: 1, ruts: 1 });
+    expect(hits).toEqual({ mantu: 1, gmail: 1, ruts: 1, unreserved: 1 });
+  });
+
+  it('flags an email domain that is not RFC 2606 reserved or example, without naming a person', () => {
+    const unreserved = ['person@not-reserved.', 'com'].join('');
+    expect(scanText(unreserved, 'sample.txt', empty, true).unreserved).toBe(1);
+    expect(scanText('person@example.com', 'sample.txt', empty, true).unreserved).toBe(0);
+    expect(scanText('person@example.test', 'sample.txt', empty, true).unreserved).toBe(0);
+    expect(scanText('person@docs.example', 'sample.txt', empty, true).unreserved).toBe(0);
+    const allowed: Allowlist = { ...empty, fixtureEmailDomains: ['not-reserved.com'] };
+    expect(scanText(unreserved, 'sample.txt', allowed, true).unreserved).toBe(0);
   });
 
   it('flags a dashed RUT that the dotted pattern cannot see', () => {
@@ -325,13 +390,14 @@ describe('personal-data guard', () => {
   it('ignores an allowlisted gmail fixture and a seeded RUT body', () => {
     const rut = syntheticRut(4, 'person');
     const allow: Allowlist = {
+      fixtureEmailDomains: [],
       gmailAddresses: ['owner@gmail.com'],
       mantuPaths: [],
       rutBodies: [rut.body],
       rutPaths: [],
     };
     const sample = `owner@gmail.com ${rut.formatted}`;
-    expect(scanText(sample, 'sample.txt', allow, true)).toEqual({ mantu: 0, gmail: 0, ruts: 0 });
+    expect(scanText(sample, 'sample.txt', allow, true)).toEqual({ mantu: 0, gmail: 0, ruts: 0, unreserved: 0 });
   });
 
   it('does not path-allow the fixtures this change rewrote', () => {

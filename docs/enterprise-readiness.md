@@ -134,7 +134,7 @@ v24 cockpit, MARS sync, and MSA intake (HEMA leverage flags) are unchanged.
 
 ## Owner decisions before loading real data
 
-1. **Allowed users and roles** — set `POLO_ALLOWED_USERS` (and keep Cloudflare Access `ALLOWED_EMAILS` in sync). Example: `tony@example.test:Admin,colleague@amaris.com:Account Executive`.
+1. **Allowed users and roles** — set `POLO_ALLOWED_USERS` (and keep Cloudflare Access `ALLOWED_EMAILS` in sync). Example: `tony@example.test:Admin,colleague@example.test:Account Executive`.
 2. **Auth path** — Cloudflare Access (`CF_ACCESS_AUTH=true`, `VITE_AUTH_MODE=cf-access`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`) **or** Clerk. Not both. Not stub.
 3. **Empty real org id** — `POLO_REAL_ORG_CLERK` (default `org_polo_real`) and `pnpm db:seed:prod -- --clerk-org … --name "Mantu Sales"`.
 4. **Backup destination** — `POLO_BACKUP_DIR` or a managed Postgres snapshot. Run `pnpm db:backup:selftest` once, then a real restore drill.

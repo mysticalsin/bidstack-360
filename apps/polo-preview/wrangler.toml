@@ -9,6 +9,11 @@
 #   DO      RELAY / Relay / namespace 0d921e2b3ba74386afdb1147745866d0
 #   secret  RELAY_KEY (set once on the Worker; never committed)
 #   secret  ACCESS_AUD (wrangler secret put ACCESS_AUD) Cloudflare Access audience
+#   secret  ALLOWED_EMAILS (wrangler secret put ALLOWED_EMAILS)
+#   secret  POLO_ADMIN_EMAILS (wrangler secret put POLO_ADMIN_EMAILS)
+# Do not assign those names under [vars]. Without the secrets the Worker
+# refuses authenticated routes instead of demoting admins. Do not use this
+# file to deploy the live Worker.
 #
 # Container secrets (names only; values in the macOS Keychain, service toto-os):
 #   POLO_INTERNAL_KEY               Worker <-> container control endpoints
@@ -37,9 +42,8 @@ workers_dev = true
 preview_urls = false
 
 [vars]
-# Exact emails, or @domain to admit a whole domain (exact match) as Sales Manager.
-ALLOWED_EMAILS = "alex.example@example.test,@example.test"
-POLO_ADMIN_EMAILS = "alex.example@example.test"
+# ALLOWED_EMAILS, POLO_ADMIN_EMAILS, and ACCESS_AUD are secrets. See the
+# header. Assigning them here would publish placeholders over the live values.
 PUBLIC_ORIGIN = "https://polo-preview.tony-walteur.workers.dev"
 # SEC EDGAR and public registries require a contact User-Agent.
 POLO_INTEL_USER_AGENT = "Polo account intelligence (Amaris Consulting) intel@example.test"
