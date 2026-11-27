@@ -72,6 +72,12 @@ export interface DueDateChipProps {
   /** sm = kanban card / dense table cell. md = default. lg = detail-page header. */
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  /**
+   * How the accessible name prints the absolute day. Defaults to the shared
+   * instant formatter. The opportunities list passes a calendar-day formatter
+   * so the name matches the Due cell west of UTC.
+   */
+  formatAbsoluteDate?: (dueDate: string) => string;
 }
 
 const SIZE_CLASS: Record<'sm' | 'md' | 'lg', string> = {
@@ -82,9 +88,15 @@ const SIZE_CLASS: Record<'sm' | 'md' | 'lg', string> = {
 
 const ICON_SIZE: Record<'sm' | 'md' | 'lg', number> = { sm: 10, md: 12, lg: 13 };
 
-export function DueDateChip({ dueDate, size = 'md', className }: DueDateChipProps) {
+export function DueDateChip({
+  dueDate,
+  size = 'md',
+  className,
+  formatAbsoluteDate,
+}: DueDateChipProps) {
   const { t } = useTranslation('crm');
   const { tone, days } = dueDateUrgency(dueDate);
+  const printDate = formatAbsoluteDate ?? formatDate;
 
   const label =
     days === null
@@ -100,7 +112,7 @@ export function DueDateChip({ dueDate, size = 'md', className }: DueDateChipProp
   // meaning between when the page was rendered and when it's read aloud;
   // the absolute date does not.
   const ariaLabel = dueDate
-    ? t('dueDateChip.ariaLabel', 'Due {{date}}', { date: formatDate(dueDate) })
+    ? t('dueDateChip.ariaLabel', 'Due {{date}}', { date: printDate(dueDate) })
     : t('dueDateChip.ariaLabelNoDate', 'No due date set');
 
   return (
