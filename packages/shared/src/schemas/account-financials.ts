@@ -115,6 +115,55 @@ export const FinancialPeriod = z.object({
 });
 export type FinancialPeriod = z.infer<typeof FinancialPeriod>;
 
+type StoredMetric = { value?: unknown; concept?: unknown };
+type StoredMetrics = Record<string, StoredMetric | undefined> & {
+  _derived?: { operatingMargin?: unknown; netMargin?: unknown; freeCashFlow?: unknown };
+};
+
+const finiteNumber = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/** Percent, one decimal. Null when revenue is missing, zero, or not finite. */
+function marginPercent(part: number | null, revenue: number | null): number | null {
+  if (part == null || revenue == null || revenue <= 0) return null;
+  const pct = Math.round((part / revenue) * 1000) / 10;
+  return Number.isFinite(pct) ? pct : null;
+}
+
+/**
+ * Margin for one stored year. A filer-written `_derived` wins. Otherwise Polo
+ * divides operating or net income by revenue. Zero revenue stays null.
+ */
+export function resolvePeriodDerived(metrics: StoredMetrics | null | undefined): FinancialPeriod['derived'] {
+  const m = metrics ?? {};
+  const stored = m._derived;
+  const revenue = finiteNumber(m.revenue?.value);
+  return {
+    operatingMargin: finiteNumber(stored?.operatingMargin) ?? marginPercent(finiteNumber(m.operatingIncome?.value), revenue),
+    netMargin: finiteNumber(stored?.netMargin) ?? marginPercent(finiteNumber(m.netIncome?.value), revenue),
+    freeCashFlow: finiteNumber(stored?.freeCashFlow),
+  };
+}
+
+export type FinancialDataMode = 'demo' | 'real';
+
+/** The built-in example is demo-only, and only while the account has no stored filings. */
+export function builtInFinancialSample(mode: FinancialDataMode, eligible: boolean, storedCount: number): boolean {
+  return mode === 'demo' && eligible && storedCount === 0;
+}
+
+const SAMPLE_FINANCIAL_SOURCES = new Set(['Sample data', 'sample', 'fixture']);
+
+export function isSampleFinancialSource(source: string): boolean {
+  return SAMPLE_FINANCIAL_SOURCES.has(source);
+}
+
+/** Real mode does not take a margin from a fixture or built-in example year. */
+export function marginPeriodsForMode(periods: FinancialPeriod[], mode: FinancialDataMode): FinancialPeriod[] {
+  if (mode !== 'real') return periods;
+  return periods.filter((p) => !isSampleFinancialSource(p.source));
+}
+
 export const FinancialSignalRule = z.enum([
   'capex_up',
   'rnd_up',

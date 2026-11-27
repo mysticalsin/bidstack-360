@@ -14,6 +14,8 @@ import {
   themeForText,
   tierLabel,
   pickFigure,
+  isSampleFinancialSource,
+  marginPeriodsForMode,
   type FigureOrigin,
   type FigureProvenance,
   type AccountKeyNumbers,
@@ -28,6 +30,7 @@ import {
 } from '@bidstack/shared';
 
 import type { AccessScope } from '../../lib/access-scope.js';
+import { getPoloDataMode } from '../../lib/polo-mode.js';
 import { visibleMeetingWhere } from '../../meeting-intel/access.js';
 import { loadAccountFinancials } from '../../routes/account-financials.js';
 import { loadInitiatives } from '../account-signals/initiatives.js';
@@ -410,13 +413,16 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     editKey: 'annualRevenueMicros',
   });
 
-  // Margin trend.
-  const lm = latest ? marginOf(latest) : null;
-  if (lm && latest) {
-    const pm = prev ? marginOf(prev) : null;
-    const series = asc.map((p) => (lm.label === 'Operating margin' ? p.derived.operatingMargin : p.derived.netMargin)).filter((v): v is number => v != null);
-    items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${latest.source}, derived by Polo`, period: `${fy(latest)}, change vs prior year`, sourceUrl: latest.sourceUrl, anchor: 'financial-health' }));
-  } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', missing: latest ? 'No margin in the filed numbers' : finMissing }));
+  // Margin trend. Real mode ignores fixture and built-in example years.
+  const marginPeriods = marginPeriodsForMode(periods, getPoloDataMode());
+  const marginLatest = marginPeriods[0];
+  const marginPrev = marginLatest ? marginPeriods.find((p) => p.fiscalYear === marginLatest.fiscalYear - 1) : undefined;
+  const lm = marginLatest ? marginOf(marginLatest) : null;
+  if (lm && marginLatest) {
+    const pm = marginPrev ? marginOf(marginPrev) : null;
+    const series = [...marginPeriods].reverse().map((p) => (lm.label === 'Operating margin' ? p.derived.operatingMargin : p.derived.netMargin)).filter((v): v is number => v != null);
+    items.push(base({ id: 'margin', group: 'company', label: lm.label, unit: 'pct', value: Math.round(lm.value * 10) / 10, delta: pm && pm.label === lm.label ? Math.round((lm.value - pm.value) * 10) / 10 : null, deltaUnit: 'pts', series, source: `${marginLatest.source}, derived by Polo`, period: `${fy(marginLatest)}, change vs prior year`, sourceUrl: marginLatest.sourceUrl, anchor: 'financial-health', sample: isSampleFinancialSource(marginLatest.source) }));
+  } else items.push(base({ id: 'margin', group: 'company', label: 'Margin', unit: 'pct', source: 'None', missing: marginLatest ? 'No margin in the filed numbers' : finMissing }));
 
   // Open jobs and hiring trend.
   const openJobs = postings.filter((p) => (p.lastSeenAt ?? p.postedAt) >= new Date(now.getTime() - 45 * DAY)).length;

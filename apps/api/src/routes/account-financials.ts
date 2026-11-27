@@ -20,10 +20,13 @@ import {
   financialsGate,
   tierLabel,
   FINANCIAL_SOURCE_LABEL,
+  builtInFinancialSample,
+  resolvePeriodDerived,
   type FinancialPeriod,
 } from '@bidstack/shared';
 
 import { canReadAccount } from '../lib/account-access.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
 import { userHasAnyRole, userHasPermission } from '../lib/rbac-decision-cache.js';
 import { syncAccountFinancialsSchedule } from '../services/account-financials/schedule.js';
 
@@ -67,16 +70,15 @@ export async function loadAccountFinancials(orgId: string, companyId: string, to
       sourceUrl: r.sourceUrl,
       filedAt: r.filedAt ? r.filedAt.toISOString() : null,
       metrics,
-      derived: { operatingMargin: _derived?.operatingMargin ?? null, netMargin: _derived?.netMargin ?? null, freeCashFlow: _derived?.freeCashFlow ?? null },
+      derived: resolvePeriodDerived(r.metrics as Parameters<typeof resolvePeriodDerived>[0]),
     };
   });
   // The probe is the row past the list. It is not a period to show.
   const page = filingPeriodPage(loaded);
   const periods = page.periods;
   const signals = z.array(FinancialSignal).catch([]).parse(p?.signals ?? []);
-  // Sample only for tracked accounts still waiting for real filings; General
-  // accounts get the plain empty state instead.
-  const sample = periods.length === 0 && financialsEligible(c);
+  // Built-in example only in demo, and only while a tracked account has no stored filings.
+  const sample = builtInFinancialSample(getPoloDataMode(), financialsEligible(c), periods.length);
   return {
     companyId: c.id,
     tier: c.tier,

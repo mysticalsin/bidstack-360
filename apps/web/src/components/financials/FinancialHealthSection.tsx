@@ -14,6 +14,7 @@ import type { AccountFinancials } from '@bidstack/shared';
 import { Spark } from '@/components/viz/charts';
 import { noDash } from '@/components/signals/category';
 import { useAccountFinancials, useTrackFinancials } from '@/hooks/useAccountFinancials';
+import { usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 
 import { buildTiles, type Tile } from './financials-format';
 
@@ -104,9 +105,11 @@ function TrackToggle({ data, companyId }: { data: AccountFinancials; companyId: 
 
 export function FinancialHealthSection({ companyId }: { companyId: string }) {
   const q = useAccountFinancials(companyId);
+  const identity = usePoloPublicIdentity();
   const d = q.data;
+  const showExample = Boolean(d?.sample) && identity.data?.dataMode === 'demo';
   const general = d?.gate === 'general';
-  const tiles = d ? buildTiles(d.periods) : [];
+  const tiles = d && (showExample || !d.sample) ? buildTiles(d.periods) : [];
   const latest = d && !d.sample ? d.periods.reduce<string | null>((m, p) => (!m || p.periodEnd > m ? p.periodEnd : m), null) : null;
   const latestFy = latest && d ? d.periods.find((p) => p.periodEnd === latest)?.fiscalYear : null;
   // Measured against the last pull (not the clock) so render stays pure.
@@ -117,13 +120,13 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
       <section className="wd-surface" aria-labelledby="fh-h">
         <header className="wd-head">
           <h2 id="fh-h" className="wd-h">
-            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            Public financials watchdog {showExample ? <span className="wd-sample-badge">Sample</span> : null}
           </h2>
           {d ? (
             <span className="wd-row-meta">
               {d.tierLabel} account
               {d.entity ? ` · ${d.entity.source}` : ''}
-              {d.lastPulledAt && !d.sample ? ` · pulled ${dateFmt.format(new Date(d.lastPulledAt))}` : ''}
+              {d.lastPulledAt && !showExample ? ` · pulled ${dateFmt.format(new Date(d.lastPulledAt))}` : ''}
             </span>
           ) : null}
         </header>
@@ -134,6 +137,14 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
             <span>Couldn&apos;t load financials</span>
             <button type="button" className="wd-more" onClick={() => void q.refetch()}>Retry</button>
           </p>
+        ) : d && d.sample && !showExample ? (
+          <>
+            {d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
+            <footer className="fh-foot">
+              <span id={`fh-gate-${companyId}`} className="wd-row-meta">{d.gateCopy}</span>
+              <TrackToggle data={d} companyId={companyId} />
+            </footer>
+          </>
         ) : d ? (
           <>
             {general && !d.periods.length ? (
@@ -143,15 +154,15 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
               </div>
             ) : (
               <>
-                {d.sample ? <p className="wd-row-meta">Example layout. {d.statusCopy ?? 'Real filed numbers replace it after the next pull.'}</p> : null}
-                {!d.sample && d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
+                {showExample ? <p className="wd-row-meta">Example layout. {d.statusCopy ?? 'Real filed numbers replace it after the next pull.'}</p> : null}
+                {!showExample && d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
                 {stale ? (
                   <p className="wd-row-meta fh-stale" data-testid="fh-stale">
                     Latest filed period is FY{latestFy}. No newer statements at this source, so read the trend as history.
                   </p>
                 ) : null}
                 <div className="fh-tiles">
-                  {tiles.map((t) => <MetricTile key={t.key} t={t} sample={d.sample} />)}
+                  {tiles.map((t) => <MetricTile key={t.key} t={t} sample={showExample} />)}
                 </div>
                 {signals.length ? (
                   <>
