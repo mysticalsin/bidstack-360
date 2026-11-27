@@ -3,29 +3,56 @@ import { z } from 'zod';
 
 import { prisma } from '@bidstack/db';
 import type { Prisma } from '@bidstack/db';
-import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '@bidstack/shared';
+import {
+  projectFixtureTaskDueDate,
+  Task,
+  TaskCreate,
+  TaskFilter,
+  TaskPage,
+  TaskPatch,
+  TaskSummary,
+} from '@bidstack/shared';
 
+import { projectedTaskDueSql } from '../demo/fixture-task-due-sql.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
 
-async function buildTaskSummary(orgId: string): Promise<TaskSummaryPayload> {
-  const today = new Date().toISOString().slice(0, 10);
-  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+function readTaskDueDate(
+  task: { id: string; status: string; dueDate: Date | null },
+  now: Date,
+): string | null {
+  if (!task.dueDate) return null;
+  const projected = projectFixtureTaskDueDate(
+    { id: task.id, status: task.status, dueDate: task.dueDate },
+    now,
+    getPoloDataMode(),
+  );
+  return projected.toISOString().slice(0, 10);
+}
+
+async function buildTaskSummary(orgId: string, now = new Date()): Promise<TaskSummaryPayload> {
+  const today = now.toISOString().slice(0, 10);
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const due = projectedTaskDueSql(now, getPoloDataMode());
   const rows = await prisma.$queryRaw<Array<TaskSummaryPayload>>`
     SELECT
       COUNT(*)::int AS total,
       COUNT(*) FILTER (WHERE status <> 'done')::int AS open,
-      COUNT(*) FILTER (WHERE status <> 'done' AND due_date < ${today}::date)::int AS overdue,
+      COUNT(*) FILTER (WHERE status <> 'done' AND due_on < ${today}::date)::int AS overdue,
       COUNT(*) FILTER (
         WHERE status <> 'done'
-          AND due_date >= ${today}::date
-          AND due_date < ${nextWeek}::date
+          AND due_on >= ${today}::date
+          AND due_on < ${nextWeek}::date
       )::int AS "dueSoon"
-    FROM tasks
-    WHERE org_id = ${orgId}::uuid
-      AND deleted_at IS NULL
+    FROM (
+      SELECT status, ${due} AS due_on
+      FROM tasks
+      WHERE org_id = ${orgId}::uuid
+        AND deleted_at IS NULL
+    ) AS task_due
   `;
   return rows[0] ?? { total: 0, open: 0, overdue: 0, dueSoon: 0 };
 }
@@ -57,12 +84,13 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
       const hasMore = items.length > limit;
       const sliced = hasMore ? items.slice(0, -1) : items;
       const nextCursor = hasMore ? (sliced[sliced.length - 1]?.id ?? null) : null;
+      const now = new Date();
       return {
         items: sliced.map((t) => ({
           id: t.id,
           oppId: t.oppId,
           title: t.title,
-          dueDate: t.dueDate ? t.dueDate.toISOString().slice(0, 10) : null,
+          dueDate: readTaskDueDate(t, now),
           status: t.status,
           assignee: t.assignee?.email ?? null,
           createdAt: t.createdAt.toISOString(),
@@ -112,7 +140,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         id: task.id,
         oppId: task.oppId,
         title: task.title,
-        dueDate: task.dueDate ? task.dueDate.toISOString().slice(0, 10) : null,
+        dueDate: readTaskDueDate(task, new Date()),
         status: task.status,
         assignee: task.assignee?.email ?? null,
         createdAt: task.createdAt.toISOString(),
@@ -177,7 +205,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         id: created.id,
         oppId: created.oppId,
         title: created.title,
-        dueDate: created.dueDate ? created.dueDate.toISOString().slice(0, 10) : null,
+        dueDate: readTaskDueDate(created, new Date()),
         status: created.status,
         assignee: created.assignee?.email ?? null,
         createdAt: created.createdAt.toISOString(),
@@ -315,7 +343,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         id: updated.id,
         oppId: updated.oppId,
         title: updated.title,
-        dueDate: updated.dueDate ? updated.dueDate.toISOString().slice(0, 10) : null,
+        dueDate: readTaskDueDate(updated, new Date()),
         status: updated.status,
         assignee: updated.assignee?.email ?? null,
         createdAt: updated.createdAt.toISOString(),

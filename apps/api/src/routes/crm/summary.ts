@@ -3,6 +3,9 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
+import { projectedTaskDueSql } from '../../demo/fixture-task-due-sql.js';
+import { getPoloDataMode } from '../../lib/polo-mode.js';
+
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
@@ -59,7 +62,8 @@ export function invalidateCrmSummaryCache(orgId: string): void {
   }
 }
 
-async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummaryPayload> {
+async function buildCrmSummary(orgId: string, limit: number, now = new Date()): Promise<CrmSummaryPayload> {
+  const taskDue = projectedTaskDueSql(now, getPoloDataMode());
   // NOTE: 'closed_won' and 'closed_lost' are inlined as SQL text (not interpolated
   // parameters) because Prisma's $queryRaw tagged-template serializer cannot encode
   // a JS array as a PostgreSQL enum-array parameter. Static enum literals are safe
@@ -92,7 +96,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
           FROM tasks
           WHERE org_id = ${orgId}::uuid
             AND status <> 'done'
-            AND due_date < CURRENT_DATE
+            AND ${taskDue} < CURRENT_DATE
             AND deleted_at IS NULL
         ) AS "overdueTasks",
         (SELECT COUNT(*)::int FROM service_cases WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS "serviceCases",
