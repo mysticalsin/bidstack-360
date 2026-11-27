@@ -7,11 +7,13 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { useIsAdmin } from '@/lib/auth';
 import { useStageGateMode, useUpdateStageGateMode } from '@/hooks/useStageGateMode';
 import type { OrgStageGateSettings, StageGateMode } from '@bidstack/shared';
+
+import { stageGatePhase } from './stage-gate-read';
 
 // '' is the wire's `null` — "no override, follow the server default". A select
 // cannot carry null, so the empty string is the sentinel and is mapped back on
@@ -26,14 +28,34 @@ const OPTIONS: { value: StageGateMode | ''; labelKey: string; fallback: string }
 export function StageGateSection() {
   const { t } = useTranslation('settings');
   const stageGate = useStageGateMode();
+  const phase = stageGatePhase({
+    data: stageGate.data,
+    isError: stageGate.isError,
+    status: stageGate.status,
+  });
 
-  if (stageGate.isLoading) return <LoadingSkeleton rows={2} />;
-  if (stageGate.isError || !stageGate.data) {
+  if (phase === 'failed') {
     return (
       <ErrorState
         title={t('stageGate.loadErrorTitle', 'Could not load stage-gate enforcement')}
         message={stageGate.error?.message ?? t('stageGate.loadErrorMessage', 'Try again shortly.')}
       />
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('stageGate.checking', 'Checking stage-gate enforcement. The setting has not arrived.')}
+      </p>
+    );
+  }
+
+  if (stageGate.data == null) {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        {t('stageGate.none', 'No stage-gate enforcement is saved.')}
+      </p>
     );
   }
 
