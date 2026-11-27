@@ -1,17 +1,23 @@
 // Email, LinkedIn and phone for one person. Compact: small icon links on the
 // chart node. Full: labelled rows in the side panel. Only safe schemes are
 // rendered (mailto:, https://*.linkedin.com, tel:); LinkedIn opens in a new tab.
+//
+// A node with no phone of its own shows the linked contact's phone. Demo
+// contacts store that number with spaces ("+49 30 1234 5670"). The call href
+// is the digits. The printed number stays the label. A fragment stays text.
+import { normalizePhone } from '@bidstack/shared';
+
 import type { OrgNode } from '@/lib/orgchart/types';
 
 const LINKEDIN = /^https:\/\/([a-z0-9-]+\.)*linkedin\.com\//i;
 const EMAIL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
-const PHONE = /^\+?[0-9]{7,15}$/;
 
 export function contactHrefs(n: Pick<OrgNode, 'email' | 'phone' | 'linkedinUrl'>) {
+  const dial = normalizePhone(n.phone);
   return {
     email: n.email && EMAIL.test(n.email) ? `mailto:${n.email}` : null,
     linkedin: n.linkedinUrl && LINKEDIN.test(n.linkedinUrl) ? n.linkedinUrl : null,
-    phone: n.phone && PHONE.test(n.phone) ? `tel:${n.phone}` : null,
+    phone: dial ? `tel:${dial}` : null,
   };
 }
 
