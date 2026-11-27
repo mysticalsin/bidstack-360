@@ -13,7 +13,9 @@ import {
   stripSamplePrefix,
   themeForText,
   tierLabel,
+  fixtureClockMode,
   pickFigure,
+  projectFixturePostings,
   type FigureOrigin,
   type FigureProvenance,
   type AccountKeyNumbers,
@@ -317,7 +319,7 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     prisma.company.findFirstOrThrow({ where: { id: companyId, orgId }, select: { name: true, employeeCount: true, updatedAt: true } }),
     prisma.companyFirmographics.findFirst({ where: { orgId, companyId }, select: { employeeCount: true, headcountGrowth12m: true, annualRevenueUsd: true, fetchedAt: true, provenance: true } }),
     loadAccountFinancials(orgId, companyId, false),
-    prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true }, take: 1000 }),
+    prisma.companyJobPosting.findMany({ where: { orgId, companyId: { in: ids }, postedAt: { gte: new Date(now.getTime() - 365 * DAY) } }, select: { postedAt: true, lastSeenAt: true, source: true }, take: 1000 }),
     prisma.opportunity.findMany({
       where: { orgId, companyId: { in: ids }, deletedAt: null },
       select: {
@@ -340,7 +342,11 @@ export async function loadKeyNumbers(orgId: string, scope: AccessScope, companyI
     loadPeople(c, ids),
   ]);
   const items: KeyNumber[] = [];
-  const postings = rawPostings.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt }] : []));
+  const postings = projectFixturePostings(
+    rawPostings.flatMap((p) => (p.postedAt ? [{ postedAt: p.postedAt, lastSeenAt: p.lastSeenAt, source: p.source }] : [])),
+    now,
+    fixtureClockMode(process.env.POLO_DATA_MODE),
+  );
   const periods = fyPeriods(fin);
   const asc = [...periods].reverse();
   const latest = periods[0];

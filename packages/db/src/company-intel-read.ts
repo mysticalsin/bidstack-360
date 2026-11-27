@@ -6,10 +6,12 @@
  */
 import {
   classifyPost,
+  fixtureClockMode,
   FINANCIAL_SOURCE_LABEL,
   INTEL_SOURCE_LABEL,
   IntelPostKind,
   IntelSourceKey,
+  projectFixturePostings,
   type CompanyIntelSnapshot,
   type IntelEvidence,
   type IntelSnapshotPost,
@@ -188,7 +190,8 @@ export async function loadCompanyIntel(db: Db, orgId: string, companyId: string,
         }
       : null;
 
-  const snapshotPostings = postings.map((p) => ({
+  const clockedPostings = projectFixturePostings(postings, now, fixtureClockMode(process.env.POLO_DATA_MODE));
+  const snapshotPostings = clockedPostings.map((p) => ({
     id: p.id,
     title: p.title,
     function: p.function,
