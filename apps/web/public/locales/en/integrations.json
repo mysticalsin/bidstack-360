@@ -204,9 +204,12 @@
   "erpConnector": {
     "title": "ERP MCP",
     "caption": "set ERP_MCP_URL + ERP_DB to enable",
+    "captionUnread": "Checking ERP.",
+    "captionFailed": "Could not load ERP status.",
     "status": {
       "error": "error",
       "checking": "checking",
+      "unread": "The status has not arrived.",
       "notConfigured": "not configured",
       "live": "live",
       "unreachable": "unreachable"
@@ -214,6 +217,7 @@
     "error": {
       "title": "Couldn't reach the ERP status endpoint",
       "message": "This is a connection problem, not a missing configuration. Please retry.",
+      "unread": "It has not arrived. This is a connection problem, not a missing configuration. Please retry.",
       "retry": "Retry"
     },
     "notConfigured": {
@@ -235,10 +239,14 @@
     "kit": {
       "title": "ERP bid operating kit",
       "subtitle": "Partner, opportunity, quote, activity, document, and handoff patterns adapted for Polo PreSales presales.",
+      "unread": "The ERP kit has not arrived.",
+      "failed": "Could not load the ERP kit. It has not arrived.",
       "badge": {
         "sidecar": "sidecar",
         "fixSidecar": "fix sidecar",
-        "local": "local"
+        "local": "local",
+        "unread": "checking",
+        "failed": "error"
       }
     },
     "autocomplete": {

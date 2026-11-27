@@ -8,6 +8,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { ApiError, api } from '@/lib/api';
 
+import { erpPayloadPhase } from './erp-payload-phase';
+
 interface ErpStatus {
   configured: boolean;
   url: string | null;
@@ -91,6 +93,12 @@ export function ErpConnectorCard() {
     },
   });
 
+  const statusPhase = erpPayloadPhase(status);
+  // The kit query stays off until status says ERP is configured. That
+  // settled unset read still uses the local badge. An unread or failed
+  // kit is not that badge.
+  const kitPhase = configured ? erpPayloadPhase(kit) : 'ready';
+
   const tone = status.isError
     ? 'tomato'
     : !status.data
@@ -117,22 +125,29 @@ export function ErpConnectorCard() {
       <SectionHeader
         title={t('erpConnector.title', 'ERP MCP')}
         caption={
-          status.data?.database ??
-          t('erpConnector.caption', 'set ERP_MCP_URL + ERP_DB to enable')
+          statusPhase === 'unread'
+            ? t('erpConnector.captionUnread', 'Checking ERP.')
+            : statusPhase === 'failed'
+              ? t('erpConnector.captionFailed', 'Could not load ERP status.')
+              : (status.data?.database ??
+                t('erpConnector.caption', 'set ERP_MCP_URL + ERP_DB to enable'))
         }
         action={<Badge tone={tone}>{label}</Badge>}
       />
-      {status.isLoading ? (
+      {statusPhase === 'unread' ? (
         <div className="p-5">
+          <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+            {t('erpConnector.status.unread', 'The status has not arrived.')}
+          </p>
           <LoadingSkeleton rows={2} />
         </div>
-      ) : status.isError ? (
+      ) : statusPhase === 'failed' ? (
         <div className="p-5">
           <ErrorState
             title={t('erpConnector.error.title', "Couldn't reach the ERP status endpoint")}
             message={t(
-              'erpConnector.error.message',
-              'This is a connection problem, not a missing configuration. Please retry.',
+              'erpConnector.error.unread',
+              'It has not arrived. This is a connection problem, not a missing configuration. Please retry.',
             )}
             action={
               <Button size="sm" variant="secondary" onClick={() => void status.refetch()}>
@@ -188,6 +203,7 @@ export function ErpConnectorCard() {
         </>
       )}
 
+      {statusPhase === 'ready' ? (
       <div className="border-t border-[var(--border-subtle)] p-5">
         <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <div>
@@ -204,16 +220,41 @@ export function ErpConnectorCard() {
                 </p>
               </div>
               <Badge
-                tone={kit.data?.reachable ? 'jade' : kit.data?.configured ? 'tomato' : 'amber'}
+                tone={
+                  kitPhase === 'failed'
+                    ? 'tomato'
+                    : kitPhase === 'unread'
+                      ? 'gray'
+                      : kit.data?.reachable
+                        ? 'jade'
+                        : kit.data?.configured
+                          ? 'tomato'
+                          : 'amber'
+                }
               >
-                {kit.data?.reachable
-                  ? t('erpConnector.kit.badge.sidecar', 'sidecar')
-                  : kit.data?.configured
-                    ? t('erpConnector.kit.badge.fixSidecar', 'fix sidecar')
-                    : t('erpConnector.kit.badge.local', 'local')}
+                {kitPhase === 'unread'
+                  ? t('erpConnector.kit.badge.unread', 'checking')
+                  : kitPhase === 'failed'
+                    ? t('erpConnector.kit.badge.failed', 'error')
+                    : kit.data?.reachable
+                      ? t('erpConnector.kit.badge.sidecar', 'sidecar')
+                      : kit.data?.configured
+                        ? t('erpConnector.kit.badge.fixSidecar', 'fix sidecar')
+                        : t('erpConnector.kit.badge.local', 'local')}
               </Badge>
             </div>
-            {kit.isLoading ? (
+            {kitPhase === 'unread' ? (
+              <p role="status" className="mt-4 text-sm text-[var(--fg-secondary)]">
+                {t('erpConnector.kit.unread', 'The ERP kit has not arrived.')}
+              </p>
+            ) : kitPhase === 'failed' ? (
+              <p role="status" className="mt-4 text-sm text-[var(--fg-secondary)]">
+                {t(
+                  'erpConnector.kit.failed',
+                  'Could not load the ERP kit. It has not arrived.',
+                )}
+              </p>
+            ) : kit.isLoading ? (
               <div className="pt-4">
                 <LoadingSkeleton rows={3} />
               </div>
@@ -358,6 +399,7 @@ export function ErpConnectorCard() {
           </div>
         ) : null}
       </div>
+      ) : null}
     </Card>
   );
 }
