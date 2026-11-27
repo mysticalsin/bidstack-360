@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
 import { SourceBadge } from '@/components/cockpit/SourceBadge';
@@ -67,6 +67,9 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
   const patch = usePatchCrossSellAction();
   const canWrite = useHasPermission('accounts:write');
   const { t } = useTranslation('crm');
+  const page = actions.data;
+  // No payload yet is not an empty log. isLoading is false while a read is
+  // paused, so that flag alone still painted the settled empty sentence.
 
   const statusLabel = (status: GovernanceStatus): string => {
     switch (status) {
@@ -89,20 +92,31 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
         action={canWrite ? <CreateAction accountKey={accountKey} /> : undefined}
       />
       <div className="px-5 pb-5">
-        {actions.isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : actions.isError ? (
+        {page === undefined && actions.isError ? (
           <ErrorState
             title={t('crossSell.errorTitle', 'Could not load cross-sell actions')}
             message={actions.error?.message ?? t('crossSell.errorRetry', 'Try again shortly.')}
           />
-        ) : (actions.data?.items.length ?? 0) === 0 ? (
+        ) : page === undefined ? (
+          <p className="text-sm text-[var(--fg-tertiary)]" role="status">
+            {t('crossSell.unread', 'Checking cross-sell actions. The list has not arrived.')}
+          </p>
+        ) : page.items.length === 0 ? (
           <p className="text-sm text-[var(--fg-tertiary)]">
             {t('crossSell.empty', 'No cross-sell actions logged for this account yet.')}
           </p>
         ) : (
-          <ul className="divide-y divide-[var(--border)]">
-            {actions.data!.items.map((action) => (
+          <>
+            {actions.isError ? (
+              <p className="mb-3 text-sm text-[var(--fg-secondary)]" role="status">
+                {t(
+                  'crossSell.staleRead',
+                  'The latest cross-sell read failed. The list already on screen stays.',
+                )}
+              </p>
+            ) : null}
+            <ul className="divide-y divide-[var(--border)]">
+            {page.items.map((action) => (
               <li key={action.id} className="py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -145,7 +159,8 @@ export function CrossSellCard({ accountKey }: { accountKey: string }) {
                 </div>
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
     </Card>
