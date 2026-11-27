@@ -16,6 +16,7 @@ import {
   useNotificationStream,
   type NotificationType,
 } from '@/hooks/useNotifications';
+import { accountNewsAlertPath } from './account-news-alert-path';
 
 const TYPE_ICON: Record<NotificationType, IconName> = {
   mention: 'messageCircle',
@@ -55,8 +56,9 @@ export function NotificationsBell() {
 
   function openItem(id: string, url: string | null, read: boolean) {
     if (!read) markRead.mutate(id);
-    if (url) {
-      navigate(url);
+    const destination = accountNewsAlertPath(url);
+    if (destination) {
+      navigate(destination);
       setOpen(false);
     }
   }
