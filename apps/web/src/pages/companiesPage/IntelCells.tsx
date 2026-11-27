@@ -70,6 +70,14 @@ export function gapFor(summary: CompanyIntelSummary | null, field: string): Inte
   return summary.gaps[field] ?? { reason: 'no_public_data', detail: 'No value found' };
 }
 
+/**
+ * Demo watchdog rows are titled "Sample:" and can still be stored with
+ * sample:false. Either mark means the signal is not a live filing.
+ */
+function signalIsSample(signal: { sample: boolean; title: string }): boolean {
+  return signal.sample || /^sample:\s*/i.test(signal.title);
+}
+
 export function EmptyIntel({ gap }: { gap: IntelGap }) {
   const text = `${INTEL_EMPTY_REASON_LABEL[gap.reason]}: ${gap.detail}`;
   return (
@@ -272,9 +280,12 @@ export function IntelCellFor({
     case 'signal': {
       const g = s?.signal;
       if (!g) return <EmptyIntel gap={gapFor(s, 'signal')} />;
-      const label = `${g.label}: ${g.title}. ${g.sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${g.sample ? ', sample data' : ''}`;
+      const sample = signalIsSample(g);
+      const sourceLabel = /^sample$/i.test(g.sourceLabel) ? 'Sample data' : g.sourceLabel;
+      const sampleNote = sample && !/sample data/i.test(sourceLabel) ? ', sample data' : '';
+      const label = `${g.label}: ${g.title}. ${sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${sampleNote}`;
       return (
-        <span aria-label={label} title={label} className="inline-flex">
+        <span aria-label={label} title={label} className="inline-flex items-center gap-1.5">
           <StatusPill
             tone={
               g.kind === 'layoffs'
@@ -287,6 +298,9 @@ export function IntelCellFor({
           >
             {g.label}
           </StatusPill>
+          {sample ? (
+            <span className="text-xs font-medium text-[var(--fg-tertiary)]">Sample</span>
+          ) : null}
         </span>
       );
     }
