@@ -19,11 +19,11 @@ import {
   useTerritorySegments,
   type TerritorySegment,
 } from '@/hooks/useTerritories';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft } from '@/lib/motion';
 
 import { StrategicSignalInsight } from './accountsPage/StrategicSignalInsight';
 import { SectorPipelineCard } from './sectorView/SectorPipelineCard';
+import { sectorIndustryAmount } from './sectorView/sector-industry-amount';
 import { sourceLabel, titleCase } from './accountsPage/accountUtils';
 import { sectorAccountSignal, sectorCoverageSignal } from './accountsPage/strategicSignals';
 
@@ -443,11 +443,9 @@ function SectorMetric({
 
 function IndustryBars({ items }: { items: TerritorySegment[] }) {
   const { t } = useTranslation('crm');
-  // Use the currency-aware formatter so this figure tracks the user's selected
-  // display currency like every other money surface — the module-level
-  // formatMoneyMicros hardcoded EUR and diverged from Territories/Opportunities
-  // showing the same segment data in the chosen currency.
-  const { formatMoneyMicros } = useFormatMoney();
+  // Industry bars sum opportunity valueMicros. Those rows do not store a
+  // currency, so the label is the grouped units. The bar still scales to the
+  // largest segment.
   if (items.length === 0) {
     return (
       <EmptyState
@@ -472,7 +470,7 @@ function IndustryBars({ items }: { items: TerritorySegment[] }) {
             <span className="shrink-0 tabular-nums text-xs text-[var(--fg-tertiary)]">
               {t('sectorView.geoIndustryMeta', '{{count}} opps · {{value}}', {
                 count: seg.opportunityCount,
-                value: formatMoneyMicros(seg.totalValueMicros),
+                value: sectorIndustryAmount(seg.totalValueMicros),
               })}
             </span>
           </div>
