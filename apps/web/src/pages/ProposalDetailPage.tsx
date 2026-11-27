@@ -53,6 +53,14 @@ export function ProposalDetailPage() {
   const canWrite = useHasPermission('proposals:write');
   useDocumentTitle();
 
+  // The desk sorts by this proposal's updatedAt and keeps the list for two
+  // minutes. A section write, an AI draft, and a due-date change have to
+  // drop that cache or the row stays on the old day.
+  const refreshProposal = () => {
+    void qc.invalidateQueries({ queryKey: ['proposal', id] });
+    void qc.invalidateQueries({ queryKey: ['proposals'] });
+  };
+
   const {
     data: proposal,
     isLoading,
@@ -79,7 +87,7 @@ export function ProposalDetailPage() {
       );
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['proposal', id] });
+      refreshProposal();
     },
   });
 
@@ -95,7 +103,7 @@ export function ProposalDetailPage() {
       );
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['proposal', id] });
+      refreshProposal();
     },
   });
 
@@ -140,7 +148,7 @@ export function ProposalDetailPage() {
       return api<Proposal>(`/api/v1/proposals/${id}`, { method: 'PATCH', body: { dueDate } });
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['proposal', id] });
+      refreshProposal();
     },
   });
 
