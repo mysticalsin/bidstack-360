@@ -7,6 +7,11 @@ import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useSampleDataStatus, useDeleteSampleData } from '@/hooks/useOnboarding';
 
+import { sampleDataStatusPhase } from './sample-data-status-read';
+
+const BANNER_SHELL =
+  'fixed bottom-4 left-1/2 z-[80] w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-lg)]';
+
 export function SampleDataBanner() {
   const { t } = useTranslation('onboarding');
   // Source of truth is the server status query (the store flag is a fast-path
@@ -16,9 +21,41 @@ export function SampleDataBanner() {
   const setHasSampleData = useOnboardingStore((s) => s.setHasSampleData);
   const del = useDeleteSampleData();
   const [hidden, setHidden] = useState(false);
+  const phase = sampleDataStatusPhase({
+    data: status.data,
+    isError: status.isError,
+    status: status.status,
+  });
 
-  const hasSampleData = (status.data?.hasSampleData ?? false) || storeHas;
-  if (hidden || !hasSampleData) return null;
+  if (hidden) return null;
+
+  if (phase === 'failed') {
+    return (
+      <div role="alert" className={BANNER_SHELL} data-testid="sample-data-error">
+        <div className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t('sampleDataBanner.errorTitle', 'Could not check sample data.')}
+        </div>
+      </div>
+    );
+  }
+
+  // The store flag is a local write after install. It can show the banner
+  // while the refetch is still unread. It does not override a failed read.
+  if (phase === 'unread' && !storeHas) {
+    return (
+      <div role="status" className={BANNER_SHELL} data-testid="sample-data-checking">
+        <div className="text-sm font-semibold text-[var(--fg-primary)]">
+          {t(
+            'sampleDataBanner.checking',
+            'Checking sample data. The status has not arrived.',
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const hasSampleData = (phase === 'ready' && status.data?.hasSampleData === true) || storeHas;
+  if (!hasSampleData) return null;
 
   async function removeSampleData() {
     const ok = await confirm({
@@ -40,7 +77,7 @@ export function SampleDataBanner() {
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-[80] w-[min(560px,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-card)] p-4 shadow-[var(--shadow-lg)]">
+    <div className={BANNER_SHELL} data-testid="sample-data-on">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[var(--fg-primary)]">
