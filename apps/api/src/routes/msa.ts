@@ -60,6 +60,7 @@ import { userHasPermission } from '../lib/rbac-decision-cache.js';
 import { normalizeName } from '../services/crm/dashboard.utils.js';
 import { getStorage, keyBelongsToOrg } from '../storage/index.js';
 import { detectMsaContentType, sha256Hex } from '../msa/file-checks.js';
+import { liabilityCapForRead, liabilityFields } from '../msa/liability-cap.js';
 import { enqueueMsaTextExtract } from '../queues/msa-text-extract.js';
 import { issueMsaDownloadToken, MSA_DOWNLOAD_TTL_SECONDS, openMsaDownloadToken } from '../msa/download-token.js';
 
@@ -229,12 +230,6 @@ function safeContentDisposition(filename: string): string {
 /** Storage keys for MSA files embed the contract id so finalize can bind them. */
 function msaKeySegment(contractId: string): string {
   return `msa-${contractId}`;
-}
-
-function liabilityFields(cap: { amountMicros: number; currency: string } | null | undefined) {
-  if (cap === undefined) return {};
-  if (cap === null) return { liabilityCapMicros: null, liabilityCapCurrency: null };
-  return { liabilityCapMicros: BigInt(cap.amountMicros), liabilityCapCurrency: cap.currency };
 }
 
 export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
@@ -485,10 +480,7 @@ export const msaRoutes: FastifyPluginAsyncZod = async (server) => {
       return {
         ...serializeRow(row),
         governingLaw: extra.governingLaw,
-        liabilityCap:
-          extra.liabilityCapMicros !== null && extra.liabilityCapCurrency
-            ? { amountMicros: Number(extra.liabilityCapMicros), currency: extra.liabilityCapCurrency }
-            : null,
+        liabilityCap: liabilityCapForRead(extra.liabilityCapMicros, extra.liabilityCapCurrency),
         paymentTerms: extra.paymentTerms,
         notes: extra.notes,
         currency: extra.currency,
