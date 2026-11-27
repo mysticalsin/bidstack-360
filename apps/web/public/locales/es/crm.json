@@ -2071,7 +2071,7 @@
     "upload": "Subir",
     "dropzoneLabel": "Arrastra archivos aquí para subirlos",
     "dropPrompt": "Suelta archivos o haz clic para examinar",
-    "acceptedFormats": "PDF, DOCX, XLSX, imágenes — hasta 50 MB",
+    "acceptedFormats": "PDF, Office, texto/datos, imagen, audio o vídeo, hasta 50 MB",
     "unsupportedType": "Tipo de archivo no admitido: {{type}}",
     "unknownType": "desconocido",
     "loadErrorTitle": "No se pudieron cargar los archivos",

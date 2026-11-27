@@ -22,6 +22,7 @@ import {
 } from '@bidstack/shared';
 
 import { fileAttachmentCaption, shownFileAttachments } from './file-attachment-caption';
+import { fileUploadAcceptCaption } from './file-upload-accept-caption';
 
 interface FilesPanelProps {
   accountId: string;
@@ -151,7 +152,7 @@ export function FilesPanel({ accountId }: FilesPanelProps) {
           {t('files.dropPrompt', 'Drop files or click to browse')}
         </p>
         <p className="mt-0.5 text-[11px] text-[var(--fg-tertiary)]">
-          {t('files.acceptedFormats', 'PDF, DOCX, XLSX, images — up to 50 MB')}
+          {t('files.acceptedFormats', fileUploadAcceptCaption())}
         </p>
       </div>
 

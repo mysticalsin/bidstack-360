@@ -2039,7 +2039,7 @@
     "upload": "Upload",
     "dropzoneLabel": "Drag files here to upload",
     "dropPrompt": "Drop files or click to browse",
-    "acceptedFormats": "PDF, DOCX, XLSX, images — up to 50 MB",
+    "acceptedFormats": "PDF, Office, text/data, image, audio, or video, up to 50 MB",
     "unsupportedType": "Unsupported file type: {{type}}",
     "unknownType": "unknown",
     "loadErrorTitle": "Couldn't load files",

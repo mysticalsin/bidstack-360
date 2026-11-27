@@ -2038,7 +2038,7 @@
     "upload": "Enviar",
     "dropzoneLabel": "Arraste arquivos aqui para enviar",
     "dropPrompt": "Solte os arquivos ou clique para procurar",
-    "acceptedFormats": "PDF, DOCX, XLSX, imagens — até 50 MB",
+    "acceptedFormats": "PDF, Office, texto/dados, imagem, áudio ou vídeo, até 50 MB",
     "unsupportedType": "Tipo de arquivo não suportado: {{type}}",
     "unknownType": "desconhecido",
     "loadErrorTitle": "Não foi possível carregar os arquivos",

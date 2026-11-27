@@ -2093,7 +2093,7 @@
     "upload": "Téléverser",
     "dropzoneLabel": "Glissez des fichiers ici pour les téléverser",
     "dropPrompt": "Déposez des fichiers ou cliquez pour parcourir",
-    "acceptedFormats": "PDF, DOCX, XLSX, images — jusqu'à 50 Mo",
+    "acceptedFormats": "PDF, Office, texte/données, image, audio ou vidéo, jusqu'à 50 Mo",
     "unsupportedType": "Type de fichier non pris en charge : {{type}}",
     "unknownType": "inconnu",
     "loadErrorTitle": "Impossible de charger les fichiers",
