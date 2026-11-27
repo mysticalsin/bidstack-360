@@ -248,6 +248,29 @@ export function AccountsAllSegment() {
   const orgHasNoAccounts = !filtersActive && allRows.length === 0;
 
   const syncErpAccounts = () => {
+    // Demo runs with ERP left unset. Do not pull local accounts and do not
+    // call that a failed ERP sync.
+    if (autopopulate.erpSync === 'unset') {
+      toast.info(t('accounts.sync.unsetTitle', 'ERP is not connected'), {
+        description: t(
+          'accounts.sync.unsetDescription',
+          'This workspace has no ERP to sync. Demo accounts were not pulled.',
+        ),
+      });
+      return;
+    }
+    if (autopopulate.erpSync === 'pending') {
+      toast.info(t('accounts.sync.checkingTitle', 'Still checking ERP'), {
+        description: t('accounts.sync.checkingDescription', 'No customers were pulled yet.'),
+      });
+      return;
+    }
+    if (autopopulate.erpSync === 'unknown') {
+      toast.info(t('accounts.sync.unknownTitle', 'Could not check ERP'), {
+        description: t('accounts.sync.unknownDescription', 'No customers were pulled.'),
+      });
+      return;
+    }
     autopopulate.mutate(
       { limit: AUTOPOPULATE_MAX },
       {
@@ -288,7 +311,7 @@ export function AccountsAllSegment() {
           }
           actions={
             <>
-              {autopopulate.data ? (
+              {autopopulate.data && autopopulate.erpSync !== 'unset' ? (
                 <div className="account-sync-result">
                   {t('accounts.sync.result', '{{enriched}} enriched / {{cached}} cached', {
                     enriched: autopopulate.data.enriched,
@@ -301,10 +324,17 @@ export function AccountsAllSegment() {
                 className="btn btn-secondary"
                 disabled={autopopulate.isPending}
                 onClick={syncErpAccounts}
-                title={t(
-                  'accounts.sync.buttonTitle',
-                  'Sync top ERP sale.order customers into verified Polo PreSales accounts',
-                )}
+                title={
+                  autopopulate.erpSync === 'unset'
+                    ? t(
+                        'accounts.sync.unsetButtonTitle',
+                        'ERP is not connected, so there are no sale.order customers to pull.',
+                      )
+                    : t(
+                        'accounts.sync.buttonTitle',
+                        'Sync top ERP sale.order customers into verified Polo PreSales accounts',
+                      )
+                }
               >
                 {autopopulate.isPending ? (
                   <span
@@ -316,7 +346,9 @@ export function AccountsAllSegment() {
                 )}
                 {autopopulate.isPending
                   ? t('accounts.sync.inProgress', 'Syncing...')
-                  : t('accounts.sync.button', 'Sync ERP accounts')}
+                  : autopopulate.erpSync === 'unset'
+                    ? t('accounts.sync.unsetButton', 'ERP not connected')
+                    : t('accounts.sync.button', 'Sync ERP accounts')}
               </button>
               <SmartCompanyDialog
                 trigger={
@@ -568,10 +600,17 @@ export function AccountsAllSegment() {
           <EmptyState
             icon="building"
             title={t('accounts.empty.title', 'No accounts yet')}
-            message={t(
-              'accounts.empty.body',
-              'Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.',
-            )}
+            message={
+              autopopulate.erpSync === 'unset'
+                ? t(
+                    'accounts.empty.bodyUnsetErp',
+                    'Add your first account. ERP is not connected, so there are no ERP customers to pull.',
+                  )
+                : t(
+                    'accounts.empty.body',
+                    'Add your first account, or sync top ERP customers above — pipeline, health, and technology signals populate automatically.',
+                  )
+            }
             secondary={
               <EmptyStateLink to="/settings?tab=data-import">
                 {t('accounts.empty.importCsv', 'Or import accounts from CSV')}
