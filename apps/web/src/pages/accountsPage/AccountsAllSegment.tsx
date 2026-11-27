@@ -246,6 +246,9 @@ export function AccountsAllSegment() {
   // underlying snapshot itself has zero rows. Distinct from "filters matched
   // nothing" — that case keeps the existing filter-miss copy below.
   const orgHasNoAccounts = !filtersActive && allRows.length === 0;
+  // A visible page with no rows is not a zero portfolio. Totals and the
+  // "no coverage gaps" panel describe rows that are not on screen.
+  const visibleBook = rows.length > 0;
 
   const syncErpAccounts = () => {
     autopopulate.mutate(
@@ -274,17 +277,19 @@ export function AccountsAllSegment() {
         <SegmentHeader
           title={t('accounts.title', 'Accounts')}
           subtitle={
-            <>
-              {rows.length === 1
-                ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
-                : t('accounts.summary.companyCount_other', '{{count}} companies', {
-                    count: rows.length,
-                  })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
-              {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
-              })}
-            </>
+            visibleBook ? (
+              <>
+                {rows.length === 1
+                  ? t('accounts.summary.companyCount_one', '{{count}} company', { count: rows.length })
+                  : t('accounts.summary.companyCount_other', '{{count}} companies', {
+                      count: rows.length,
+                    })}{' '}
+                · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+                {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
+                  amount: formatMoneyMicros(totalPipeline, 'EUR'),
+                })}
+              </>
+            ) : undefined
           }
           actions={
             <>
@@ -359,6 +364,7 @@ export function AccountsAllSegment() {
         </div>
       ) : null}
 
+      {visibleBook ? (
       <section
         aria-label={t('accounts.stats.regionLabel', 'Account source coverage')}
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
@@ -392,7 +398,9 @@ export function AccountsAllSegment() {
           sublabel={t('accounts.stats.enrichedProfiles.detail', 'verified data cache')}
         />
       </section>
+      ) : null}
 
+      {visibleBook ? (
       <InsightPanel
         ariaLabel={t('accounts.experience.regionLabel', 'Portfolio cockpit')}
         eyebrow={t('accounts.experience.eyebrow', 'Portfolio cockpit')}
@@ -422,6 +430,7 @@ export function AccountsAllSegment() {
           })}
         </div>
       </InsightPanel>
+      ) : null}
 
       <motion.div
         className="space-y-3"
