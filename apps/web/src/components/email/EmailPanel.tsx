@@ -13,10 +13,37 @@ import { Sheet, SheetContent } from '@/components/ui/Sheet';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+import { contactMailHref } from './contact-mail-href';
 import { DraftComposer, type DraftLink } from './DraftComposer';
 import { EmailThreadView } from './EmailThreadView';
 
 const LIMIT = 25;
+
+function ContactMessageEmpty({ contactId, email }: { contactId?: string; email?: string }) {
+  const { t } = useTranslation('crm');
+  // A filed-message gap is not a missing address. Klaus Vogt's demo record
+  // already has klaus.vogt.<workspace>@example.com. Say that nothing is filed,
+  // and mail that address. A later contact replaces the link because it is
+  // read from the current address, not from the first one this panel opened.
+  const mail = contactId ? contactMailHref(email) : null;
+  if (!mail) return <EmptyState title={t('emailPanel.empty', 'No email yet')} />;
+  return (
+    <EmptyState
+      title={t('emailPanel.noMessages', 'No messages yet')}
+      message={t('emailPanel.noMessagesFor', 'Nothing is filed for {{email}}.', {
+        email: mail.address,
+      })}
+      action={
+        <a
+          href={mail.href}
+          className="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"
+        >
+          {mail.address}
+        </a>
+      }
+    />
+  );
+}
 
 interface EmailPanelProps {
   filter: DraftLink;
@@ -83,7 +110,7 @@ export function EmailPanel({ filter, defaultTo }: EmailPanelProps) {
           }
         />
       ) : threads.length === 0 ? (
-        <EmptyState title={t('emailPanel.empty', 'No email yet')} />
+        <ContactMessageEmpty contactId={filter.contactId} email={defaultTo} />
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {threads.map((m) => {
