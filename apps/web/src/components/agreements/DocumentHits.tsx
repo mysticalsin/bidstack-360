@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useMsaSearch } from '@/hooks/useMsa';
 import { KIND_LABEL, snippetParts } from '@/lib/msa/labels';
 
+import { documentHitsReadPhase } from './document-hits-read';
 import { MsaStatusBadge } from './StatusBadge';
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -20,16 +21,25 @@ export function DocumentHits({ q, companyId, enabled }: { q: string; companyId?:
   const term = useDebounced(q, 300);
   const search = useMsaSearch(term, { companyId, enabled });
   if (!enabled || term.trim().length < 2) return null;
-  const items = search.data?.items ?? [];
+  // A missing payload is not an empty search. isLoading is false while a
+  // read is paused, so that flag alone still left only the heading.
+  const phase = documentHitsReadPhase(search);
+  const items = phase === 'ready' ? (search.data?.items ?? []) : [];
   return (
     <section className="agr-section" aria-labelledby="agr-hits" data-testid="agreements-doc-hits">
       <h2 id="agr-hits">Found inside documents</h2>
-      {search.isLoading ? <p className="agr-caption">Searching the files…</p> : null}
-      {search.isError ? <p className="agr-error" role="alert">Document search is unavailable right now.</p> : null}
-      {search.isSuccess && items.length === 0 ? (
+      {phase === 'failed' ? (
+        <p className="agr-error" role="alert">Document search is unavailable right now.</p>
+      ) : null}
+      {phase === 'unread' ? (
+        <p className="agr-caption" role="status">
+          Checking document search. The hits have not arrived.
+        </p>
+      ) : null}
+      {phase === 'ready' && items.length === 0 ? (
         <p className="drill-empty">No file text matches &ldquo;{term.trim()}&rdquo;. New uploads become searchable once their text is extracted.</p>
       ) : null}
-      {items.length > 0 ? (
+      {phase === 'ready' && items.length > 0 ? (
         <ul className="agr-hits">
           {items.map((h) => (
             <li key={h.versionId}>
