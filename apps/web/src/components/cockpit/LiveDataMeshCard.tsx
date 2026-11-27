@@ -23,8 +23,14 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
     query: cockpit.company.legalName ?? cockpit.company.name,
     ticker,
   });
-  const connectors = liveData.data?.connectors ?? [];
-  const usingFallbackConnectors = connectors.length === 0;
+  const page = liveData.data ?? null;
+  // A missing payload is not an empty registry. The published catalog is only
+  // for a settled read that returned no connectors.
+  const unread = page == null;
+  const failed = unread && liveData.isError;
+  const pending = unread && !liveData.isError;
+  const connectors = page?.connectors ?? [];
+  const usingFallbackConnectors = !unread && !liveData.isError && connectors.length === 0;
   const visibleConnectors = usingFallbackConnectors ? fallbackConnectors() : connectors;
   const signals = liveData.data?.signals ?? [];
   const openConnectors = visibleConnectors.filter((c) => c.kind === 'open_api').length;
@@ -44,20 +50,30 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
     <Card role="region" aria-label={t('liveDataMesh.regionLabel', 'Connected data sources')}>
       <SectionHeader
         title={
-          usingFallbackConnectors
-            ? t('liveDataMesh.titleAvailable', 'Available data sources')
-            : t('liveDataMesh.titleConnected', 'Connected data sources')
+          failed
+            ? t('liveDataMesh.titleUnread', 'Data sources are not loaded')
+            : pending
+              ? t('liveDataMesh.titlePending', 'Checking data sources')
+              : usingFallbackConnectors
+                ? t('liveDataMesh.titleAvailable', 'Available data sources')
+                : t('liveDataMesh.titleConnected', 'Connected data sources')
         }
         caption={
-          usingFallbackConnectors
-            ? t(
-                'liveDataMesh.captionAvailable',
-                'Sources available after credentials or connector setup',
-              )
-            : t('liveDataMesh.captionConnected', 'Configured APIs, widgets, and verified data feeds')
+          failed
+            ? t('liveDataMesh.captionUnread', 'This is not a list of available sources.')
+            : pending
+              ? t('liveDataMesh.captionPending', 'The source list has not arrived.')
+              : usingFallbackConnectors
+                ? t(
+                    'liveDataMesh.captionAvailable',
+                    'Sources available after credentials or connector setup',
+                  )
+                : t('liveDataMesh.captionConnected', 'Configured APIs, widgets, and verified data feeds')
         }
       />
       <div className="data-mesh">
+        {unread ? null : (
+        <>
         <div className="mesh-hero">
           <div>
             <div className="mesh-kicker">{t('liveDataMesh.kicker', 'Source availability')}</div>
@@ -79,6 +95,8 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
             />
           ))}
         </div>
+        </>
+        )}
 
         <div
           className="mesh-signals"
@@ -89,11 +107,13 @@ export const LiveDataMeshCard = memo(function LiveDataMeshCard({ cockpit }: Prop
               {t('liveDataMesh.loading', 'Checking configured sources...')}
             </div>
           ) : liveData.isError ? (
-            <div className="mesh-empty">
-              {t(
-                'liveDataMesh.error',
-                'Connector registry loaded; source check returned an error.',
-              )}
+            <div className="mesh-empty" role="alert">
+              {unread
+                ? t('liveDataMesh.unreadError', 'Could not load data sources.')
+                : t(
+                    'liveDataMesh.error',
+                    'Connector registry loaded; source check returned an error.',
+                  )}
             </div>
           ) : signals.length === 0 ? (
             <div className="mesh-empty">
