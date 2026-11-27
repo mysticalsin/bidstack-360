@@ -111,11 +111,40 @@ export function fakeOrgChartServer(companyId: string) {
         return { dryRun: Boolean(body?.dryRun), created: people.length, updated: 0, errors: [], warnings, chartVersion: version, format: 'table', found: tags.length, skipped: tags.length - people.length, skippedBy, photos: 0, preview };
       }
       if (method === 'POST' && p === `${C}/import`) {
-        const rows = String(body?.csv ?? '').trim().split('\n').slice(1).filter(Boolean);
-        const errors = rows.map((r, i) => (r.split(',')[0] ? null : { line: i + 2, message: 'name is required' })).filter(Boolean) as Array<{ line: number; message: string }>;
+        const lines = String(body?.csv ?? '').replace(/\r/g, '').trim().split('\n').filter(Boolean);
+        const header = (lines[0] ?? '').split(',').map((cell) => cell.trim().toLowerCase());
+        const at = (cells: string[], name: string) => {
+          const index = header.indexOf(name);
+          return index >= 0 ? (cells[index] ?? '').trim() : '';
+        };
+        const data = lines.slice(1);
+        const errors = data
+          .map((line, index) => {
+            const name = at(line.split(','), 'name') || line.split(',')[0]?.trim() || '';
+            return name ? null : { line: index + 2, message: 'name is required' };
+          })
+          .filter(Boolean) as Array<{ line: number; message: string }>;
         if (errors.length) throw new ApiError('Import has errors', 422, { dryRun: Boolean(body?.dryRun), created: 0, updated: 0, errors, chartVersion: version });
-        if (!body?.dryRun) for (const r of rows) s.add({ name: r.split(',')[0], title: r.split(',')[1] || null, source: 'csv' });
-        return { dryRun: Boolean(body?.dryRun), created: rows.length, updated: 0, errors: [], chartVersion: version };
+        const preview = data.map((line, index) => {
+          const cells = line.split(',');
+          const name = at(cells, 'name') || cells[0]!.trim();
+          const title = (header.includes('title') ? at(cells, 'title') : (cells[1] ?? '').trim()) || null;
+          const manager = at(cells, 'manager_name') || at(cells, 'manager') || null;
+          return {
+            line: index + 2,
+            name,
+            title,
+            email: at(cells, 'email') || null,
+            phone: at(cells, 'phone') || null,
+            linkedinUrl: at(cells, 'linkedin_url') || null,
+            hasPhoto: false,
+            manager: manager || null,
+            action: 'create' as const,
+            extras: [] as string[],
+          };
+        });
+        if (!body?.dryRun) for (const person of preview) s.add({ name: person.name, title: person.title, source: 'csv' });
+        return { dryRun: Boolean(body?.dryRun), created: data.length, updated: 0, errors: [], chartVersion: version, preview };
       }
       if (method === 'POST' && p === `${C}/seed`) return { queued: true, jobId: 'job-1' };
       const m = /^\/api\/org-chart\/nodes\/([^/]+)(\/move)?$/.exec(p!);

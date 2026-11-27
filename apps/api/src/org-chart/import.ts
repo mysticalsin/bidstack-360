@@ -23,6 +23,7 @@ import { companiesInScope, groupCompanyIds } from '../meeting-intel/access.js';
 import { getStorage } from '../storage/index.js';
 import { OrgChartConflictError, liveNodes, lockChart, provenanceFor, redactedContactIds } from './access.js';
 import { type HtmlPhoto, type HtmlSprite, sniffImage } from './html-import.js';
+import { peopleImportPreview } from './people-import-preview.js';
 
 export interface ImportRow {
   line: number;
@@ -74,21 +75,6 @@ interface Planned {
 
 const lower = (s: string | null | undefined) => (s ? s.trim().toLowerCase() : null);
 const PHOTO_EXT: Record<OrgChartPhotoType, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
-const EXTRA_LABELS: Partial<Record<keyof OrgChartProfile, string>> = {
-  location: 'location',
-  tenure: 'tenure',
-  headline: 'headline',
-  summary: 'bio',
-  career: 'career',
-  education: 'education',
-  languages: 'languages',
-  employer: 'employer',
-  signals: 'signals',
-  footprint: 'public footprint',
-  socials: 'socials',
-  fit: 'fit score',
-  workMode: 'work mode',
-};
 
 /** Crops sprite cells on demand (one decode per import). */
 async function spriteCutter(sprite: HtmlSprite) {
@@ -267,25 +253,7 @@ export async function runPeopleImport(
         const created = plan.filter((x) => x.isNew).length + (placeholderRoot ? 1 : 0);
         if (existing.length + created > ORG_CHART_MAX_NODES) errors.push({ line: 1, message: `An org chart holds at most ${ORG_CHART_MAX_NODES} nodes` });
 
-        if (source === 'html') {
-          const nameOf = new Map<string, string>([...existing.map((e) => [e.id, e.name] as const), ...plan.map((p) => [p.id, p.row.name] as const)]);
-          if (placeholderRoot) nameOf.set(placeholderRoot, 'Chief Executive Officer');
-          preview = plan.map((p) => {
-            const pid = p.parentId === undefined ? existing.find((e) => e.id === p.id)?.parentId ?? null : p.parentId;
-            return {
-              line: p.row.line,
-              name: p.row.name,
-              title: p.row.title,
-              email: p.row.email,
-              phone: p.row.phone ?? null,
-              linkedinUrl: p.row.linkedinUrl ?? null,
-              hasPhoto: !!(p.row.photo || p.row.photoUrl),
-              manager: pid ? (nameOf.get(pid) ?? null) : null,
-              action: p.isNew ? ('create' as const) : ('update' as const),
-              extras: Object.keys(p.row.profile ?? {}).map((k) => EXTRA_LABELS[k as keyof OrgChartProfile]).filter((x): x is string => !!x),
-            };
-          });
-        }
+        preview = peopleImportPreview(plan, existing, placeholderRoot);
         if (errors.length) return { ok: false as const, chartVersion: chart?.version ?? null };
         const updated = plan.length - plan.filter((x) => x.isNew).length;
         const photoCount = plan.filter((p) => p.row.photo || p.row.photoUrl).length;
@@ -416,7 +384,8 @@ export async function runPeopleImport(
       warnings,
       chartVersion: result.chartVersion,
       ...input.extra,
-      ...(source === 'html' ? { photos: result.photos, preview } : {}),
+      ...(preview ? { preview } : {}),
+      ...(source === 'html' ? { photos: result.photos } : {}),
     };
   } catch (err) {
     if (written.length) {
