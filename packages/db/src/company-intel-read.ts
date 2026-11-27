@@ -19,6 +19,7 @@ import {
 } from '@bidstack/shared';
 
 import type { PrismaClient } from '../generated/client/index.js';
+import { demoFixtureShifts, projectFixtureRow } from './demo-fixture-postings.js';
 
 export type { CompanyIntelSnapshot } from '@bidstack/shared';
 
@@ -87,18 +88,30 @@ const POSTING_PAGE = 1000;
  * day trends over all of them, so a row cap here would skew the aggregates.
  * Callers cap the detail list. Read in pages to stay under the query guard.
  */
-async function loadPostings(db: Db, orgId: string, companyId: string, since: Date) {
+async function loadPostings(db: Db, orgId: string, companyId: string, since: Date, now: Date) {
   const select = { id: true, source: true, title: true, url: true, city: true, country: true, function: true, seniority: true, skills: true, department: true, postedAt: true, lastSeenAt: true, fetchedAt: true, sample: true } as const;
+  const shifts = await demoFixtureShifts(db as PrismaClient, orgId, [companyId], now);
+  const shift = shifts?.get(companyId) ?? 0;
+  const inWindow = { OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }] };
+  const where = !shifts || shift === 0
+    ? { orgId, companyId, ...inWindow }
+    : { orgId, companyId, OR: [{ source: 'fixture' }, inWindow] };
   const out = [];
   for (let cursor: string | undefined; ; ) {
     const page = await db.companyJobPosting.findMany({
-      where: { orgId, companyId, OR: [{ postedAt: { gte: since } }, { lastSeenAt: { gte: since } }] },
+      where,
       orderBy: { id: 'asc' },
       take: POSTING_PAGE,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select,
     });
-    out.push(...page);
+    for (const row of page) {
+      const projected = row.source === 'fixture' && shift !== 0 ? projectFixtureRow(row, shift) : row;
+      const posted = projected.postedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+      const seen = projected.lastSeenAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+      if (shifts && shift !== 0 && posted < since.getTime() && seen < since.getTime()) continue;
+      out.push(projected);
+    }
     if (page.length < POSTING_PAGE) break;
     cursor = page[page.length - 1]!.id;
   }
@@ -114,7 +127,7 @@ export async function loadCompanyIntel(db: Db, orgId: string, companyId: string,
 
   const [periods, postings, posts, events, ledger, runs, firmo] = await Promise.all([
     db.accountFinancialPeriod.findMany({ where: { orgId, companyId, periodType: 'FY' }, orderBy: { periodEnd: 'desc' }, take: 40, select: { id: true, source: true, fiscalYear: true, periodEnd: true, currency: true, sourceUrl: true, metrics: true, updatedAt: true } }),
-    loadPostings(db, orgId, companyId, since),
+    loadPostings(db, orgId, companyId, since, now),
     db.companyPost.findMany({ where: { orgId, companyId }, orderBy: { publishedAt: 'desc' }, take: 60, select: { id: true, source: true, url: true, title: true, excerpt: true, kind: true, publishedAt: true, fetchedAt: true, sample: true } }),
     db.accountWatchEvent.findMany({ where: { orgId, companyId, occurredAt: { gte: newsSince }, source: { notIn: NEWS_EXCLUDED } }, orderBy: { occurredAt: 'desc' }, take: 40, select: { id: true, source: true, title: true, sourceUrl: true, summary: true, occurredAt: true, detectedAt: true } }),
     db.intelEvidence.findMany({ where: { orgId, companyId, kind: { in: ['registry', 'statement'] } }, orderBy: { fetchedAt: 'desc' }, take: 200 }),
