@@ -30,6 +30,23 @@ interface AICalibrateResponse {
   memosPolicies: string[];
 }
 
+// Quick Start's "run your first bid/no-bid" row used to flip on a click. A demo
+// workspace already has a score (the DNB Bank landing zone). The row follows
+// the same list the matrix reads. `limit=1` keeps the payload to a single
+// score; only whether one exists is kept. A lead or a deal on the org summary
+// is not this signal. A failed read (no opportunities:read) stays unresolved so
+// the page can fall back to the click instead of inventing a score.
+export function useChecklistBidScoreCount() {
+  return useQuery({
+    queryKey: ['bid-score', 'checklist-count'],
+    queryFn: ({ signal }) =>
+      api<{ items: Array<{ id: string }> }>('/api/v1/bid-scores?limit=1', { signal }),
+    select: (page) => page.items.length,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
 export function useBidScoreLatest(opportunityId: string | undefined) {
   return useQuery({
     queryKey: ['bid-score', 'latest', opportunityId],
@@ -62,6 +79,7 @@ export function useCreateBidScore() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['bid-score', 'latest', vars.opportunityId] });
+      qc.invalidateQueries({ queryKey: ['bid-score', 'checklist-count'] });
     },
   });
 }
