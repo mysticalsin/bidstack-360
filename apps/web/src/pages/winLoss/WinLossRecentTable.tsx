@@ -6,10 +6,11 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SortableHeader, getSortableHeaderAriaSort } from '@/components/ui/SortableHeader';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useTableSort } from '@/hooks/useTableSort';
 import { REASON_LABELS } from '@/pages/winLoss/reasonLabels';
 import type { WinLossClosedRow } from '@/pages/winLoss/useWinLossAnalysis';
+
+import { winLossRecentAmount } from './win-loss-recent-amount';
 
 type SortKey = 'name' | 'customer' | 'outcome' | 'reason' | 'value' | 'owner' | 'decidedAt';
 
@@ -26,10 +27,8 @@ const ACCESSORS: Record<SortKey, (r: WinLossClosedRow) => string | number | null
 
 export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
   const { t } = useTranslation('crm');
-  // Currency-aware formatter converts the EUR-at-rest valueMicros into the
-  // user's selected display currency; the raw @/lib/format formatter only
-  // re-labels the symbol without applying the FX conversion.
-  const { formatMoneyMicros } = useFormatMoney();
+  // Opportunity valueMicros has no currency column. The cell is the grouped
+  // units. A display currency must not turn that integer into a euro forecast.
   const { state, setState, sorted } = useTableSort<WinLossClosedRow, SortKey>(rows, ACCESSORS, {
     initial: { key: 'decidedAt', dir: 'desc' },
   });
@@ -98,7 +97,7 @@ export function WinLossRecentTable({ rows }: { rows: WinLossClosedRow[] }) {
                   ) : null}
                 </td>
                 <td className="px-4 py-3 text-right align-top tabular-nums text-[var(--fg-secondary)]">
-                  {formatMoneyMicros(row.valueMicros, 'EUR')}
+                  {winLossRecentAmount(row.valueMicros)}
                 </td>
                 <td className="px-4 py-3 align-top text-xs text-[var(--fg-tertiary)]">
                   {row.ownerName ?? t('winLoss.unowned', 'Unowned')}
