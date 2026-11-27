@@ -13,6 +13,7 @@ import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { springSoft } from '@/lib/motion';
+import { readPhase } from '@/lib/read-phase';
 
 import { AccountCard } from './AccountCard';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -205,6 +206,7 @@ export function AccountsAllSegment() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
   }, [rows]);
 
+  const dashboardPhase = readPhase(dashboard);
   if (dashboard.isLoading) {
     return (
       <>
@@ -213,7 +215,7 @@ export function AccountsAllSegment() {
       </>
     );
   }
-  if (dashboard.isError) {
+  if (dashboardPhase === 'error') {
     return (
       <>
         <h1 className="sr-only">{t('accounts.title', 'Accounts')}</h1>
@@ -227,11 +229,13 @@ export function AccountsAllSegment() {
       </>
     );
   }
-  if (!dashboard.data) {
+  if (dashboardPhase === 'unread' || !dashboard.data) {
     return (
       <>
         <h1 className="sr-only">{t('accounts.title', 'Accounts')}</h1>
-        <EmptyState title={t('accounts.empty.title', 'No accounts yet')} />
+        <p className="text-sm text-[var(--fg-secondary)]" role="status">
+          {t('accounts.checking', 'Checking accounts')}
+        </p>
       </>
     );
   }

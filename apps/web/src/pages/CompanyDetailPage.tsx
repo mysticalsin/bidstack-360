@@ -24,6 +24,7 @@ import { ConsultingPartnersSection } from '@/components/consulting-partners/Cons
 import { AccountDirectionSection } from '@/components/company-intel/AccountDirectionSection';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyIntelSummary, useRefreshCompanyIntel } from '@/hooks/useCompanyIntelSummary';
+import { readPhase } from '@/lib/read-phase';
 
 import { CompanyDetailsForm } from './companyDetail/CompanyDetailsForm';
 import { CompanyPeopleTab } from './companyDetail/CompanyPeopleTab';
@@ -73,6 +74,7 @@ export function CompanyDetailPage() {
     canReadIntel ? id : undefined,
     refreshIntel.pollUntil,
   );
+  const intelPhase = readPhase(intelSummary);
   const openIntel = (next: IntelTab) => {
     setIntelTab(next);
     setTab('intel');
@@ -214,11 +216,21 @@ export function CompanyDetailPage() {
           {canReadIntel && (
             <div className="flex flex-col gap-2 lg:flex-row lg:items-stretch">
               <div className="min-w-0 flex-1">
-                <IntelStrip
-                  summary={intelSummary.data?.summary ?? null}
-                  onOpen={openIntel}
-                  crmEmployees={c.employeeCount ?? null}
-                />
+                {intelPhase === 'error' ? (
+                  <p className="text-sm text-[var(--fg-secondary)]" role="alert">
+                    {t('companyDetail.intelError', "Couldn't load company intel")}
+                  </p>
+                ) : intelPhase === 'unread' ? (
+                  <p className="text-sm text-[var(--fg-secondary)]" role="status">
+                    {t('companyDetail.intelChecking', 'Checking company intel')}
+                  </p>
+                ) : (
+                  <IntelStrip
+                    summary={intelSummary.data?.summary ?? null}
+                    onOpen={openIntel}
+                    crmEmployees={c.employeeCount ?? null}
+                  />
+                )}
               </div>
               {canRefreshIntel && (
                 <Button
