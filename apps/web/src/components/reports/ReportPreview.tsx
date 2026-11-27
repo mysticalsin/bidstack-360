@@ -5,7 +5,7 @@
 // contract: group keys aliased by field, a lone aggregate aliased 'value'),
 // never free-typed.
 
-import { Component, type ReactNode } from 'react';
+import { Component, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChartContainer } from '@/components/charts/ChartContainer';
@@ -22,6 +22,7 @@ import {
   TableChart,
 } from '@/components/charts/charts';
 import type { ChartType, ReportQuery, ReportRun } from '@/hooks/useAnalyticsReports';
+import { presentReportRows } from '@/lib/reportCell';
 
 type Row = Record<string, unknown>;
 
@@ -104,6 +105,14 @@ interface Props {
 export function ReportPreview({ chartType, query, run, isLoading, error, onRun }: Props) {
   const { t } = useTranslation('reports');
   const rows: Row[] = run?.result ?? [];
+  const presented = useMemo(() => presentReportRows(query, rows), [query, rows]);
+  const columns = presented.columns.map((column) => ({
+    key: column.key,
+    label:
+      column.key === 'valueMicros'
+        ? t('reportPreview.column.valueMicros', column.label)
+        : column.label,
+  }));
   const runError = run?.status === 'error' ? (run.error ?? t('reportPreview.queryFailed', 'Query failed')) : null;
   const combinedError = error ?? runError;
   const hasRun = run !== null || isLoading || combinedError !== null;
@@ -140,11 +149,15 @@ export function ReportPreview({ chartType, query, run, isLoading, error, onRun }
                 "This chart type doesn't fit the current query shape. The table below shows the raw rows.",
               )}
             >
-              <Chart chartType={chartType} query={query} rows={rows} />
+              <Chart chartType={chartType} query={query} rows={presented.chartRows} />
             </PreviewErrorBoundary>
           )}
           {rows.length > 0 && (
-            <TableChart data={rows} aria-label={t('reportPreview.rowsAriaLabel', 'Report preview rows')} />
+            <TableChart
+              data={presented.tableRows}
+              columns={columns}
+              aria-label={t('reportPreview.rowsAriaLabel', 'Report preview rows')}
+            />
           )}
         </div>
       )}
