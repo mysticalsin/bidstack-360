@@ -22,8 +22,15 @@ interface TargetRect {
 
 const HOLE_PADDING = 8;
 
+function isOffscreen(rect: DOMRect): boolean {
+  const vh = window.innerHeight;
+  const vw = window.innerWidth;
+  return rect.bottom <= 0 || rect.top >= vh || rect.right <= 0 || rect.left >= vw;
+}
+
 function useTargetRect(selector: string | undefined): TargetRect | null {
   const [rect, setRect] = useState<TargetRect | null>(null);
+  const scrolledFor = useRef<string | null>(null);
 
   useEffect(() => {
     if (!selector) {
@@ -39,7 +46,14 @@ function useTargetRect(selector: string | undefined): TargetRect | null {
         setRect(null);
         return;
       }
-      const r = el.getBoundingClientRect();
+      let r = el.getBoundingClientRect();
+      // The account timeline sits below the cockpit fold. A hole around an
+      // off-screen marker looks like the same empty dark sheet.
+      if (isOffscreen(r) && scrolledFor.current !== selector) {
+        scrolledFor.current = selector ?? null;
+        el.scrollIntoView({ block: 'center', inline: 'nearest' });
+        r = el.getBoundingClientRect();
+      }
        
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     }
