@@ -7,7 +7,8 @@ import { SourceChip } from '@/components/figures/SourcedFigure';
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
-import { beatsProvider, figureText, useSourcedFigures } from '@/hooks/useSourcedFigures';
+import { useAccountKeyNumbers } from '@/hooks/useAccountPositioning';
+import { beatsProvider, figureText, isCompanyId } from '@/hooks/useSourcedFigures';
 import { api } from '@/lib/api';
 import { springSnap, staggerChild, staggerParent } from '@/lib/motion';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -15,6 +16,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import type { AccountCockpitSnapshot, CockpitKpi, KeyNumber } from '@bidstack/shared';
 
 import { KPI_TONE_BG, KPI_TONE_FG, iconForKpi } from './_tokens';
+import { kpiSourcedPhase, type KpiSourcedPhase } from './kpi-sourced-read';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -31,8 +33,19 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
   const external = cockpit.kpis.filter((k) => k.block === 'external');
   const internal = cockpit.kpis.filter((k) => k.block !== 'external');
   const companyOverrideKey = cockpit.company.name;
-  const sourced = useSourcedFigures(cockpit.company.id);
-  const figures: SourcedByField = { annualRevenueMicros: sourced.revenue, employeeCount: sourced.employees };
+  // A name key is not this read. The key-numbers query stays disabled, and the
+  // snapshot stays on the card.
+  const sourcedReadEnabled = isCompanyId(cockpit.company.id);
+  const keyNumbers = useAccountKeyNumbers(sourcedReadEnabled ? cockpit.company.id : undefined);
+  const sourcedPhase = sourcedReadEnabled
+    ? kpiSourcedPhase({ data: keyNumbers.data, isError: keyNumbers.isError, status: keyNumbers.status })
+    : 'ready';
+  const sourcedItems =
+    sourcedPhase === 'ready' && Array.isArray(keyNumbers.data?.items) ? keyNumbers.data.items : [];
+  const figures: SourcedByField = {
+    annualRevenueMicros: sourcedItems.find((item) => item.id === 'revenue') ?? null,
+    employeeCount: sourcedItems.find((item) => item.id === 'employees') ?? null,
+  };
   const lastSynced = cockpit.externalLastSyncedAt
     ? cockpit.externalLastSyncedAt.slice(0, 10)
     : null;
@@ -49,6 +62,7 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
         kpis={external}
         companyKey={companyOverrideKey}
         figures={figures}
+        sourcedPhase={sourcedPhase}
         editable
       />
       <KpiBlock
@@ -57,6 +71,7 @@ export const KpiRow = memo(function KpiRow({ cockpit }: Props) {
         kpis={internal}
         companyKey={companyOverrideKey}
         figures={figures}
+        sourcedPhase={sourcedPhase}
       />
     </section>
   );
@@ -68,6 +83,7 @@ function KpiBlock({
   kpis,
   companyKey,
   figures,
+  sourcedPhase,
   editable = false,
 }: {
   title: string;
@@ -75,6 +91,7 @@ function KpiBlock({
   kpis: CockpitKpi[];
   companyKey: string;
   figures: SourcedByField;
+  sourcedPhase: KpiSourcedPhase;
   editable?: boolean;
 }) {
   const { t } = useTranslation('crm');
@@ -97,7 +114,14 @@ function KpiBlock({
       </div>
       <div className={`kpi-grid ${colsClass}`}>
         {kpis.map((kpi) => {
-          const figure = kpi.fieldKey === 'annualRevenueMicros' || kpi.fieldKey === 'employeeCount' ? figures[kpi.fieldKey] : null;
+          const sourcedField =
+            kpi.fieldKey === 'annualRevenueMicros' || kpi.fieldKey === 'employeeCount';
+          const sourcedUnread = sourcedField && sourcedPhase === 'unread';
+          const sourcedFailed = sourcedField && sourcedPhase === 'failed';
+          const figure =
+            kpi.fieldKey === 'annualRevenueMicros' || kpi.fieldKey === 'employeeCount'
+              ? figures[kpi.fieldKey]
+              : null;
           const figureValue = figureText(figure);
           const sourcedValue = figureValue && (kpi.sourceState === 'missing' || beatsProvider(figure)) ? figureValue : null;
           return (
@@ -119,9 +143,24 @@ function KpiBlock({
             <div className="kpi-text">
               <div className="kpi-label">{kpi.label}</div>
               <div className="kpi-value">
-                <KpiValue raw={sourcedValue ?? kpi.value} reduced={reduced} />
+                {sourcedUnread ? (
+                  <p role="status" className="text-sm text-[var(--fg-secondary)]">
+                    {t(
+                      'kpiRow.sourcedUnread',
+                      'Checking sourced figures. The key numbers have not arrived.',
+                    )}
+                  </p>
+                ) : sourcedFailed ? (
+                  <p role="alert" className="text-sm text-[var(--fg-secondary)]">
+                    {t('kpiRow.sourcedFailed', 'Could not load sourced figures.')}
+                  </p>
+                ) : (
+                  <KpiValue raw={sourcedValue ?? kpi.value} reduced={reduced} />
+                )}
               </div>
-              {kpi.detail && !(sourcedValue && kpi.sourceState === 'missing') ? <div className="kpi-sub">{kpi.detail}</div> : null}
+              {!sourcedUnread && !sourcedFailed && kpi.detail && !(sourcedValue && kpi.sourceState === 'missing') ? (
+                <div className="kpi-sub">{kpi.detail}</div>
+              ) : null}
             </div>
             <div
               style={{
@@ -133,7 +172,7 @@ function KpiBlock({
                 gap: 2,
               }}
             >
-              {sourcedValue && figure?.provenance ? (
+              {sourcedUnread || sourcedFailed ? null : sourcedValue && figure?.provenance ? (
                 <SourceChip p={figure.provenance} testId={`kpi-chip-${kpi.fieldKey}`} />
               ) : (
                 <SourceBadge
@@ -142,7 +181,7 @@ function KpiBlock({
                   hint={kpi.sourceHint ?? kpi.detail ?? t('kpiRow.internalDataHint', 'Polo PreSales internal data')}
                 />
               )}
-              {(editable || kpi.overridden) && kpi.fieldKey ? (
+              {!sourcedUnread && !sourcedFailed && (editable || kpi.overridden) && kpi.fieldKey ? (
                 <FieldOverrideEditor kpi={kpi} companyKey={companyKey} />
               ) : null}
             </div>
