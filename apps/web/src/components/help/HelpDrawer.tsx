@@ -1,8 +1,11 @@
 // Slide-from-right shortcuts drawer. Opens via the topbar help button or
 // by pressing `?` (unmodified) anywhere outside an input. Mirrors the
 // "Help" sheets in GitHub, Linear, and Notion. Content is grouped by
-// surface (Global, Navigation, Records) so a new user can read it
-// top-to-bottom.
+// surface (Global, Navigation) so a new user can read it top-to-bottom.
+//
+// Only keys with an app-wide handler belong here. List-row keys (arrows,
+// Enter, E, Delete) are not global, so listing them taught a demo user
+// to press something that does nothing.
 
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -25,7 +28,9 @@ function buildGroups(t: TFunction): Array<{ id: string; title: string; items: Sh
       id: 'Global',
       title: t('helpDrawer.groupGlobal', 'Global'),
       items: [
-        { keys: ['Ctrl', 'K'], label: t('helpDrawer.openCommandPalette', 'Open command palette') },
+        { keys: ['⌘K / Ctrl+K'], label: t('helpDrawer.openCommandPalette', 'Open command palette') },
+        { keys: ['⌘J / Ctrl+J'], label: t('helpDrawer.openJarvis', 'Open Jarvis') },
+        { keys: ['⌘/ / Ctrl+/'], label: t('helpDrawer.focusSearch', 'Focus search') },
         { keys: ['N'], label: t('helpDrawer.quickAddMenu', 'Quick-add menu') },
         { keys: ['?'], label: t('helpDrawer.openThisDrawer', 'Open this drawer') },
         { keys: ['Esc'], label: t('helpDrawer.closeCurrentDialog', 'Close current dialog') },
@@ -44,16 +49,6 @@ function buildGroups(t: TFunction): Array<{ id: string; title: string; items: Sh
         { keys: ['G', 'A'], label: t('helpDrawer.goToAccounts', 'Go to Accounts') },
         { keys: ['G', 'S'], label: t('helpDrawer.goToSettings', 'Go to Settings') },
         { keys: ['G', 'F'], label: t('helpDrawer.goToSearch', 'Go to Search') },
-      ],
-    },
-    {
-      id: 'Records',
-      title: t('helpDrawer.groupRecords', 'Records'),
-      items: [
-        { keys: ['Up', 'Down'], label: t('helpDrawer.moveSelectionInLists', 'Move selection in lists') },
-        { keys: ['Enter'], label: t('helpDrawer.openRecord', 'Open record') },
-        { keys: ['E'], label: t('helpDrawer.editSelectedRecord', 'Edit selected record') },
-        { keys: ['Del'], label: t('helpDrawer.deleteWithConfirmation', 'Delete with confirmation') },
       ],
     },
   ];
@@ -132,7 +127,7 @@ export function HelpDrawer() {
                   <footer className="pt-2 text-[11px] text-[var(--fg-tertiary)]">
                     {t(
                       'helpDrawer.footer',
-                      'Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer.',
+                      'Letter shortcuts pause inside a text field. Ctrl and Command still open search, Jarvis, and the command palette. Press ? outside a field to reopen this drawer.',
                     )}
                   </footer>
                 </div>

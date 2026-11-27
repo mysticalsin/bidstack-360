@@ -325,8 +325,9 @@
     "closeAria": "Fermer les raccourcis",
     "groupGlobal": "Global",
     "groupNavigation": "Navigation",
-    "groupRecords": "Enregistrements",
     "openCommandPalette": "Ouvrir la palette de commandes",
+    "openJarvis": "Ouvrir Jarvis",
+    "focusSearch": "Activer le champ de recherche",
     "quickAddMenu": "Menu d'ajout rapide",
     "openThisDrawer": "Ouvrir ce panneau",
     "closeCurrentDialog": "Fermer la boîte de dialogue actuelle",
@@ -339,11 +340,7 @@
     "goToAccounts": "Aller aux comptes",
     "goToSettings": "Aller aux paramètres",
     "goToSearch": "Aller à la recherche",
-    "moveSelectionInLists": "Déplacer la sélection dans les listes",
-    "openRecord": "Ouvrir l'enregistrement",
-    "editSelectedRecord": "Modifier l'enregistrement sélectionné",
-    "deleteWithConfirmation": "Supprimer avec confirmation",
-    "footer": "La plupart des raccourcis fonctionnent partout, sauf dans les champs de texte. Appuyez sur ? à tout moment pour rouvrir ce panneau."
+    "footer": "Les raccourcis d'une lettre s'arrêtent dans un champ de texte. Ctrl et Commande ouvrent encore la recherche, Jarvis et la palette de commandes. Appuyez sur ? hors d'un champ pour rouvrir ce panneau."
   },
   "breadcrumbs": {
     "dashboard": "Tableau de bord",

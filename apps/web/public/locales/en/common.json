@@ -327,8 +327,9 @@
     "closeAria": "Close shortcuts",
     "groupGlobal": "Global",
     "groupNavigation": "Navigation",
-    "groupRecords": "Records",
     "openCommandPalette": "Open command palette",
+    "openJarvis": "Open Jarvis",
+    "focusSearch": "Focus search",
     "quickAddMenu": "Quick-add menu",
     "openThisDrawer": "Open this drawer",
     "closeCurrentDialog": "Close current dialog",
@@ -341,11 +342,7 @@
     "goToAccounts": "Go to Accounts",
     "goToSettings": "Go to Settings",
     "goToSearch": "Go to Search",
-    "moveSelectionInLists": "Move selection in lists",
-    "openRecord": "Open record",
-    "editSelectedRecord": "Edit selected record",
-    "deleteWithConfirmation": "Delete with confirmation",
-    "footer": "Most shortcuts work everywhere except inside text fields. Press ? any time to reopen this drawer."
+    "footer": "Letter shortcuts pause inside a text field. Ctrl and Command still open search, Jarvis, and the command palette. Press ? outside a field to reopen this drawer."
   },
   "breadcrumbs": {
     "dashboard": "Dashboard",
