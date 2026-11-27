@@ -72,25 +72,33 @@ export function DataQualitySection() {
   const highCount = issues.filter((issue) => issue.severity === 'high').length;
   const mediumCount = issues.filter((issue) => issue.severity === 'medium').length;
   const score = qualityScore(issues);
+  const headerTone: BadgeTone =
+    isError || isLoading ? 'gray' : score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato';
 
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
       <SectionHeader
         title={t('dataQuality.title', 'Data quality')}
         caption={
-          data
-            ? t('dataQuality.caption.generated', 'Report generated {{time}} · {{count}} issue', {
-                time: relativeTime(data.generatedAt),
-                count: issues.length,
-              })
-            : t(
-                'dataQuality.caption.idle',
-                'Detects duplicate companies, stale data, missing owners, and bad domains.',
-              )
+          isError
+            ? t('dataQuality.caption.failed', 'Data quality is not loaded.')
+            : data
+              ? t('dataQuality.caption.generated', 'Report generated {{time}} · {{count}} issue', {
+                  time: relativeTime(data.generatedAt),
+                  count: issues.length,
+                })
+              : t(
+                  'dataQuality.caption.idle',
+                  'Detects duplicate companies, stale data, missing owners, and bad domains.',
+                )
         }
         action={
-          <Badge tone={score >= 90 ? 'jade' : score >= 70 ? 'amber' : 'tomato'}>
-            {score}/100
+          <Badge tone={headerTone}>
+            {isError
+              ? t('dataQuality.badge.notLoaded', 'not loaded')
+              : isLoading
+                ? t('dataQuality.badge.checking', 'checking')
+                : `${score}/100`}
           </Badge>
         }
       />
