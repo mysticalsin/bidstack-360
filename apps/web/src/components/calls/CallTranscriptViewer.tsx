@@ -20,7 +20,8 @@ import { useState, useRef, useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/Button';
-import type { TranscriptSegment } from '@/hooks/useCalls';
+import { useCall, type TranscriptSegment } from '@/hooks/useCalls';
+import { callTranscriptPhase } from '@/components/calls/call-transcript-read';
 
 // ─── Speaker colour palette (10 colours, repeats) ────────────────────────────
 
@@ -105,6 +106,27 @@ export function CallTranscriptViewer({
   className,
 }: CallTranscriptViewerProps) {
   const { t } = useTranslation('crm');
+  const detail = useCall(callId);
+  // Empty props are what the detail panel passes before the call arrives.
+  // With a call id, those props are not a transcript.
+  const phase = callTranscriptPhase({
+    callId,
+    data: detail.data,
+    isError: detail.isError,
+    status: detail.status,
+  });
+  const resolvedSegments =
+    phase === 'ready'
+      ? (detail.data?.transcriptStructured ?? [])
+      : phase === 'local'
+        ? segments
+        : [];
+  const resolvedText =
+    phase === 'ready'
+      ? (detail.data?.transcriptText ?? undefined)
+      : phase === 'local'
+        ? transcriptText
+        : undefined;
   const [search, setSearch] = useState('');
   const searchId = useId();
   const resultId = useId();
@@ -114,14 +136,14 @@ export function CallTranscriptViewer({
   const speakerIndex: Map<string, number> = useMemo(() => {
     const map = new Map<string, number>();
     let idx = 0;
-    for (const seg of segments) {
+    for (const seg of resolvedSegments) {
       if (!map.has(seg.speaker)) {
         map.set(seg.speaker, idx % SPEAKER_COLOURS.length);
         idx++;
       }
     }
     return map;
-  }, [segments]);
+  }, [resolvedSegments]);
 
   // Build search regex once per search term change
   const searchPattern = useMemo((): RegExp | null => {
@@ -138,20 +160,20 @@ export function CallTranscriptViewer({
   const matchCount = useMemo(() => {
     if (!searchPattern) return 0;
     let count = 0;
-    for (const seg of segments) {
+    for (const seg of resolvedSegments) {
       const matches = seg.text.match(new RegExp(searchPattern.source, searchPattern.flags));
       if (matches) count += matches.length;
     }
     return count;
-  }, [searchPattern, segments]);
+  }, [searchPattern, resolvedSegments]);
 
   // Filter to only segments containing the search term
   const visibleSegments = useMemo(() => {
-    if (!searchPattern) return segments;
-    return segments.filter((seg) => {
+    if (!searchPattern) return resolvedSegments;
+    return resolvedSegments.filter((seg) => {
       return new RegExp(searchPattern.source, searchPattern.flags).test(seg.text);
     });
-  }, [segments, searchPattern]);
+  }, [resolvedSegments, searchPattern]);
 
   const seekTo = useCallback(
     (ms: number) => {
@@ -167,8 +189,8 @@ export function CallTranscriptViewer({
 
   const downloadTranscript = () => {
     const text =
-      transcriptText ??
-      segments
+      resolvedText ??
+      resolvedSegments
         .map((s) => `[${formatMs(s.startMs)}] ${s.speaker}: ${s.text}`)
         .join('\n\n');
     const blob = new Blob([text], { type: 'text/plain' });
@@ -180,7 +202,33 @@ export function CallTranscriptViewer({
     URL.revokeObjectURL(url);
   };
 
-  if (segments.length === 0 && !transcriptText) {
+  if (phase === 'unread') {
+    return (
+      <div
+        className={cn('rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center', className)}
+        role="status"
+      >
+        <p className="text-sm text-[var(--fg-secondary)]">
+          {t('callTranscript.unread', 'Checking the transcript. The call has not arrived.')}
+        </p>
+      </div>
+    );
+  }
+
+  if (phase === 'failed') {
+    return (
+      <div
+        className={cn('rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center', className)}
+        role="alert"
+      >
+        <p className="text-sm text-[var(--danger)]">
+          {t('callTranscript.loadError', 'Failed to load the transcript.')}
+        </p>
+      </div>
+    );
+  }
+
+  if (resolvedSegments.length === 0 && !resolvedText) {
     return (
       <div className={cn('rounded-lg border border-dashed border-[var(--border-default)] px-6 py-8 text-center', className)}>
         <p className="text-sm text-[var(--fg-tertiary)]">{t('callTranscript.emptyNotAvailable', 'Transcript not yet available.')}</p>
@@ -299,9 +347,9 @@ export function CallTranscriptViewer({
       </div>
 
       {/* Fallback: plain text when no structured segments */}
-      {segments.length === 0 && transcriptText && (
+      {resolvedSegments.length === 0 && resolvedText && (
         <pre className="whitespace-pre-wrap text-sm text-[var(--fg-primary)] leading-relaxed font-sans overflow-y-auto max-h-[60vh]">
-          {transcriptText}
+          {resolvedText}
         </pre>
       )}
     </section>
