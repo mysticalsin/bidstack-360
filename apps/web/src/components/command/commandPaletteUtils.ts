@@ -24,6 +24,44 @@ export const ACCOUNT_RESULT_LIMIT = 6;
 export const CONTACT_RESULT_LIMIT = 6;
 export const TASK_RESULT_LIMIT = 6;
 
+/**
+ * Both palette server searches (opportunity list and workspace search) start
+ * at this length. Keep it aligned with `useGlobalSearch`: a shorter query
+ * is local-only, so the empty sentence is allowed without a server read.
+ */
+export const PALETTE_SERVER_QUERY_MIN = 2;
+
+export type PaletteServerRead = 'searching' | 'failed' | 'settled';
+
+/**
+ * "No matches." is honest only after every server read this query owes has
+ * succeeded. The debounce pause, an in-flight request, and a failed request
+ * have not produced an empty catalog.
+ */
+export function paletteServerRead(input: {
+  query: string;
+  debouncedQuery: string;
+  opportunityPending: boolean;
+  opportunityFetching: boolean;
+  opportunityError: boolean;
+  globalPending: boolean;
+  globalFetching: boolean;
+  globalError: boolean;
+}): PaletteServerRead {
+  if (input.query.trim().length < PALETTE_SERVER_QUERY_MIN) return 'settled';
+  if (input.query !== input.debouncedQuery) return 'searching';
+  if (
+    input.opportunityFetching ||
+    input.globalFetching ||
+    input.opportunityPending ||
+    input.globalPending
+  ) {
+    return 'searching';
+  }
+  if (input.opportunityError || input.globalError) return 'failed';
+  return 'settled';
+}
+
 export interface Item {
   id: string;
   group:

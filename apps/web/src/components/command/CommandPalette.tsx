@@ -104,7 +104,7 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
 
   // Feed an empty query while in copilot mode so the debounced server
   // searches never fire against a natural-language prompt.
-  const { items, isFetching, selectNavTarget, findDirectNavTarget } = usePaletteItems(
+  const { items, serverRead, selectNavTarget, findDirectNavTarget } = usePaletteItems(
     copilotMode ? '' : query,
     onClose,
   );
@@ -291,9 +291,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
       >
         {displayItems.length === 0 ? (
           <div className="px-4 py-6 text-center text-xs text-[var(--fg-tertiary)]">
-            {isFetching
-              ? t('commandPalette.searching', 'Searching…')
-              : t('commandPalette.noMatches', 'No matches.')}
+            {serverRead === 'failed'
+              ? t('commandPalette.searchFailed', 'Search could not be completed.')
+              : serverRead === 'searching'
+                ? t('commandPalette.searching', 'Searching…')
+                : t('commandPalette.noMatches', 'No matches.')}
           </div>
         ) : null}
         {/* Wrap contiguous same-group runs in role="group" + aria-label so
