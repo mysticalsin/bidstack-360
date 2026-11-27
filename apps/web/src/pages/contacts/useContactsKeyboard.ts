@@ -53,12 +53,20 @@ export function useContactsKeyboard({
         tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || targetEl?.isContentEditable;
       if (inField) return;
       if (items.length === 0) return;
+      // An open peek is the highlighted person. Moving the highlight without
+      // moving the peek leaves the previous title and phone on the card.
+      const showAt = (index: number) => {
+        setCursorIdx(index);
+        if (!quickLook) return;
+        const row = items[index];
+        if (row) setQuickLook(row);
+      };
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
-        setCursorIdx((i) => Math.min(items.length - 1, i < 0 ? 0 : i + 1));
+        showAt(Math.min(items.length - 1, cursorIdx < 0 ? 0 : cursorIdx + 1));
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
         e.preventDefault();
-        setCursorIdx((i) => Math.max(0, i < 0 ? 0 : i - 1));
+        showAt(Math.max(0, cursorIdx < 0 ? 0 : cursorIdx - 1));
       } else if (e.key === 'Enter' && cursorIdx >= 0) {
         e.preventDefault();
         const row = items[cursorIdx];
@@ -83,14 +91,14 @@ export function useContactsKeyboard({
         if (pendingG.current && now - pendingG.current < 900) {
           e.preventDefault();
           pendingG.current = null;
-          setCursorIdx(0);
+          showAt(0);
         } else {
           pendingG.current = now;
         }
       } else if (e.key === 'G') {
         // Shift+g — jump to the bottom of the visible list.
         e.preventDefault();
-        setCursorIdx(items.length - 1);
+        showAt(items.length - 1);
       }
     };
     window.addEventListener('keydown', handler);
