@@ -28,6 +28,8 @@ import { useForecastProjection } from '@/hooks/useForecasts';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import type { ForecastProjectionPeriod } from '@bidstack/shared';
 
+import { forecastProjectionPhase } from './forecast-projection-read';
+
 type FormatMoney = (micros: number, currency?: string) => string;
 
 export function ForecastProjection() {
@@ -38,14 +40,16 @@ export function ForecastProjection() {
 
   const periods = projection.data?.periods ?? [];
   const activePeriod = periods.find((p) => p.period === selected) ?? periods[0];
-  const hasPipeline = periods.some((p) => p.openMicros > 0 || p.wonMicros > 0);
   const bars = forecastPeriodBars(periods);
+  // A pause reports isLoading false, so the old order fell through to
+  // "No open pipeline" before any projection had arrived.
+  const phase = forecastProjectionPhase(projection);
 
   return (
     <Card>
       <SectionHeader title={t('forecastProjection.title', 'Weighted pipeline projection')} />
 
-      {projection.isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('forecastProjection.errorTitle', 'Failed to load projection')}
           message={projection.error instanceof Error ? projection.error.message : undefined}
@@ -55,9 +59,15 @@ export function ForecastProjection() {
             </Button>
           }
         />
-      ) : projection.isLoading ? (
-        <LoadingSkeleton rows={4} />
-      ) : !hasPipeline || !activePeriod ? (
+      ) : phase === 'unread' ? (
+        <div>
+          <p role="status" className="px-5 pt-4 text-sm text-[var(--fg-secondary)]">
+            {t('forecastProjection.checkingTitle', 'Checking the weighted pipeline')}.{' '}
+            {t('forecastProjection.checkingMessage', 'The projection has not arrived.')}
+          </p>
+          <LoadingSkeleton rows={4} />
+        </div>
+      ) : phase === 'empty' || !activePeriod ? (
         <EmptyState
           title={t('forecastProjection.emptyTitle', 'No open pipeline to forecast')}
           message={t(
