@@ -47,6 +47,10 @@ export function PipelinePage() {
   const pageContinues = Boolean(data?.nextCursor);
   const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
+  // A failed stage read is not "no stages configured". Falling through let
+  // getPipelineStages invent the default funnel, or keep the previous titles.
+  const stageReadFailed = configuredStages.isError;
+  const bidsOnBoard = (data?.items.length ?? 0) > 0;
   // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
   // board itself only loads the first 50 cards, so totals/win-rate computed
   // from `data.items` were silently truncated for any org past 50 deals.
@@ -79,8 +83,9 @@ export function PipelinePage() {
   // for a11y — drag-and-drop is unreachable by keyboard alone (WCAG 2.1.1).
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
-  const configuredStageOptions = useMemo<PipelineStage[]>(
-    () =>
+  const configuredStageOptions = useMemo<PipelineStage[]>(() => {
+    if (stageReadFailed) return [];
+    return (
       configuredStages.data?.items.map((stage) => ({
         id: stage.id,
         name: stage.name,
@@ -88,17 +93,17 @@ export function PipelinePage() {
         color: stage.color,
         isWon: stage.isWon,
         isLost: stage.isLost,
-      })) ?? [],
-    [configuredStages.data?.items],
-  );
+      })) ?? []
+    );
+  }, [configuredStages.data?.items, stageReadFailed]);
 
   // Stage columns come from CRM configuration, not whichever opportunity
   // records happen to be present in the current page. This keeps empty stages
   // visible and avoids pagination hiding parts of the funnel.
-  const stages = useMemo(
-    () => getPipelineStages(data?.items ?? [], configuredStageOptions),
-    [configuredStageOptions, data?.items],
-  );
+  const stages = useMemo(() => {
+    if (stageReadFailed) return [];
+    return getPipelineStages(data?.items ?? [], configuredStageOptions);
+  }, [configuredStageOptions, data?.items, stageReadFailed]);
 
   const stageIdByBusinessKey = useMemo(
     () => new Map(stages.map((stage) => [getPipelineStageBusinessKey(stage), stage.id])),
@@ -232,7 +237,7 @@ export function PipelinePage() {
 
       {/* sr-only live region — announces visible opportunity count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading && data
+        {!isLoading && data && !(stageReadFailed && bidsOnBoard)
           ? (() => {
               const count = visibleStages.reduce(
                 (s, st) => s + (byStage.get(st.id)?.length ?? 0),
@@ -325,6 +330,23 @@ export function PipelinePage() {
         />
       ) : isLoading || (configuredStages.isLoading && configuredStageOptions.length === 0) ? (
         <KanbanSkeleton />
+      ) : stageReadFailed && bidsOnBoard ? (
+        <ErrorState
+          title={t('pipeline.stagesErrorTitle', 'Could not load pipeline stages')}
+          message={t(
+            'pipeline.stagesErrorMessage',
+            'The columns did not load. This is not an empty pipeline and it is not the saved funnel.',
+          )}
+          action={
+            <button
+              type="button"
+              onClick={() => void configuredStages.refetch()}
+              className="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-fg-on-brand hover:bg-brand-hover"
+            >
+              {t('pipeline.stagesErrorRetry', 'Retry')}
+            </button>
+          }
+        />
       ) : (data?.items.length ?? 0) === 0 ? (
         <EmptyState
           title={t('pipeline.emptyTitle', 'No opportunities yet')}
