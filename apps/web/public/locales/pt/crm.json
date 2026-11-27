@@ -1509,6 +1509,7 @@
     "footerImporting": "Importando {{done}} de {{total}}…",
     "footerReady": "{{ready}}/{{total}} prontos para importar",
     "footerAwaiting": "Aguardando colagem",
+    "noContactRows": "Esta colagem não tem linhas de contato.",
     "cancelButton": "Cancelar",
     "importButtonImporting": "Importando {{done}} / {{total}}…",
     "importButton": "Importar {{label}}",

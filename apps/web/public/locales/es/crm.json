@@ -1542,6 +1542,7 @@
     "footerImporting": "Importando {{done}} de {{total}}…",
     "footerReady": "{{ready}}/{{total}} listos para importar",
     "footerAwaiting": "Esperando que pegues",
+    "noContactRows": "Este pegado no tiene filas de contacto.",
     "cancelButton": "Cancelar",
     "importButtonImporting": "Importando {{done}} / {{total}}…",
     "importButton": "Importar {{label}}",

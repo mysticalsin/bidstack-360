@@ -185,6 +185,86 @@ describe('ContactCsvImportDialog', () => {
     expect(screen.getByRole('button', { name: 'Import 1' })).toBeTruthy();
   });
 
+  it('keeps a real contact when the paste has blank spreadsheet rows around it', async () => {
+    // WHY: Excel leaves comma-only rows under a table, and a leading blank row
+    // must not become the header. Those rows are not contacts. A quoted empty
+    // cell is not a name, so it must not be created.
+    hookMocks.mutateAsync.mockResolvedValue(undefined);
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv(
+      ',,,\n' +
+        'name,customer,email\n' +
+        'Mina Solano,Northwind Freight,mina@northwind.example\n' +
+        ',,,\n' +
+        '"","",""\n',
+    );
+
+    expect(screen.getByText('Mina Solano')).toBeTruthy();
+    expect(screen.getByText('1/1 ready to import')).toBeTruthy();
+    expect(screen.queryByText(/need fixes/)).toBeNull();
+    expect(screen.queryByText('""')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1' }));
+    await waitFor(() => expect(hookMocks.mutateAsync).toHaveBeenCalledOnce());
+    expect(hookMocks.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      name: 'Mina Solano',
+      customer: 'Northwind Freight',
+      email: 'mina@northwind.example',
+    });
+  });
+
+  it('treats a quoted empty email as no email', async () => {
+    // WHY: Excel writes an empty optional cell as "". That is not an address,
+    // and it must not mark an otherwise ready contact as needing fixes.
+    hookMocks.mutateAsync.mockResolvedValue(undefined);
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('name,customer,email\nMina Solano,Northwind Freight,""\n');
+
+    expect(screen.queryByText(/need fixes/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Import 1' }));
+    await waitFor(() => expect(hookMocks.mutateAsync).toHaveBeenCalledOnce());
+    expect(hookMocks.mutateAsync.mock.calls[0]?.[0]).toMatchObject({
+      name: 'Mina Solano',
+      customer: 'Northwind Freight',
+      email: null,
+    });
+  });
+
+  it('says a paste of only blank rows has no contacts', async () => {
+    // WHY: a sheet of comma-only rows is not an empty box, and it is not a
+    // list of contacts that need fixes. The demo paste must say there is
+    // nothing to import.
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('name,customer\n,,,\n, ,\n"","",""\n');
+
+    expect(screen.getAllByText('That paste has no contact rows.').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Awaiting paste')).toBeNull();
+    expect(screen.queryByText(/need fixes/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Import' })).toHaveProperty('disabled', true);
+  });
+
+  it('still says the box is waiting when the paste is only whitespace', async () => {
+    // WHY: spaces are not a file. The empty sentence is for a paste that
+    // arrived and had no contacts, not for a box the user has not filled.
+    hookMocks.useCreateContact.mockReturnValue({ mutateAsync: hookMocks.mutateAsync });
+    render(<ContactCsvImportDialog />);
+    await openDialog();
+
+    pasteCsv('  \n\t  ');
+
+    expect(screen.getByText('Awaiting paste')).toBeTruthy();
+    expect(screen.queryByText('That paste has no contact rows.')).toBeNull();
+  });
+
   it('the textarea is labeled and wired to the error message via aria-describedby when a row is invalid', async () => {
     // WHY: this is a plain <textarea>, not a design-system Input — the a11y
     // contract (label + aria-invalid + aria-describedby pointing at the
