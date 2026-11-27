@@ -15,6 +15,7 @@ import { usePortfolioMomentum } from '@/hooks/useAccountSignals';
 
 import { CATEGORY_LABEL, CATEGORY_TONE, noDash, sourceLabel } from './category';
 import { portfolioAccountLabel, shownPortfolioAccounts } from './portfolio-account-caption';
+import { portfolioMomentumPhase } from './portfolio-momentum-read';
 
 type Trend = PortfolioData['accounts'][number]['trend'];
 const TRENDS: Array<{ key: Trend | 'all'; label: string }> = [
@@ -129,10 +130,25 @@ export function AlertsList({ alerts }: { alerts: PortfolioData['alerts'] }) {
 
 export function PortfolioMomentum() {
   const q = usePortfolioMomentum();
-  const body = (render: (d: PortfolioData) => React.ReactNode, h: number) =>
-    q.isLoading ? <div className="sg-skel" aria-busy="true" style={{ minHeight: h }} /> : q.isError || !q.data ? (
-      <p className="sg-empty" role="alert"><span>Couldn&apos;t load momentum</span><button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button></p>
-    ) : render(q.data);
+  const phase = portfolioMomentumPhase({
+    data: q.data,
+    isError: q.isError,
+    status: q.status,
+  });
+  const payload = phase === 'ready' ? q.data : undefined;
+  const readNote = () =>
+    phase === 'unread' ? (
+      <p className="sg-empty" role="status">
+        Checking momentum. The list has not arrived.
+      </p>
+    ) : phase === 'failed' ? (
+      <p className="sg-empty" role="alert">
+        <span>Couldn&apos;t load momentum</span>
+        <button type="button" className="sg-link" onClick={() => void q.refetch()}>
+          Retry
+        </button>
+      </p>
+    ) : null;
   return (
     <div className="sg viz-grid-3" data-testid="portfolio-momentum">
       <section className="sg-surface" aria-labelledby="sg-port-h">
@@ -140,14 +156,16 @@ export function PortfolioMomentum() {
           <h2 id="sg-port-h" className="sg-h">Account momentum</h2>
           <span className="sg-meta">Change in the last 4 weeks</span>
         </header>
-        {body((d) => <MomentumList data={d} />, 360)}
+        {readNote()}
+        {payload ? <MomentumList data={payload} /> : null}
       </section>
       <section className="sg-surface" aria-labelledby="sg-alerts-h">
         <header className="sg-head">
           <h2 id="sg-alerts-h" className="sg-h">Watchdog alerts</h2>
           <span className="sg-meta">Most important first</span>
         </header>
-        {body((d) => <AlertsList alerts={d.alerts} />, 360)}
+        {readNote()}
+        {payload ? <AlertsList alerts={payload.alerts} /> : null}
       </section>
     </div>
   );
