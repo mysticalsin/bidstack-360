@@ -17,13 +17,16 @@ export function PeopleDrill({ groupId, cell, onLog }: { groupId: string; cell: C
   const details = useMeetingDetails(ids);
   const loaded = details.map((d) => d.data).filter((d): d is MeetingIntelDetail => Boolean(d));
   const people = collectPeople(loaded, cell);
-  const loading = list.isLoading || details.some((d) => d.isLoading);
+  // isLoading is false while a read is paused, so an unread list looked empty.
+  // A failed detail also has no people. Neither one means nobody was met.
+  const unread = list.isPending || details.some((d) => d.isPending);
+  const detailMissed = details.some((d) => d.isError) && people.length === 0;
   const names = new Map(loaded.flatMap((m) => m.attendees).filter((a) => a.contactId).map((a) => [a.contactId!, a.name]));
   const label = `${SENIORITY_LABEL[cell.seniority]} in ${cell.region}`;
   return (
     <div data-testid="people-drill" aria-live="polite">
       <h3 className="mi-row-title" style={{ margin: '0 0 8px' }}>{label}</h3>
-      {loading ? <p className="mi-empty">Loading people…</p> : list.isError ? (
+      {unread ? <p className="mi-empty">Loading people…</p> : list.isError || detailMissed ? (
         <p className="mi-empty" role="alert">Couldn&apos;t load these meetings.</p>
       ) : people.length === 0 ? (
         <p className="mi-empty">
