@@ -34,6 +34,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import { boardArrowStep, isOppositeClosedOutcome } from './pipelineBoard/board-outcome-step';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -124,15 +125,31 @@ export function PipelinePage() {
     return map;
   }, [data?.items, getVisibleStageId, stages]);
 
+  const outcomeSwapToast = () =>
+    toast.error(t('pipeline.outcomeSwapTitle', 'Won and lost stay separate'), {
+      description: t(
+        'pipeline.outcomeSwapDescription',
+        'Move the bid to an open stage to reopen it.',
+      ),
+    });
+
   const handleKey = (e: KeyboardEvent<HTMLAnchorElement>, opp: Opportunity) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if (!canWrite) return;
-    const ids = stages.map((s) => s.id);
-    const idx = ids.indexOf(getVisibleStageId(opp));
-    const nextIdx = e.key === 'ArrowRight' ? idx + 1 : idx - 1;
-    if (nextIdx < 0 || nextIdx >= ids.length) return;
+    // Closed Won is painted beside Closed Lost. The next column is the other
+    // outcome, so the arrow must not file a win as a loss or a loss as a win.
+    const step = boardArrowStep(
+      stages,
+      getVisibleStageId(opp),
+      e.key === 'ArrowRight' ? 'right' : 'left',
+    );
+    if (step.kind === 'stay') return;
     e.preventDefault();
-    const nextStage = stages[nextIdx];
+    if (step.kind === 'blocked') {
+      outcomeSwapToast();
+      return;
+    }
+    const nextStage = stages.find((stage) => stage.id === step.id);
     if (nextStage) {
       move.mutate(
         { id: opp.id, pipelineStageId: nextStage.id, pipelineStage: nextStage },
@@ -161,7 +178,12 @@ export function PipelinePage() {
     if (!id) return;
     const item = data?.items.find((o) => o.id === id);
     if (!item || getVisibleStageId(item) === stageId) return;
+    const fromStage = stages.find((s) => s.id === getVisibleStageId(item));
     const targetStage = stages.find((s) => s.id === stageId);
+    if (fromStage && targetStage && isOppositeClosedOutcome(fromStage, targetStage)) {
+      outcomeSwapToast();
+      return;
+    }
     const targetStageName = targetStage?.name ?? stageId;
     move.mutate(
       { id, pipelineStageId: stageId, pipelineStage: targetStage },
