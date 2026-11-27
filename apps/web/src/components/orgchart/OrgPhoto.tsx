@@ -1,9 +1,12 @@
 // A person's photo as the API gives it: an external https URL, or the API's
-// own photo path (auth required, so fetched as a blob). Initials otherwise.
+// own photo path (auth required, so fetched as a blob). Initials only after
+// that read settles with no usable photo.
 import { useQuery } from '@tanstack/react-query';
 
 import { buildApiUrl, getAuthToken } from '@/lib/api';
 import { initials } from '@/lib/orgchart/tree';
+
+import { orgPhotoPhase } from './org-photo-read';
 
 // One object URL per photo path for the life of the page. The same photo shows
 // in the node and the panel at once, so a per-component revoke would break the
@@ -30,6 +33,24 @@ export function OrgPhoto({ url, name }: { url: string | null | undefined; name: 
     gcTime: Infinity,
     retry: false,
   });
-  const src = apiPath ? blob.data : url && url.startsWith('https://') ? url : null;
+  if (apiPath) {
+    const phase = orgPhotoPhase({
+      data: blob.data,
+      isError: blob.isError,
+      status: blob.status,
+    });
+    if (phase === 'unread') {
+      return <span role="status">Checking the photo. It has not arrived.</span>;
+    }
+    if (phase === 'failed') {
+      return <span role="alert">Could not load the photo.</span>;
+    }
+    if (typeof blob.data === 'string' && blob.data.length > 0) {
+      return <img src={blob.data} alt="" loading="lazy" referrerPolicy="no-referrer" />;
+    }
+    return <span>{initials(name)}</span>;
+  }
+
+  const src = url && url.startsWith('https://') ? url : null;
   return src ? <img src={src} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span>{initials(name)}</span>;
 }
