@@ -44,6 +44,7 @@ import {
   RoutingRuleListPanel,
   TerritoryListPanel,
 } from './territoriesPage/TerritoryPanels';
+import { territoryTotalAmount } from './territoriesPage/territory-total-amount';
 
 export function TerritoriesPage() {
   const { t } = useTranslation('crm');
@@ -227,7 +228,7 @@ export function TerritoriesPage() {
         >
           <KpiTile
             label={t('territories.kpiTotalPipeline', 'Total Pipeline')}
-            value={formatMoneyMicros(totals.totalValueMicros, 'EUR')}
+            value={territoryTotalAmount(totals.totalValueMicros)}
             tone="blue"
           />
           <KpiTile
