@@ -851,6 +851,7 @@
   },
   "companies": {
     "title": "Companies",
+    "listChecking": "Checking companies. They have not arrived.",
     "subtitleOne": "{{count}} company visible.",
     "subtitleMany": "{{count}} companies visible.",
     "newCompany": "New company",
