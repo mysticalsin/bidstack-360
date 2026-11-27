@@ -11,6 +11,8 @@ import { springSoft } from '@/lib/motion';
 
 import type { AccountCockpitSnapshot, CrmLogoSource, SourceAttribution } from '@bidstack/shared';
 
+import { dataTrustPosture } from './data-trust-posture';
+
 interface Props {
   cockpit: AccountCockpitSnapshot;
 }
@@ -19,12 +21,11 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
   const reducedMotion = useReducedMotion();
   const { t } = useTranslation('crm');
   const company = cockpit.company;
-  const sources = company.sourceAttribution.slice(0, 4);
-  const sourceCount = company.sourceAttribution.length;
-  const averageConfidence = sourceCount
-    ? company.sourceAttribution.reduce((acc, source) => acc + source.confidence, 0) / sourceCount
-    : company.confidence;
-  const latestFetch = latestFetchedAt(company.sourceAttribution) ?? company.updatedAt;
+  const posture = dataTrustPosture(company.sourceAttribution);
+  const sources = posture.realSources.slice(0, 4);
+  const sourceCount = posture.realSources.length;
+  const notVerified = t('dataTrust.valueNotVerified', 'Not verified');
+  const latestFetch = posture.latestFetch;
 
   const checks: Array<{ label: string; value: string; tone: BadgeTone }> = [
     {
@@ -43,8 +44,8 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
     },
     {
       label: t('dataTrust.checkFreshness', 'Freshness'),
-      value: relativeTime(latestFetch),
-      tone: isFresh(latestFetch) ? 'jade' : 'amber',
+      value: latestFetch ? relativeTime(latestFetch) : notVerified,
+      tone: latestFetch && isFresh(latestFetch) ? 'jade' : 'amber',
     },
   ];
 
@@ -57,13 +58,19 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
       <div className="data-trust">
         <div className="data-trust-score">
           <span>{t('dataTrust.attributionConfidence', 'Attribution confidence')}</span>
-          <strong>
-            <AnimatedMetric value={`${Math.round(averageConfidence * 100)}%`} />
+          <strong data-testid="data-trust-confidence">
+            {posture.confidence === null ? (
+              notVerified
+            ) : (
+              <AnimatedMetric value={`${Math.round(posture.confidence * 100)}%`} />
+            )}
           </strong>
           <small>
-            {t('dataTrust.attributedSources', '{{count}} attributed sources', {
-              count: sourceCount,
-            })}
+            {sourceCount === 0
+              ? t('dataTrust.noExternalSource', 'No external source is attached.')
+              : t('dataTrust.attributedSources', '{{count}} attributed sources', {
+                  count: sourceCount,
+                })}
           </small>
         </div>
 
@@ -84,10 +91,15 @@ export const DataTrustCard = memo(function DataTrustCard({ cockpit }: Props) {
         <div className="data-trust-sources" aria-label={t('dataTrust.sourceReceipts', 'Source receipts')}>
           {sources.length === 0 ? (
             <div className="data-trust-empty">
-              {t(
-                'dataTrust.emptySources',
-                'Run data verification to attach registry, logo, and market data sources.',
-              )}
+              {company.sourceAttribution.length > 0
+                ? t(
+                    'dataTrust.placeholderSources',
+                    'A CRM placeholder or demo seed profile is not an external attribution.',
+                  )
+                : t(
+                    'dataTrust.emptySources',
+                    'Run data verification to attach registry, logo, and market data sources.',
+                  )}
             </div>
           ) : (
             sources.map((source, index) => (
@@ -153,14 +165,6 @@ function SourceReceipt({
       {content}
     </motion.div>
   );
-}
-
-function latestFetchedAt(sources: SourceAttribution[]): string | null {
-  let latest: string | null = null;
-  for (const source of sources) {
-    if (!latest || source.fetchedAt > latest) latest = source.fetchedAt;
-  }
-  return latest;
 }
 
 function isFresh(iso: string): boolean {
