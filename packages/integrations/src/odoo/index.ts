@@ -73,8 +73,16 @@ export class OdooPlugin implements IntegrationPlugin {
           fields: ['id', 'name'],
           limit: 500,
         });
-        const records = Array.isArray(result) ? result : [];
-        created += records.length; // Simplified — real logic would upsert.
+        // A missing list is not an empty book. An empty array already arrived.
+        if (!Array.isArray(result)) {
+          errors.push({
+            entityType: model,
+            externalId: '',
+            message: 'The ERP record list has not arrived.',
+          });
+          continue;
+        }
+        created += result.length;
       } catch (err) {
         errors.push({
           entityType: model,

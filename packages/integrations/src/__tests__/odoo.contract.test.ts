@@ -71,7 +71,14 @@ describe('Odoo plugin contract (mocked MCP sidecar, no real keys)', () => {
       created: 2,
       updated: 0,
       deleted: 0,
-      errors: [{ entityType: 'crm.lead', externalId: '', message: 'crm.lead denied' }],
+      errors: [
+        { entityType: 'crm.lead', externalId: '', message: 'crm.lead denied' },
+        {
+          entityType: 'sale.order',
+          externalId: '',
+          message: 'The ERP record list has not arrived.',
+        },
+      ],
     });
   });
 
