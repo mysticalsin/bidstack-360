@@ -25,6 +25,25 @@ import { useIsWideShell } from './shellBreakpoint';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+// A missing payload is not zero. The badge is hidden at a settled 0, so
+// coercing an unread or failed read to 0 tells a phone user the book is clear.
+type DrawerCount =
+  | { kind: 'unread' }
+  | { kind: 'failed' }
+  | { kind: 'settled'; value: number };
+
+type DrawerBadges = { openBids: DrawerCount; overdueTasks: DrawerCount };
+
+function drawerCount(
+  query: { data?: { count?: number; overdue?: number } | null; isError?: boolean },
+  field: 'count' | 'overdue',
+): DrawerCount {
+  const raw = query.data?.[field];
+  if (typeof raw === 'number') return { kind: 'settled', value: raw };
+  if (query.isError) return { kind: 'failed' };
+  return { kind: 'unread' };
+}
+
 export function MobileNav() {
   const wide = useIsWideShell();
   const open = useUiStore((s) => s.mobileNavOpen);
@@ -163,10 +182,10 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
   const recents = useAccountHistory((s) => s.recents);
   const favorites = useAccountHistory((s) => s.favorites);
 
-  const openBids = oppsCount.data?.count ?? 0;
-  const overdueTasks = taskSummary.data?.overdue ?? 0;
-
-  const badges = { openBids, overdueTasks };
+  const badges: DrawerBadges = {
+    openBids: drawerCount(oppsCount, 'count'),
+    overdueTasks: drawerCount(taskSummary, 'overdue'),
+  };
   const { data: appModules } = useAppModules();
   const sections = NAV_SECTIONS.map((s) => ({
     ...s,
@@ -250,7 +269,7 @@ function MobileNavSection({
   onNavigate,
 }: {
   section: NavSection;
-  badges: { openBids: number; overdueTasks: number };
+  badges: DrawerBadges;
   onNavigate: () => void;
 }) {
   const location = useLocation();
@@ -286,12 +305,12 @@ function MobileNavItem({
   onNavigate,
 }: {
   item: NavItem;
-  badges: { openBids: number; overdueTasks: number };
+  badges: DrawerBadges;
   onNavigate: () => void;
 }) {
   const { t } = useTranslation('common');
   const label = t(item.labelKey, item.label);
-  const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+  const count = item.badgeKey ? badges[item.badgeKey] : null;
   const location = useLocation();
 
   const isActive = (() => {
@@ -328,12 +347,24 @@ function MobileNavItem({
       onMouseEnter={() => prefetchRoute(item.to)}
     >
       <Icon name={item.icon} size={16} />
-      <span className="flex-1">{label}</span>
-      {badge > 0 && (
+      <span className="min-w-0 flex-1">
+        <span className="block">{label}</span>
+        {count?.kind === 'unread' ? (
+          <span className="block text-[11px] font-semibold text-[var(--fg-tertiary)]">
+            {t('nav.countUnread', 'The count has not arrived.')}
+          </span>
+        ) : null}
+        {count?.kind === 'failed' ? (
+          <span className="block text-[11px] font-semibold text-[var(--fg-tertiary)]">
+            {t('nav.countFailed', 'It has not arrived.')}
+          </span>
+        ) : null}
+      </span>
+      {count?.kind === 'settled' && count.value > 0 ? (
         <span className="rounded-full bg-[var(--surface-sunken)] px-2 py-0.5 text-[11px] font-semibold text-[var(--fg-tertiary)]">
-          {badge}
+          {count.value}
         </span>
-      )}
+      ) : null}
     </NavLink>
   );
 }
