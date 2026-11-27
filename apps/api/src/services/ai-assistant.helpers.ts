@@ -66,6 +66,18 @@ export interface AiCapCheckResult {
   reason?: string;
 }
 
+/** Returned when the daily budget counters cannot be read. Callers must not
+ *  describe this as a spent cap: the quota has not arrived. */
+export const AI_BUDGET_UNAVAILABLE_REASON = 'AI budget state is unavailable.';
+
+/** Jarvis missing-data line for a denied cap. A store miss is not "reached". */
+export function noteWhenDailyCapDenies(cap: AiCapCheckResult): string {
+  if (cap.reason === AI_BUDGET_UNAVAILABLE_REASON) {
+    return 'AI budget could not be read. Answered from records only.';
+  }
+  return 'AI budget reached, answered from records only.';
+}
+
 export interface EmailDraftInput {
   orgId: string;
   userId: string;
@@ -185,7 +197,7 @@ export async function checkDailyCap(
     log.warn({ err }, 'ai-assistant: Redis cap check failed, denying request (fail-closed)');
     return {
       allowed: false,
-      reason: 'AI budget state is unavailable.',
+      reason: AI_BUDGET_UNAVAILABLE_REASON,
     };
   }
 

@@ -94,4 +94,19 @@ describe('CopilotPanel cap-error handling', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined();
     expect(screen.queryByText('Daily AI budget spent — it resets tomorrow.')).toBeNull();
   });
+
+  it('does not call an unread budget store a spent quota', () => {
+    // WHY: checkDailyCap fail-closes with this sentence when Redis cannot
+    // answer. That denial is still HTTP 429, so a status-only check reads it
+    // as "budget spent" and hides Retry. The quota has not been read. The
+    // user must be able to try again, and must not be told the cap is zero.
+    hoisted.draftEmail.error = new ApiError('AI budget state is unavailable.', 429, null);
+
+    renderPanel();
+    runEmailAction();
+
+    expect(screen.getByText('The daily AI budget could not be read. Try again.')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeDefined();
+    expect(screen.queryByText('Daily AI budget spent — it resets tomorrow.')).toBeNull();
+  });
 });
