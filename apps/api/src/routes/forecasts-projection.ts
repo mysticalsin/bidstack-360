@@ -37,14 +37,19 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
 
       // Aggregate in Postgres so the payload is bounded to periods × owners ×
       // stages. Open pipeline with a null/overdue close date rolls into the
-      // current quarter (it is live now); won is date-anchored actuals only.
+      // current quarter (it is live now). Won follows closed_at, the stamp
+      // the close trigger sets. due_date on a won bid can still be in the
+      // future (demo seed dates every bid 45 days out), and a closed deal
+      // cannot close in the future. wonForecastPeriod is the same window.
       const rows = await prisma.$queryRaw<ProjectionRow[]>(Prisma.sql`
         SELECT
           CASE
             WHEN o.stage = 'closed_won' THEN
               CASE
-                WHEN o.due_date >= ${curStart}::date AND o.due_date < ${winEnd}::date
-                  THEN to_char(o.due_date, 'YYYY"-Q"Q')
+                WHEN o.closed_at IS NOT NULL
+                  AND (o.closed_at AT TIME ZONE 'UTC')::date >= ${curStart}::date
+                  AND (o.closed_at AT TIME ZONE 'UTC')::date < ${winEnd}::date
+                  THEN to_char((o.closed_at AT TIME ZONE 'UTC')::date, 'YYYY"-Q"Q')
                 ELSE NULL
               END
             ELSE
