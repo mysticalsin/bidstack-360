@@ -40,7 +40,7 @@ function buildGroups(t: TFunction): Array<{ id: string; title: string; items: Sh
         { keys: ['G', 'P'], label: t('helpDrawer.goToPipeline', 'Go to Pipeline') },
         { keys: ['G', 'C'], label: t('helpDrawer.goToContacts', 'Go to Contacts') },
         { keys: ['G', 'T'], label: t('helpDrawer.goToTasks', 'Go to Tasks') },
-        { keys: ['G', 'R'], label: t('helpDrawer.goToReports', 'Go to Reports') },
+        { keys: ['G', 'R'], label: t('helpDrawer.goToReports', 'Go to Analytics & Reports') },
         { keys: ['G', 'A'], label: t('helpDrawer.goToAccounts', 'Go to Accounts') },
         { keys: ['G', 'S'], label: t('helpDrawer.goToSettings', 'Go to Settings') },
         { keys: ['G', 'F'], label: t('helpDrawer.goToSearch', 'Go to Search') },

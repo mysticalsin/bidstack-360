@@ -8,7 +8,7 @@
 //   g c                Go to /contacts
 //   g t                Go to /tasks
 //   g s                Go to /settings
-//   g r                Go to /reports
+//   g r                Go to /analytics
 //   g a                Go to /accounts
 //   g f                Go to search
 //
@@ -20,6 +20,8 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useHelpDrawer } from '@/components/help/useHelpDrawer';
+
 const CHORD_WINDOW_MS = 900;
 
 const CHORD_TARGETS: Record<string, string> = {
@@ -29,7 +31,10 @@ const CHORD_TARGETS: Record<string, string> = {
   c: '/contacts',
   t: '/tasks',
   s: '/settings',
-  r: '/reports/list',
+  // Analytics is the reports door in the nav, and /reports redirects there.
+  // The demo seeds that dashboard and does not seed saved reports, so this
+  // chord must not open the empty /reports/list library.
+  r: '/analytics',
   a: '/accounts',
   f: '/search',
 };
@@ -75,6 +80,9 @@ export function useGlobalShortcuts(): void {
         pendingG.current = null;
         if (route) {
           e.preventDefault();
+          // The shortcuts sheet teaches this chord. Leaving it open hides
+          // the page the chord just opened.
+          useHelpDrawer.getState().setOpen(false);
           navigate(route);
         }
       }

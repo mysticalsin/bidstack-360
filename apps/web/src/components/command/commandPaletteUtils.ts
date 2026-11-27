@@ -59,6 +59,8 @@ const NAV_CHORD_HINTS: Record<string, string> = {
   '/contacts': 'g c',
   '/opportunities': 'g o',
   '/tasks': 'g t',
+  // Same chord as useGlobalShortcuts. Analytics is the reports door.
+  '/analytics': 'g r',
 };
 
 // Routes reachable ONLY from the command palette — either intentionally
@@ -78,7 +80,9 @@ const PALETTE_ONLY_TARGETS: NavTarget[] = [
   { to: '/pipeline', label: 'Go to Pipeline (kanban)', hint: 'g p' },
   { to: '/calls', label: 'Go to Calls', hint: '' },
   { to: '/service-desk', label: 'Go to Service Desk', hint: '' },
-  { to: '/reports/list', label: 'Go to Reports', hint: 'g r' },
+  // Saved reports stay searchable. G R opens Analytics, not this list:
+  // the demo seeds the dashboard and does not seed saved reports.
+  { to: '/reports/list', label: 'Go to Reports', hint: '' },
   { to: '/reports/new', label: 'New report', hint: '' },
   { to: '/integrations', label: 'Go to Integrations', hint: '' },
   { to: '/settings', label: 'Go to Settings', hint: 'g s' },
