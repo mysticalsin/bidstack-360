@@ -14,11 +14,46 @@ export function SourcesPanel({ enabled = true }: { enabled?: boolean }) {
   const canAdmin = useHasPermission('msa:admin');
   const sources = useAgreementSources(enabled);
   const sync = useSyncAgreementSource();
-  const items = sources.data?.items ?? [];
-  if (!enabled || items.length === 0) return null;
+  if (!enabled) return null;
+
+  const items = sources.data?.items;
+  const retry = (
+    <Button variant="secondary" size="lg" onClick={() => void sources.refetch()}>
+      Retry
+    </Button>
+  );
+  // A missing payload is not an empty connector list. Sample mode never asks.
+  if (!items || (items.length === 0 && sources.isError)) {
+    return (
+      <section className="agr-section" aria-labelledby="agr-sources" data-testid="agreement-sources">
+        <h2 id="agr-sources">Sources</h2>
+        {sources.isError ? (
+          <>
+            <p className="agr-error" role="alert">
+              Could not load agreement sources. The sources have not arrived.
+            </p>
+            {retry}
+          </>
+        ) : (
+          <p className="agr-caption" role="status">
+            Checking agreement sources. They have not arrived.
+          </p>
+        )}
+      </section>
+    );
+  }
+  if (items.length === 0) return null;
   return (
     <section className="agr-section" aria-labelledby="agr-sources" data-testid="agreement-sources">
       <h2 id="agr-sources">Sources</h2>
+      {sources.isError ? (
+        <>
+          <p className="agr-error" role="alert">
+            Could not refresh agreement sources. The latest read has not arrived.
+          </p>
+          {retry}
+        </>
+      ) : null}
       <ul className="agr-sources">
         {items.map((s) => {
           const active = s.lastRun?.state === 'queued' || s.lastRun?.state === 'running';
