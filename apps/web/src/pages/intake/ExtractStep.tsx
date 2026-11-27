@@ -3,12 +3,15 @@
  * Step 2: user triggers extraction; rows animate between queued/running/done/error.
  */
 import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
+import { useAccountIntel } from '@/hooks/useAccountIntel';
 
+import { extractStatusPhase } from './extract-status-read';
 import type { ExtractionItem } from './intakeConfig';
 
 interface ExtractStepProps {
@@ -31,16 +34,29 @@ export function ExtractStep({
   onBack,
 }: ExtractStepProps) {
   const { t } = useTranslation('crm');
+  const [params] = useSearchParams();
+  const accountId = params.get('account') || undefined;
+  // The page passes `intel.data?.extractions ?? []`, so a missing payload and
+  // a settled empty list arrive as the same array. Read the query here.
+  const intel = useAccountIntel(accountId);
+  const phase = accountId
+    ? extractStatusPhase({ data: intel.data, isError: intel.isError, status: intel.status })
+    : 'ready';
+  const statusRows: ExtractionItem[] = !accountId
+    ? extractions
+    : phase === 'ready'
+      ? ((intel.data?.extractions ?? []) as ExtractionItem[])
+      : [];
   const isProcessing = extractingDocIds.size > 0;
 
   // Build status map by documentId for O(1) per-row lookup
   const statusByDoc = useMemo(() => {
     const map = new Map<string, { status: string; error: string | null }>();
-    for (const e of extractions) {
+    for (const e of statusRows) {
       map.set(e.documentId, { status: e.status, error: e.error });
     }
     return map;
-  }, [extractions]);
+  }, [statusRows]);
 
   return (
     <Card className="p-5 space-y-4">
@@ -55,32 +71,49 @@ export function ExtractStep({
               count: extractingDocIds.size,
             })}
           </p>
-          <div className="space-y-2">
-            {Array.from(extractingDocIds).map((docId) => {
-              const name = selectedDocNames.get(docId) ?? docId.slice(0, 8);
-              const status = statusByDoc.get(docId)?.status ?? 'queued';
-              const error = statusByDoc.get(docId)?.error;
-              return (
-                <div
-                  key={docId}
-                  className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon name="file" size={16} className="text-[var(--fg-tertiary)] shrink-0" />
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
-                        {name}
+          {phase === 'failed' ? (
+            <p role="alert" className="text-xs text-[var(--fg-secondary)]">
+              {t('extractStep.statusFailed', 'Extraction status did not load.')}
+            </p>
+          ) : phase === 'unread' ? (
+            <p role="status" className="text-xs text-[var(--fg-secondary)]">
+              {t(
+                'extractStep.statusUnread',
+                'Checking extraction status. The payload has not arrived.',
+              )}
+            </p>
+          ) : statusRows.length === 0 ? (
+            <p className="text-xs text-[var(--fg-tertiary)]">
+              {t('extractStep.statusEmpty', 'No extraction status yet.')}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {Array.from(extractingDocIds).map((docId) => {
+                const name = selectedDocNames.get(docId) ?? docId.slice(0, 8);
+                const status = statusByDoc.get(docId)?.status ?? 'queued';
+                const error = statusByDoc.get(docId)?.error;
+                return (
+                  <div
+                    key={docId}
+                    className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] p-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon name="file" size={16} className="text-[var(--fg-tertiary)] shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-[var(--fg-primary)] truncate">
+                          {name}
+                        </div>
+                        {error && (
+                          <div className="truncate text-xs text-[var(--danger)]">{error}</div>
+                        )}
                       </div>
-                      {error && (
-                        <div className="truncate text-xs text-[var(--danger)]">{error}</div>
-                      )}
                     </div>
+                    <StatusBadge status={status} />
                   </div>
-                  <StatusBadge status={status} />
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -136,8 +169,7 @@ function StatusBadge({ status }: { status: string }) {
     error: t('extractStep.status.error', 'Error'),
     failed: t('extractStep.status.failed', 'Failed'),
   };
-  const label =
-    statusLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
+  const label = statusLabels[status] ?? status.charAt(0).toUpperCase() + status.slice(1);
   return (
     <span
       className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status] ?? 'bg-gray-100 text-gray-700'}`}
