@@ -34,6 +34,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import { filedBoardColumnId } from './pipelineBoard/board-filed-column';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -104,9 +105,15 @@ export function PipelinePage() {
     () => new Map(stages.map((stage) => [getPipelineStageBusinessKey(stage), stage.id])),
     [stages],
   );
+  const columnIds = useMemo(() => stages.map((stage) => stage.id), [stages]);
   const getVisibleStageId = useCallback(
-    (opp: Opportunity) => stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
-    [stageIdByBusinessKey],
+    (opp: Opportunity) =>
+      // The saved column id wins over a nested stage copy that still names
+      // the previous column. Otherwise Closed Won stays empty.
+      filedBoardColumnId(opp.pipelineStageId, columnIds) ??
+      stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ??
+      getStageId(opp),
+    [columnIds, stageIdByBusinessKey],
   );
 
   // Group items by pipelineStageId once per data change so each column doesn't

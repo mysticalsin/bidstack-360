@@ -134,6 +134,7 @@ export const StageColumn = memo(function StageColumn({
                 isDragging={draggingId === o.id}
                 isFocused={focusedId === o.id}
                 canWrite={canWrite}
+                columnStageName={stageName}
                 onDragStart={onCardDragStart}
                 onDragEnd={onCardDragEnd}
                 onFocus={onCardFocus}

@@ -27,6 +27,12 @@ interface PipelineCardProps {
    * context keeps today's behavior.
    */
   canWrite?: boolean;
+  /**
+   * Stage name of the column this card is drawn in. The nested stage copy
+   * can still name the previous column, and the accessible name would then
+   * disagree with the column the card actually sits in.
+   */
+  columnStageName?: string;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
   onFocus: (id: string) => void;
@@ -39,6 +45,7 @@ export const PipelineCard = memo(function PipelineCard({
   isDragging,
   isFocused,
   canWrite = true,
+  columnStageName,
   onDragStart,
   onDragEnd,
   onFocus,
@@ -48,7 +55,7 @@ export const PipelineCard = memo(function PipelineCard({
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const { formatMoney } = useFormatMoney();
-  const stageName = getStageName(opp);
+  const stageName = columnStageName ?? getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
   // DueDateChip below said "Due today". Tint/aria-label must agree with the chip.
