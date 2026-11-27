@@ -1158,7 +1158,8 @@
       "run": "Importa"
     },
     "progress": {
-      "starting": "Avvio dell'importazione…",
+      "statusUnread": "Lo stato dell'importazione non è arrivato.",
+      "statusReadFailed": "Impossibile caricare l'importazione. Non è arrivata.",
       "statusComplete": "Importazione completata",
       "statusImporting": "Importazione…",
       "statusCancelled": "Importazione annullata",

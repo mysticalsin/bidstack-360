@@ -1159,7 +1159,8 @@
       "run": "Import"
     },
     "progress": {
-      "starting": "Starting import…",
+      "statusUnread": "The import status has not arrived.",
+      "statusReadFailed": "Could not load the import. It has not arrived.",
       "statusComplete": "Import complete",
       "statusImporting": "Importing…",
       "statusCancelled": "Import cancelled",
