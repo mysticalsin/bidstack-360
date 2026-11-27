@@ -20,6 +20,7 @@ import { GroupByPicker } from '@/components/reports/GroupByPicker';
 import { FieldPicker } from '@/components/reports/FieldPicker';
 import { ReportPreview } from '@/components/reports/ReportPreview';
 import { buildQuery, outputAliases } from '@/lib/reportQuery';
+import { reportEditPhase } from './report-edit-read';
 import {
   useAnalyticsReport,
   useCreateReport,
@@ -431,24 +432,41 @@ export function ReportBuilderPage() {
 
 function EditLoader({ id }: { id: string }) {
   const { t } = useTranslation('reports');
-  const { data, isLoading, error } = useAnalyticsReport(id);
-  if (isLoading) {
+  const read = useAnalyticsReport(id);
+  const phase = reportEditPhase(read);
+  if (phase === 'unread') {
     return (
       <div className="p-8">
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('reportBuilder.unread', 'Checking this report. It has not arrived.')}
+        </p>
         <LoadingSkeleton rows={6} />
       </div>
     );
   }
-  if (error || !data) {
+  if (phase === 'failed') {
     return (
       <div className="p-8">
         <ErrorState
-          title={t('reportBuilder.error.notFoundTitle', 'Report not found')}
-          message={(error as Error)?.message ?? t('reportBuilder.error.notFoundMessage', 'It may have been deleted.')}
+          title={t('reportBuilder.error.loadTitle', 'Failed to load this report')}
+          message={(read.error as Error | null)?.message}
         />
       </div>
     );
   }
-  // Keyed remount: seed all form state from `data` once; no effect-driven setState.
-  return <BuilderForm key={data.id} initial={data} reportId={id} />;
+  if (phase === 'missing' || !read.data) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          title={t('reportBuilder.error.notFoundTitle', 'Report not found')}
+          message={
+            (read.error as Error | null)?.message ??
+            t('reportBuilder.error.notFoundMessage', 'It may have been deleted.')
+          }
+        />
+      </div>
+    );
+  }
+  // Keyed remount: seed all form state from the loaded report once; no effect-driven setState.
+  return <BuilderForm key={read.data.id} initial={read.data} reportId={id} />;
 }
