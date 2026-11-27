@@ -5,10 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
-import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { useServiceCases } from '@/hooks/useServiceCases';
 import { downloadCsv, rowsToCsv } from '@/lib/csv';
 import type { CasePriority, CaseStatus } from '@bidstack/shared';
+
+import { serviceDeskListPhase } from './service-desk-list-read';
 
 const STATUS_OPTIONS: { value: CaseStatus | ''; labelKey: string; labelEn: string }[] = [
   { value: '', labelKey: 'serviceDesk.statusOption.all', labelEn: 'All' },
@@ -43,14 +44,18 @@ export function ServiceDeskPage() {
   const deferredSearch = useDeferredValue(search);
   const [status, setStatus] = useState<CaseStatus | ''>('');
   const [priority, setPriority] = useState<CasePriority | ''>('');
-  const { data, isLoading, isError, error, refetch } = useServiceCases({
+  const cases = useServiceCases({
     search: deferredSearch.trim() || undefined,
     status: status || undefined,
     priority: priority || undefined,
     limit: 50,
   });
-
-  const items = data?.items ?? [];
+  const phase = serviceDeskListPhase({
+    data: cases.data,
+    isError: cases.isError,
+    status: cases.status,
+  });
+  const items = phase === 'ready' && cases.data ? cases.data.items : [];
 
   return (
     <div className="page">
@@ -117,7 +122,7 @@ export function ServiceDeskPage() {
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading && data
+        {phase === 'ready' && cases.data
           ? `${
               items.length === 1
                 ? t('serviceDesk.resultCount.one', '{{count}} case', { count: items.length })
@@ -126,14 +131,18 @@ export function ServiceDeskPage() {
           : ''}
       </p>
 
-      {isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('serviceDesk.error.title', 'Failed to load cases')}
-          message={error?.message}
-          action={<Button onClick={() => refetch()}>{t('serviceDesk.retry', 'Retry')}</Button>}
+          message={cases.error instanceof Error ? cases.error.message : undefined}
+          action={
+            <Button onClick={() => void cases.refetch()}>{t('serviceDesk.retry', 'Retry')}</Button>
+          }
         />
-      ) : isLoading ? (
-        <TableSkeleton rows={8} />
+      ) : phase === 'unread' ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('serviceDesk.checking', 'Checking cases. The list has not arrived.')}
+        </p>
       ) : items.length === 0 ? (
         <EmptyState
           title={t('serviceDesk.empty.title', 'No cases yet')}
