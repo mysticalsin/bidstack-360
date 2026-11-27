@@ -21,7 +21,18 @@ vi.mock('@/hooks/useAccessPolicies', () => ({
   useSaveAccessPolicy: () => ({ mutateAsync: m.save, isPending: false }),
   useSimulateAccessPolicy: () => ({ mutate: m.simulate, isPending: false }),
 }));
-vi.mock('@/hooks/useCapabilities', () => ({ useHasPermission: m.useHasPermission }));
+vi.mock('@/hooks/useCapabilities', () => ({
+  useHasPermission: m.useHasPermission,
+  useCapabilities: () => ({
+    data: {
+      permissions: ['access-policies:read', 'access-policies:write', 'access-policies:approve'],
+      isAdmin: false,
+    },
+    isError: false,
+    isPending: false,
+    isLoading: false,
+  }),
+}));
 vi.mock('@/hooks/useRoles', () => ({ useRoles: () => ({ data: { items: [{ name: 'Admin' }] } }) }));
 vi.mock('@/hooks/useUserGroups', () => ({ useUserGroups: () => ({ data: { items: [{ name: 'France' }] } }) }));
 vi.mock('@/components/ui/Toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
