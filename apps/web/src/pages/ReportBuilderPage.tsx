@@ -12,7 +12,7 @@ import { Save, ArrowLeft, Play, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { FilterBuilder } from '@/components/reports/FilterBuilder';
 import { AggregatePicker } from '@/components/reports/AggregatePicker';
@@ -20,6 +20,7 @@ import { GroupByPicker } from '@/components/reports/GroupByPicker';
 import { FieldPicker } from '@/components/reports/FieldPicker';
 import { ReportPreview } from '@/components/reports/ReportPreview';
 import { buildQuery, outputAliases } from '@/lib/reportQuery';
+import { reportRecordPhase } from './report-record-read';
 import {
   useAnalyticsReport,
   useCreateReport,
@@ -431,24 +432,37 @@ export function ReportBuilderPage() {
 
 function EditLoader({ id }: { id: string }) {
   const { t } = useTranslation('reports');
-  const { data, isLoading, error } = useAnalyticsReport(id);
-  if (isLoading) {
+  const report = useAnalyticsReport(id);
+  // A paused or in-flight read has no payload and isLoading false. That is
+  // not a missing report, and a failed read does not keep a stale record.
+  const phase = reportRecordPhase(report);
+  if (phase === 'unread') {
     return (
       <div className="p-8">
-        <LoadingSkeleton rows={6} />
+        <p role="status">{t('reportBuilder.checking', 'Checking this report')}</p>
       </div>
     );
   }
-  if (error || !data) {
+  if (phase === 'error') {
     return (
       <div className="p-8">
         <ErrorState
-          title={t('reportBuilder.error.notFoundTitle', 'Report not found')}
-          message={(error as Error)?.message ?? t('reportBuilder.error.notFoundMessage', 'It may have been deleted.')}
+          title={t('reportBuilder.error.loadTitle', 'Could not load this report')}
+          message={t('reportBuilder.error.loadMessage', 'The saved report did not arrive.')}
         />
       </div>
     );
   }
-  // Keyed remount: seed all form state from `data` once; no effect-driven setState.
-  return <BuilderForm key={data.id} initial={data} reportId={id} />;
+  if (report.data == null) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          title={t('reportBuilder.error.notFoundTitle', 'Report not found')}
+          message={t('reportBuilder.error.notFoundMessage', 'It may have been deleted.')}
+        />
+      </div>
+    );
+  }
+  // Keyed remount: seed all form state from the loaded report once.
+  return <BuilderForm key={report.data.id} initial={report.data} reportId={id} />;
 }
