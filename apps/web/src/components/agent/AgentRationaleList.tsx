@@ -8,16 +8,21 @@
 // Nothing here is ever red: a proposal that was dismissed is a human doing
 // their job, not a failure.
 
+import { useContext } from 'react';
+import { QueryClientContext, useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyCellValue } from '@/components/table-kit/empty-cell';
 import { SimpleTable, SimpleTableRow } from '@/components/table-kit/simple-table';
-import { Skeleton } from '@/components/table-kit/skeleton';
 import { StatusIndicator, type StatusTone } from '@/components/table-kit/status-indicator';
 import { TableCell } from '@/components/table-kit/table';
 import type { BidFact, BidFactStatus } from '@/hooks/agent/useBidFacts';
 import { formatDate } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import {
+  agentLedgerQueriesPhase,
+  type AgentLedgerPhase,
+} from './agent-ledger-read';
 import { isHeldFact, newestFirst, rationaleDetail } from './bid-fact-view';
 
 // PROPOSED is the only "waiting on a person" state, so it is the only one that
@@ -37,24 +42,68 @@ export interface AgentRationaleListProps {
   limit?: number;
 }
 
-export function AgentRationaleList({
+function fallbackPhase(isLoading: boolean, facts: readonly BidFact[]): AgentLedgerPhase {
+  if (isLoading && facts.length === 0) return 'unread';
+  return 'ready';
+}
+
+export function AgentRationaleList(props: AgentRationaleListProps) {
+  const client = useContext(QueryClientContext);
+  if (!client) return <AgentRationaleBody {...props} phase={fallbackPhase(props.isLoading ?? false, props.facts)} />;
+  return <ObservedAgentRationaleList {...props} />;
+}
+
+function ObservedAgentRationaleList({
   facts,
   isLoading = false,
   limit = 12,
 }: AgentRationaleListProps) {
+  const client = useQueryClient();
+  // Subscribe so a paused read that later resolves repaints this list.
+  useIsFetching({ queryKey: ['bid-facts'] });
+  const queries = client.getQueryCache().findAll({ queryKey: ['bid-facts'] });
+  // A paused or in-flight read has no payload and isLoading false. That is
+  // not an empty ledger, and a failed read does not keep a stale proposal.
+  const phase =
+    queries.length === 0
+      ? fallbackPhase(isLoading, facts)
+      : agentLedgerQueriesPhase(
+          queries.map((query) => ({
+            isError: query.state.status === 'error',
+            data: query.state.data,
+          })),
+        );
+  return <AgentRationaleBody facts={facts} limit={limit} phase={phase} />;
+}
+
+function AgentRationaleBody({
+  facts,
+  limit = 12,
+  phase,
+}: {
+  facts: readonly BidFact[];
+  limit?: number;
+  phase: AgentLedgerPhase;
+}) {
   const { t } = useTranslation('rfp');
 
-  const rows = newestFirst(facts).slice(0, limit);
-
-  if (isLoading && rows.length === 0) {
+  if (phase === 'unread') {
     return (
-      <div className="flex flex-col gap-2 p-3" aria-busy="true">
-        <Skeleton className="h-4 w-2/3" />
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-4 w-3/5" />
-      </div>
+      <p className="p-3 text-xs text-fg-secondary" role="status">
+        {t('agent.ledgerChecking', 'Checking what the agent did')}
+      </p>
     );
   }
+
+  if (phase === 'error') {
+    return (
+      <p className="p-3 text-xs text-fg-secondary" role="alert">
+        {t('agent.ledgerError', 'Could not load what the agent did')}
+      </p>
+    );
+  }
+
+  const rows = newestFirst(facts).slice(0, limit);
 
   if (rows.length === 0) {
     return (

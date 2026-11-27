@@ -13,9 +13,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 
+import { connectionTesterPhase } from './connection-tester-read';
 import { ProbeHint, ProbeResultCard } from './IntegrationAtoms';
 import { defaultProbeUrl, safeUrlPreview } from './integration-helpers';
 import type { IntegrationProbeResult, IntegrationSetupGuide, ProbeKind } from './types';
@@ -51,11 +53,16 @@ const PROBE_OPTION_DESCRIPTION_KEY: Record<ProbeKind, string> = {
 export function ConnectionTester({
   guide,
   isLoading,
+  isError = false,
+  status,
 }: {
-  guide?: IntegrationSetupGuide;
+  guide?: IntegrationSetupGuide | null;
   isLoading: boolean;
+  isError?: boolean;
+  status?: string;
 }) {
   const { t } = useTranslation('integrations');
+  const phase = connectionTesterPhase({ guide, isError, status });
   const [kind, setKind] = useState<ProbeKind>('mcp');
   const [urlInput, setUrlInput] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -122,15 +129,33 @@ export function ConnectionTester({
           'Probe an endpoint from the API service before saving it. Secrets and bearer tokens are never sent.',
         )}
         action={
-          <Badge tone={result?.ok ? 'jade' : result ? 'amber' : 'gray'}>
-            {result?.ok
-              ? t('connectionTester.status.reachable', 'reachable')
-              : result
-                ? t('connectionTester.status.needsAttention', 'needs attention')
-                : t('connectionTester.status.ready', 'ready to test')}
-          </Badge>
+          phase === 'ready' ? (
+            <Badge tone={result?.ok ? 'jade' : result ? 'amber' : 'gray'}>
+              {result?.ok
+                ? t('connectionTester.status.reachable', 'reachable')
+                : result
+                  ? t('connectionTester.status.needsAttention', 'needs attention')
+                  : t('connectionTester.status.ready', 'ready to test')}
+            </Badge>
+          ) : null
         }
       />
+      {phase === 'failed' ? (
+        <ErrorState
+          title={t('connectionTester.loadErrorTitle', 'Could not load the setup contract.')}
+          message={t(
+            'connectionTester.loadErrorMessage',
+            'The endpoint has not arrived. Please retry.',
+          )}
+        />
+      ) : phase === 'unread' || guide === undefined || guide === null ? (
+        <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+          {t(
+            'connectionTester.checking',
+            'Checking the setup contract. The endpoint has not arrived.',
+          )}
+        </p>
+      ) : (
       <div className="grid gap-4 p-5 xl:grid-cols-[300px_1fr]">
         <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
           {PROBE_OPTIONS.map((option) => (
@@ -236,6 +261,7 @@ export function ConnectionTester({
           {result ? <ProbeResultCard result={result} /> : null}
         </div>
       </div>
+      )}
     </Card>
   );
 }
