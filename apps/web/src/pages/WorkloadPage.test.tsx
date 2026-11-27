@@ -123,8 +123,9 @@ describe('WorkloadPage', () => {
     expect(screen.getByTestId('workload-kpi-bids').textContent).toBe('13');
     expect(screen.getByTestId('workload-kpi-over').textContent).toBe('1');
     expect(screen.getByTestId('workload-kpi-unassigned').textContent).toBe('3');
-    // Weighted total = 9M + 4M + 0 + 1M micros, formatted at the edge.
-    expect(screen.getByTestId('workload-kpi-weighted').textContent).toBe('€14000000');
+    // 9_000_000 + 4_000_000 + 1_000_000 micros is 14 units. The tile groups
+    // them and does not name EUR. Desk rows still use the money hook.
+    expect(screen.getByTestId('workload-kpi-weighted').textContent).toBe('14');
   });
 
   it('shows a plain zero state with the way out, and no tagline or helper paragraph', () => {
