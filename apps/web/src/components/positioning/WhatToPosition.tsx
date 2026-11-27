@@ -13,6 +13,39 @@ import { fmtMoney } from '@/components/financials/financials-format';
 import { useAccountPositioning } from '@/hooks/useAccountPositioning';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 
+const LEVERAGE_RETRY_CLASS =
+  'sg-link inline-flex min-h-11 items-center justify-center px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]';
+
+function LeverageRead({ query }: { query: ReturnType<typeof useMsaLeverage> }) {
+  const items = query.data?.items ?? [];
+  const flags = items.map((flag) => <LeverageFlag key={flag.msaId} flag={flag} />);
+  if (query.isError && items.length > 0) {
+    return (
+      <>
+        {flags}
+        <p className="sg-empty" role="alert">
+          <span>Could not refresh this MSA leverage read.</span>
+          <button type="button" className={LEVERAGE_RETRY_CLASS} onClick={() => void query.refetch()}>
+            Retry
+          </button>
+        </p>
+      </>
+    );
+  }
+  if (query.isError) {
+    return (
+      <p className="sg-empty" role="alert">
+        <span>Could not load the MSA leverage read.</span>
+        <button type="button" className={LEVERAGE_RETRY_CLASS} onClick={() => void query.refetch()}>
+          Retry
+        </button>
+      </p>
+    );
+  }
+  if (items.length === 0) return null;
+  return <>{flags}</>;
+}
+
 const CONF_LABEL: Record<PositioningPlay['confidence'], string> = { high: 'High confidence', medium: 'Medium confidence', low: 'Low confidence' };
 const CONF_BARS: Record<PositioningPlay['confidence'], number> = { high: 3, medium: 2, low: 1 };
 const KIND_LABEL: Record<EvidenceChip['kind'], string> = {
@@ -172,10 +205,23 @@ export function WhatToPosition({ companyId }: { companyId: string }) {
   // Pipeline micros are EUR at rest. Same formatter as revenue above so one
   // brief never mixes "EUR 29.9bn" with "CA$1.2M".
   const micros = (m: string) => fmtMoney(microsToUnits(m), 'EUR');
-  if (q.isLoading) return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
+  const leverageRead = <LeverageRead query={leverage} />;
+  if (q.isLoading) {
+    const holdFlag = (leverage.data?.items.length ?? 0) > 0 || leverage.isError;
+    if (!holdFlag) {
+      return <div className="sg wp" aria-busy="true"><div className="sg-skel" style={{ minHeight: 320 }} /></div>;
+    }
+    return (
+      <section className="sg sg-surface wp" aria-busy="true" data-testid="what-to-position">
+        {leverageRead}
+        <div className="sg-skel" style={{ minHeight: 320 }} />
+      </section>
+    );
+  }
   if (q.isError || !q.data) {
     return (
       <section className="sg sg-surface wp">
+        {leverageRead}
         <p className="sg-empty" role="alert">
           <span>Couldn&apos;t load what to position</span>
           <button type="button" className="sg-link" onClick={() => void q.refetch()}>Retry</button>
@@ -192,9 +238,7 @@ export function WhatToPosition({ companyId }: { companyId: string }) {
         <span className="sg-meta">From signals, filings, people and pipeline in Polo</span>
       </div>
       <p className="wp-brief" data-testid="account-brief">{brief}</p>
-      {(leverage.data?.items ?? []).map((flag) => (
-        <LeverageFlag key={flag.msaId} flag={flag} />
-      ))}
+      {leverageRead}
       {d.plays.length ? (
         <ol className="wp-plays">
           {d.plays.map((p) => <PlayCard key={p.theme} play={p} micros={micros} />)}
