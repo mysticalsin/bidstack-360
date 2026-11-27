@@ -8,7 +8,6 @@ import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
-import { DetailPageSkeleton } from '@/components/skeletons/DetailPageSkeleton';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConvertLead, useDeleteLead, useLead, useUpdateLead } from '@/hooks/useLeads';
@@ -19,6 +18,7 @@ import { formatDate } from '@/lib/format';
 import { LeadPriority, LeadStatus, LeadSource } from '@bidstack/shared';
 
 import { ConvertLeadDialog } from './leadDetail/ConvertLeadDialog';
+import { leadDetailReadPhase } from './lead-detail-read';
 
 // 'converted' is only reachable through the convert action, which creates the
 // opportunity and contact; the API rejects it on PATCH.
@@ -41,16 +41,17 @@ export function LeadDetailPage() {
   const readOnlyHint = t('leadDetail.readOnlyHint', 'You need lead write access to make changes.');
   const [isConverting, setIsConverting] = useState(false);
 
-  if (lead.isLoading) return <DetailPageSkeleton columns={2} cards={3} />;
-  if (lead.isError) {
+  // A missing payload is not a missing lead. isLoading is false while a
+  // read is paused, so that flag alone still said the lead was not found.
+  const phase = leadDetailReadPhase(lead);
+  if (phase === 'unread') {
     return (
-      <ErrorState
-        title={t('leadDetail.errorTitle', "Couldn't load lead")}
-        message={t('leadDetail.errorMessage', 'The lead may have been deleted.')}
-      />
+      <p role="status" className="p-6 text-sm text-[var(--fg-secondary)]">
+        {t('leadDetail.checking', 'Checking this lead. The record has not arrived.')}
+      </p>
     );
   }
-  if (!lead.data) {
+  if (phase === 'missing') {
     return (
       <EmptyState
         title={t('leadDetail.notFoundTitle', 'Lead not found')}
@@ -63,6 +64,14 @@ export function LeadDetailPage() {
             {t('leadDetail.goBack', 'Go back')}
           </Button>
         }
+      />
+    );
+  }
+  if (phase === 'failed' || !lead.data) {
+    return (
+      <ErrorState
+        title={t('leadDetail.errorTitle', "Couldn't load lead")}
+        message={t('leadDetail.loadFailedMessage', 'The lead record did not load.')}
       />
     );
   }
