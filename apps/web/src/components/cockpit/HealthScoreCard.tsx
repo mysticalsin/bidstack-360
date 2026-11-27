@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { springSoft } from '@/lib/motion';
 
+import { FeatureFlagsStatus } from './FeatureFlagsStatus';
+
 import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 const ORDER = ['strong', 'good', 'needs_attention', 'critical'] as const;
@@ -26,6 +28,7 @@ export const HealthScoreCard = memo(function HealthScoreCard({ cockpit }: Props)
         aria-label={t('healthScore.regionLabel', 'Account signal coverage')}
         className="health-score-card"
       >
+        <FeatureFlagsStatus />
         <SectionHeader
           title={t('healthScore.title', 'Signal coverage')}
           caption={t('healthScore.notScored', 'Not scored yet')}
@@ -66,6 +69,7 @@ const ScoredHealthCard = memo(function ScoredHealthCard({
       aria-label={t('healthScore.regionLabel', 'Account signal coverage')}
       className="health-score-card"
     >
+      <FeatureFlagsStatus />
       <SectionHeader
         title={t('healthScore.title', 'Signal coverage')}
         caption={t('healthScore.signalsScored', '{{count}} account signals scored', { count: total })}

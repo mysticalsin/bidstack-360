@@ -1,0 +1,19 @@
+// Feature flags may hide a block only after the read arrives.
+// A pause has isLoading false and no payload. That read is still unread.
+// Error wins, then undefined data is unread, else the read is ready.
+
+import type { FeatureFlags } from '@bidstack/shared';
+
+export type FeatureFlagPhase = 'unread' | 'failed' | 'ready';
+
+export interface FeatureFlagSnapshot {
+  data?: FeatureFlags | null;
+  isError?: boolean;
+  status?: string;
+}
+
+export function featureFlagsPhase(snapshot: FeatureFlagSnapshot): FeatureFlagPhase {
+  if (snapshot.isError === true || snapshot.status === 'error') return 'failed';
+  if (snapshot.data === undefined) return 'unread';
+  return 'ready';
+}
