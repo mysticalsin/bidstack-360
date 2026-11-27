@@ -1,12 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import type { ComponentProps, ElementType, ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ContractAgreementsCard } from './ContractAgreementsCard';
 import type { ContractAgreement, ContractFieldProvenance } from '@bidstack/shared';
 
 const hookMocks = vi.hoisted(() => ({
-  agreements: [] as ContractAgreement[],
+  agreements: [] as ContractAgreement[] | undefined,
+  isLoading: false,
+  isError: false,
+  error: null as Error | null,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -55,9 +58,9 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/hooks/useContractAgreements', () => ({
   useContractAgreements: () => ({
     data: hookMocks.agreements,
-    isLoading: false,
-    isError: false,
-    error: null,
+    isLoading: hookMocks.isLoading,
+    isError: hookMocks.isError,
+    error: hookMocks.error,
   }),
   useCreateContractAgreement: () => ({ mutate: vi.fn(), isPending: false }),
   useApproveContractExtraction: () => ({ mutate: vi.fn(), isPending: false }),
@@ -126,6 +129,17 @@ function agreement(): ContractAgreement {
 }
 
 describe('ContractAgreementsCard provenance', () => {
+  beforeEach(() => {
+    hookMocks.agreements = [];
+    hookMocks.isLoading = false;
+    hookMocks.isError = false;
+    hookMocks.error = null;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
   it('shows compact source badges on decision-critical contract fields', () => {
     hookMocks.agreements = [agreement()];
 
@@ -162,5 +176,50 @@ describe('ContractAgreementsCard provenance', () => {
       screen.getByTestId('contract-source-33333333-3333-4333-8333-333333333333-rate-card')
         .textContent,
     ).toBe('AI reviewed');
+  });
+
+  it('does not call an unread agreement list an empty book', () => {
+    // WHY: a pending or paused read reports isLoading false and no payload.
+    // "No MSAs..." is only true after a settled list with zero agreements.
+    // Sellers must not treat a contract book that has not arrived as none.
+    hookMocks.agreements = undefined;
+    hookMocks.isLoading = false;
+    hookMocks.isError = false;
+    hookMocks.error = null;
+
+    render(<ContractAgreementsCard accountKey="acme" />);
+
+    expect(screen.queryByText(/No MSAs or framework agreements/)).toBeNull();
+    expect(screen.queryByText('None')).toBeNull();
+    expect(document.querySelector('[aria-busy="true"]')).toBeTruthy();
+  });
+
+  it('does not call a failed agreement read an empty book', () => {
+    // WHY: a failed read is unknown, not a book of zero. Pricing a deal
+    // against "no MSA on file" when the load failed would skip a real contract.
+    hookMocks.agreements = undefined;
+    hookMocks.isLoading = false;
+    hookMocks.isError = true;
+    hookMocks.error = new Error('agreements down');
+
+    render(<ContractAgreementsCard accountKey="acme" />);
+
+    expect(screen.queryByText(/No MSAs or framework agreements/)).toBeNull();
+    expect(screen.getByText('Could not load contractual agreements')).toBeTruthy();
+  });
+
+  it('still says there are no agreements after a settled empty list', () => {
+    // WHY: an arrived payload of zero agreements is a real empty book.
+    hookMocks.agreements = [];
+    hookMocks.isLoading = false;
+    hookMocks.isError = false;
+    hookMocks.error = null;
+
+    render(<ContractAgreementsCard accountKey="acme" />);
+
+    expect(
+      screen.getByText('No MSAs or framework agreements recorded for this account yet.'),
+    ).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 });
