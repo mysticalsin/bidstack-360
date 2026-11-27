@@ -35,6 +35,9 @@ import {
   ACCOUNT_RESULT_LIMIT,
   CONTACT_RESULT_LIMIT,
   TASK_RESULT_LIMIT,
+  paletteCatalogRead,
+  type PaletteCatalogRead,
+  type PaletteCatalogSource,
   buildNavTargets,
   finalizePaletteItems,
   findDirectNavTarget as findDirectNavTargetIn,
@@ -58,6 +61,8 @@ const WEAK_MATCH_SCORE = 1;
 export interface UsePaletteItemsResult {
   items: Item[];
   isFetching: boolean;
+  /** Whether the local company, contact, and task reads have a payload. */
+  catalogRead: PaletteCatalogRead;
   selectNavTarget: (target: NavTarget) => void;
   /** Bound to the current (flag-filtered) nav target list — see CommandPalette's
    *  Enter-key "jump straight to an exact route match" shortcut. */
@@ -390,10 +395,30 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
   // BOTH — reporting only oppSearch here made the palette flash "No matches."
   // whenever the opportunity search resolved empty while the global search
   // was still in flight (false negative on the app's main discovery surface).
+  // The company snapshot, contact book, and task list are separate reads.
+  // A missing or failed payload is not an empty catalog.
+  const catalogRead = paletteCatalogRead([
+    catalogSource(dashboard),
+    catalogSource(contacts),
+    catalogSource(tasks),
+  ]);
+
   return {
     items,
     isFetching: oppSearch.isFetching || globalSearch.isFetching,
+    catalogRead,
     selectNavTarget,
     findDirectNavTarget,
+  };
+}
+
+function catalogSource(source: {
+  isPending: boolean;
+  isError: boolean;
+  data: unknown;
+}): PaletteCatalogSource {
+  return {
+    pending: source.isPending,
+    failed: source.isError && source.data == null,
   };
 }
