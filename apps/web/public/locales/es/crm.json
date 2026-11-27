@@ -1837,12 +1837,13 @@
   "companyDetail": {
     "error": {
       "title": "No se pudo cargar la empresa",
-      "message": "Es posible que la empresa se haya eliminado."
+      "message": "El registro de la empresa no se cargó. Inténtalo de nuevo.",
+      "retry": "Reintentar"
     },
     "notFound": {
       "title": "Empresa no encontrada",
       "message": "Es posible que la empresa se haya eliminado o que no tengas acceso a ella.",
-      "goBack": "Volver"
+      "backToCompanies": "Volver a empresas"
     },
     "field": {
       "companyName": "Nombre de la empresa",

@@ -1804,12 +1804,13 @@
   "companyDetail": {
     "error": {
       "title": "无法加载公司",
-      "message": "该公司可能已被删除。"
+      "message": "公司记录没有加载。请重试。",
+      "retry": "重试"
     },
     "notFound": {
       "title": "未找到公司",
       "message": "该公司可能已被删除，或者您没有访问权限。",
-      "goBack": "返回"
+      "backToCompanies": "返回公司列表"
     },
     "field": {
       "companyName": "公司名称",

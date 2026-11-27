@@ -1859,12 +1859,13 @@
   "companyDetail": {
     "error": {
       "title": "Impossible de charger l'entreprise",
-      "message": "L'entreprise a peut-être été supprimée."
+      "message": "L'enregistrement de l'entreprise n'a pas été chargé. Réessayez.",
+      "retry": "Réessayer"
     },
     "notFound": {
       "title": "Entreprise introuvable",
       "message": "L'entreprise a peut-être été supprimée ou vous n'y avez pas accès.",
-      "goBack": "Retour"
+      "backToCompanies": "Retour aux entreprises"
     },
     "field": {
       "companyName": "Nom de l'entreprise",

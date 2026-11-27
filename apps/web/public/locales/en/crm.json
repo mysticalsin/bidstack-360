@@ -1805,12 +1805,13 @@
   "companyDetail": {
     "error": {
       "title": "Couldn't load company",
-      "message": "The company may have been deleted."
+      "message": "The company record did not load. Try again.",
+      "retry": "Retry"
     },
     "notFound": {
       "title": "Company not found",
       "message": "The company may have been deleted or you may not have access to it.",
-      "goBack": "Go back"
+      "backToCompanies": "Back to companies"
     },
     "field": {
       "companyName": "Company name",

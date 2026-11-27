@@ -1804,12 +1804,13 @@
   "companyDetail": {
     "error": {
       "title": "Impossibile caricare l'azienda",
-      "message": "L'azienda potrebbe essere stata eliminata."
+      "message": "Il record dell'azienda non è stato caricato. Riprova.",
+      "retry": "Riprova"
     },
     "notFound": {
       "title": "Azienda non trovata",
       "message": "L'azienda potrebbe essere stata eliminata o potresti non avervi accesso.",
-      "goBack": "Indietro"
+      "backToCompanies": "Torna alle aziende"
     },
     "field": {
       "companyName": "Nome dell'azienda",

@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { RestrictedCompanyLabel } from '@/components/RestrictedCompanyLabel';
+import { ApiError } from '@/lib/api';
 import { isRestrictedCompany } from '@/lib/restrictedCompany';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
@@ -93,19 +94,25 @@ export function CompanyDetailPage() {
   if (company.isLoading) {
     return <DetailPageSkeleton tabs columns={2} cards={2} />;
   }
-  if (company.isError) {
+  // 404 means the company is missing: deleted, out of scope, or a demo link
+  // this org does not have. That state links to the companies list. Any other
+  // failure keeps a retry and a fixed sentence in place of the server text.
+  const missing =
+    company.isError && company.error instanceof ApiError && company.error.status === 404;
+  if (company.isError && !missing) {
     return (
       <ErrorState
         title={t('companyDetail.error.title', "Couldn't load company")}
-        message={
-          company.error instanceof Error
-            ? company.error.message
-            : t('companyDetail.error.message', 'The company may have been deleted.')
+        message={t('companyDetail.error.message', 'The company record did not load. Try again.')}
+        action={
+          <Button variant="secondary" size="lg" onClick={() => void company.refetch()}>
+            {t('companyDetail.error.retry', 'Retry')}
+          </Button>
         }
       />
     );
   }
-  if (!company.data) {
+  if (missing || !company.data) {
     return (
       <EmptyState
         title={t('companyDetail.notFound.title', 'Company not found')}
@@ -114,9 +121,12 @@ export function CompanyDetailPage() {
           'The company may have been deleted or you may not have access to it.',
         )}
         action={
-          <Button variant="secondary" onClick={() => window.history.back()}>
-            {t('companyDetail.notFound.goBack', 'Go back')}
-          </Button>
+          <Link
+            to="/companies"
+            className="inline-flex min-h-11 items-center rounded-lg border border-[var(--border-default)] px-4 text-sm font-medium text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+          >
+            {t('companyDetail.notFound.backToCompanies', 'Back to companies')}
+          </Link>
         }
       />
     );
