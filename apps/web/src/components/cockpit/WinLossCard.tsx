@@ -2,10 +2,11 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { useDisplayMoneyMicros } from '@/hooks/useDisplayMoney';
 import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 import type { AccountCockpitSnapshot } from '@bidstack/shared';
+
+import { winLossCardAmount } from './win-loss-card-amount';
 
 interface Props {
   cockpit: AccountCockpitSnapshot;
@@ -20,7 +21,9 @@ export const WinLossCard = memo(function WinLossCard({ cockpit }: Props) {
   const { t } = useTranslation('crm');
   const flags = useFeatureFlags();
   const wl = cockpit.winLoss;
-  const wonValue = useDisplayMoneyMicros(wl?.wonValueMicros ?? 0, 'EUR', { compact: true });
+  // Won opportunity valueMicros has no currency column. The line is the
+  // grouped units. A display currency must not turn that integer into a euro forecast.
+  const wonValue = winLossCardAmount(wl?.wonValueMicros ?? 0);
   if (!flags.winLossDataAvailable || !wl || wl.wonCount + wl.lostCount === 0) return null;
 
   return (
