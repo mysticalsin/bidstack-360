@@ -2,26 +2,12 @@
  * forecasts-projection.helpers.ts — pure logic for the pipeline-weighted
  * forecast projection (Salesforce/Clari model). No Fastify/Prisma deps, so the
  * quarter math + weighting can be unit-tested without a database.
+ *
+ * Weight is the probability stored on the bid, summed before the stage group.
+ * A negotiation stage rate of 80% must not replace 75% on the record.
  */
 import type { OpportunityStage } from '@bidstack/db';
 import type { ForecastProjectionOwner, ForecastProjectionPeriod } from '@bidstack/shared';
-
-/**
- * Default win-probability per opportunity stage (percent), used ONLY when a
- * stage key is absent from the org's configurable pipeline_stages table.
- * Mirrors DEFAULT_STAGES in pipeline-stages.ts — the org config is the source
- * of truth; this is the documented fallback so the projection is never blank
- * just because stages were never seeded.
- */
-export const STAGE_WIN_PROBABILITY: Record<OpportunityStage, number> = {
-  s1_lead: 10,
-  s1_ongoing: 25,
-  s2_sent: 40,
-  s3_technical_iteration: 60,
-  s4_negotiation: 80,
-  closed_won: 100,
-  closed_lost: 0,
-};
 
 const UNASSIGNED = 'Unassigned';
 
@@ -68,12 +54,19 @@ export function buildProjectionWindow(now: Date, forwardQuarters: number): Proje
   return { periods, currentPeriod: periods[0]!, curQuarterStart, windowEndExclusive };
 }
 
-/** Stage win-probability (0–100): org config first, documented fallback otherwise. */
-export function resolveStageProbability(
-  stage: OpportunityStage,
-  stageProbabilities: Map<string, number>,
-): number {
-  return stageProbabilities.get(stage) ?? STAGE_WIN_PROBABILITY[stage] ?? 0;
+/**
+ * Integer micros as the driver serialized them. A blank, decimal, or other
+ * failed read is not zero: zero is what an empty quarter already reports.
+ */
+export function readProjectionMicros(raw: string): number {
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) {
+    throw new Error('Forecast projection amount is not an integer');
+  }
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value)) {
+    throw new Error('Forecast projection amount is outside the safe integer range');
+  }
+  return value;
 }
 
 /** Manual "commit" forecast row as read from the DB (pre-currency-filter). */
@@ -119,6 +112,11 @@ export interface ProjectionRow {
   ownerName: string | null;
   stage: OpportunityStage;
   valueMicros: string; // numeric SUM serialized as string by the driver
+  /**
+   * Sum of per-bid ROUND(value_micros * probability / 100). Won groups stay
+   * "0": closed revenue is an actual, not a weight.
+   */
+  weightedMicros: string;
 }
 
 interface OwnerAccumulator {
@@ -133,15 +131,16 @@ function emptyOwner(ownerId: string | null, ownerName: string): OwnerAccumulator
   return { ownerId, ownerName, openMicros: 0, weightedMicros: 0, wonMicros: 0 };
 }
 
-function applyRow(owner: OwnerAccumulator, row: ProjectionRow, probability: number): void {
-  const value = Number(row.valueMicros);
+function applyRow(owner: OwnerAccumulator, row: ProjectionRow): void {
+  const value = readProjectionMicros(row.valueMicros);
+  const weight = readProjectionMicros(row.weightedMicros);
   if (row.stage === 'closed_won') {
     // Won is a date-anchored actual — never part of open/weighted pipeline.
     owner.wonMicros += value;
     return;
   }
   owner.openMicros += value;
-  owner.weightedMicros += (value * probability) / 100;
+  owner.weightedMicros += weight;
 }
 
 /**
@@ -152,7 +151,6 @@ function applyRow(owner: OwnerAccumulator, row: ProjectionRow, probability: numb
 export function aggregateProjection(
   rows: ProjectionRow[],
   window: ProjectionWindow,
-  stageProbabilities: Map<string, number>,
   manualCommitByPeriod: Map<string, number>,
 ): ForecastProjectionPeriod[] {
   const owners = new Map<string, Map<string, OwnerAccumulator>>();
@@ -168,7 +166,7 @@ export function aggregateProjection(
       owner = emptyOwner(row.ownerId, row.ownerName ?? UNASSIGNED);
       periodOwners.set(ownerKey, owner);
     }
-    applyRow(owner, row, resolveStageProbability(row.stage, stageProbabilities));
+    applyRow(owner, row);
   }
 
   return window.periods.map((period) => buildPeriod(period, owners.get(period)!, manualCommitByPeriod));

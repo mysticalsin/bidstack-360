@@ -1,14 +1,14 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, it, expect } from 'vitest';
 
 import {
-  STAGE_WIN_PROBABILITY,
   aggregateManualCommit,
   aggregateProjection,
   buildProjectionWindow,
   quarterLabel,
   quarterPeriodKey,
   quarterStart,
-  resolveStageProbability,
   type ManualCommitRow,
   type ProjectionRow,
 } from './forecasts-projection.helpers.js';
@@ -45,26 +45,8 @@ describe('buildProjectionWindow', () => {
   });
 });
 
-describe('resolveStageProbability', () => {
-  it('prefers the org config over the documented fallback', () => {
-    const cfg = new Map<string, number>([['s2_sent', 55]]);
-    expect(resolveStageProbability('s2_sent', cfg)).toBe(55);
-  });
-
-  it('falls back to the documented map when a stage is unconfigured', () => {
-    expect(resolveStageProbability('s4_negotiation', new Map())).toBe(
-      STAGE_WIN_PROBABILITY.s4_negotiation,
-    );
-  });
-});
-
 describe('aggregateProjection', () => {
   const window = buildProjectionWindow(NOW, 2);
-  const probs = new Map<string, number>([
-    ['s2_sent', 40],
-    ['s4_negotiation', 80],
-    ['closed_won', 100],
-  ]);
 
   const row = (over: Partial<ProjectionRow>): ProjectionRow => ({
     period: '2026-Q2',
@@ -72,44 +54,58 @@ describe('aggregateProjection', () => {
     ownerName: 'Jane',
     stage: 's2_sent',
     valueMicros: '1000000',
+    weightedMicros: '400000',
     ...over,
   });
 
-  it('weights open pipeline by stage probability and keeps won separate', () => {
+  it('adds the bid weight and keeps won out of open and weighted', () => {
+    // WHY: the query already rounded each bid by the probability on the record.
+    // Re-applying a stage rate here would put won into the weighted pipeline
+    // and replace that per-bid figure.
     const result = aggregateProjection(
       [
-        row({ stage: 's2_sent', valueMicros: '1000000' }), // open, 40%
-        row({ stage: 'closed_won', valueMicros: '500000' }), // won actual
+        row({ stage: 's2_sent', valueMicros: '1000000', weightedMicros: '400000' }),
+        row({ stage: 'closed_won', valueMicros: '500000', weightedMicros: '0' }),
       ],
       window,
-      probs,
       new Map(),
     );
     const q2 = result.find((p) => p.period === '2026-Q2')!;
     expect(q2.openMicros).toBe(1_000_000); // won excluded from open
-    expect(q2.weightedMicros).toBe(400_000); // 1,000,000 × 40%
+    expect(q2.weightedMicros).toBe(400_000); // won weight is not a forecast
     expect(q2.wonMicros).toBe(500_000);
   });
 
   it('returns every requested period even when empty, in order', () => {
-    const result = aggregateProjection([], window, probs, new Map());
+    const result = aggregateProjection([], window, new Map());
     expect(result.map((p) => p.period)).toEqual(['2026-Q2', '2026-Q3', '2026-Q4']);
     expect(result.every((p) => p.openMicros === 0 && p.byOwner.length === 0)).toBe(true);
   });
 
   it('skips rows outside the window (null period)', () => {
-    const result = aggregateProjection([row({ period: null })], window, probs, new Map());
+    const result = aggregateProjection([row({ period: null })], window, new Map());
     expect(result.every((p) => p.openMicros === 0)).toBe(true);
   });
 
   it('sorts owners by weighted value desc and labels unassigned', () => {
     const result = aggregateProjection(
       [
-        row({ ownerId: 'a', ownerName: 'Ann', stage: 's2_sent', valueMicros: '1000000' }), // w=400k
-        row({ ownerId: null, ownerName: null, stage: 's4_negotiation', valueMicros: '1000000' }), // w=800k
+        row({
+          ownerId: 'a',
+          ownerName: 'Ann',
+          stage: 's2_sent',
+          valueMicros: '1000000',
+          weightedMicros: '400000',
+        }),
+        row({
+          ownerId: null,
+          ownerName: null,
+          stage: 's4_negotiation',
+          valueMicros: '1000000',
+          weightedMicros: '800000',
+        }),
       ],
       window,
-      probs,
       new Map(),
     );
     const q2 = result.find((p) => p.period === '2026-Q2')!;
@@ -119,14 +115,65 @@ describe('aggregateProjection', () => {
   });
 
   it('overlays the manual commit override per period', () => {
-    const result = aggregateProjection(
-      [row({})],
-      window,
-      probs,
-      new Map([['2026-Q3', 9_000_000]]),
-    );
+    const result = aggregateProjection([row({})], window, new Map([['2026-Q3', 9_000_000]]));
     expect(result.find((p) => p.period === '2026-Q2')!.manualCommitMicros).toBeNull();
     expect(result.find((p) => p.period === '2026-Q3')!.manualCommitMicros).toBe(9_000_000);
+  });
+
+  it('weights the IKEA bid at 75% on the record, not the 80% negotiation stage rate', () => {
+    // WHY: demo OP-0002 (IKEA, Cloud Migration & FinOps) is negotiation at 75%
+    // on the bid. The projection used to multiply by the stage rate of 80%.
+    // That kept a stale weight of 680,000 on a 850,000 bid. The deal page
+    // stores 75%. 80% adds 42,500 the rep did not enter. The grouped row
+    // already carries the per-bid weight. This function must not replace it.
+    const value = 850_000 * 1_000_000;
+    const atBid = 637_500 * 1_000_000;
+    const atStage = 680_000 * 1_000_000;
+    const result = aggregateProjection(
+      [
+        row({
+          stage: 's4_negotiation',
+          valueMicros: String(value),
+          weightedMicros: String(atBid),
+        }),
+      ],
+      window,
+      new Map(),
+    );
+    const q2 = result.find((p) => p.period === '2026-Q2')!;
+    expect(q2.openMicros).toBe(value);
+    expect(q2.weightedMicros).toBe(atBid);
+    expect(q2.weightedMicros).not.toBe(atStage);
+  });
+
+  it('does not turn a failed value read into an empty quarter', () => {
+    // WHY: a value the driver could not return as integer micros is not an
+    // empty book. Number('nope') is NaN and Math.round(NaN) is NaN, which the
+    // page can paint as a blank quarter. An empty window stays zero. A bad
+    // read must fail instead of joining that zero.
+    const empty = aggregateProjection([], window, new Map());
+    expect(empty.every((p) => p.openMicros === 0 && p.weightedMicros === 0 && p.byOwner.length === 0)).toBe(
+      true,
+    );
+    expect(() => aggregateProjection([row({ valueMicros: 'nope' })], window, new Map())).toThrow(
+      /not an integer/,
+    );
+    // A fractional string is not integer micros. Rounding it would invent a weight.
+    expect(() =>
+      aggregateProjection([row({ valueMicros: '1.5', weightedMicros: '0' })], window, new Map()),
+    ).toThrow(/not an integer/);
+  });
+});
+
+describe('projection query weight', () => {
+  it('weights each bid by the probability on the record before the stage group is summed', () => {
+    // WHY: grouping by stage and then applying 80% never sees the 75% stored
+    // on OP-0002. The weight has to be computed per bid. A failed numeric
+    // read must not be coerced into a zero weight.
+    const src = readFileSync(new URL('./forecasts-projection.ts', import.meta.url), 'utf8');
+    expect(src).toContain('ROUND(o.value_micros * o.probability / 100.0)');
+    expect(src).toContain("WHEN o.stage = 'closed_won' THEN 0");
+    expect(src).not.toContain('loadStageProbabilities');
   });
 });
 
