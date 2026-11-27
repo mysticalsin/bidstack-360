@@ -73,6 +73,16 @@ export function CustomObjectDetailPage() {
   const [editField, setEditField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [editError, setEditError] = useState<string | null>(null);
+  // This page stays mounted when /o/:objectKey/:recordId changes. The draft
+  // belongs to that record; the next record must not keep it.
+  const routeKey = `${objectKey}:${recordId}`;
+  const [draftRoute, setDraftRoute] = useState(routeKey);
+  if (draftRoute !== routeKey) {
+    setDraftRoute(routeKey);
+    setEditField(null);
+    setEditValue('');
+    setEditError(null);
+  }
 
   const record = recordQuery.data;
   const values = (record?.valuesJson ?? {}) as Record<string, unknown>;
@@ -148,7 +158,20 @@ export function CustomObjectDetailPage() {
     );
   }
 
-  const fieldKeys = Object.keys(values);
+  // Stored keys alone hide a defined field the record has not filled in, and
+  // an empty valuesJson then reads as "no fields defined". The catalog is the
+  // list. Stored keys the catalog does not know stay visible.
+  const catalog = fieldsQuery.data?.items ?? [];
+  const catalogKeys = catalog.map((field) => field.fieldKey);
+  const storedKeys = Object.keys(values);
+  const fieldKeys =
+    catalogKeys.length > 0
+      ? [...catalogKeys, ...storedKeys.filter((key) => !catalogKeys.includes(key))]
+      : storedKeys;
+
+  function fieldLabel(key: string): string {
+    return fieldsByKey.get(key)?.label ?? key.replace(/_/g, ' ');
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -231,7 +254,7 @@ export function CustomObjectDetailPage() {
               )}
             >
               <dt className="text-sm font-medium text-[var(--fg-secondary)] capitalize">
-                {key.replace(/_/g, ' ')}
+                {fieldLabel(key)}
               </dt>
               <dd className="col-span-2">
                 {editField === key ? (
@@ -248,7 +271,7 @@ export function CustomObjectDetailPage() {
                           if (e.key === 'Escape') setEditField(null);
                         },
                         'aria-label': t('customObjectDetail.editFieldAriaLabel', 'Edit {{field}}', {
-                          field: key.replace(/_/g, ' '),
+                          field: fieldLabel(key),
                         }),
                       } as const;
 
@@ -327,10 +350,10 @@ export function CustomObjectDetailPage() {
                     aria-label={
                       canWrite
                         ? t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', {
-                            field: key.replace(/_/g, ' '),
+                            field: fieldLabel(key),
                             value: String(values[key] ?? '—'),
                           })
-                        : `${t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', { field: key.replace(/_/g, ' '), value: String(values[key] ?? '—') })} — ${readOnlyHint}`
+                        : `${t('customObjectDetail.editFieldValueAriaLabel', 'Edit {{field}}: {{value}}', { field: fieldLabel(key), value: String(values[key] ?? '—') })} — ${readOnlyHint}`
                     }
                   >
                     {String(values[key] ?? '—')}
@@ -345,7 +368,19 @@ export function CustomObjectDetailPage() {
             </div>
           ))}
 
-          {fieldKeys.length === 0 && (
+          {fieldsQuery.isLoading && fieldKeys.length === 0 && (
+            <p className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]" role="status">
+              {t('customObjectDetail.fieldsLoading', 'Loading fields.')}
+            </p>
+          )}
+
+          {fieldsQuery.isError && fieldKeys.length === 0 && (
+            <p className="px-5 py-8 text-center text-sm text-[var(--fg-error)]" role="alert">
+              {t('customObjectDetail.fieldsLoadError', 'Could not load fields.')}
+            </p>
+          )}
+
+          {!fieldsQuery.isLoading && !fieldsQuery.isError && fieldKeys.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-[var(--fg-secondary)]">
               {t('customObjectDetail.emptyFields', 'No fields defined yet. Add fields in the')}{' '}
               <Link
