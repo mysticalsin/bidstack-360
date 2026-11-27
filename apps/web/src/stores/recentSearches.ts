@@ -7,15 +7,33 @@ import { create } from 'zustand';
 const STORAGE_KEY = 'bidstack-recent-searches.v1';
 const CAP = 8;
 
-function read(): string[] {
-  if (typeof window === 'undefined') return [];
+export type RecentSearchStatus = 'ready' | 'failed';
+
+export interface RecentSearchSnapshot {
+  items: string[];
+  /** `failed` means the stored list was not read. It is not an empty history. */
+  status: RecentSearchStatus;
+}
+
+/**
+ * The stored recent-search list, or a failed read. A missing key is an empty
+ * history that arrived. A thrown read, corrupt JSON, or a non-array payload
+ * has not arrived: callers must not present that as "no recent searches".
+ * No `window` (module init outside a browser) is not a failed browser read.
+ */
+export function readRecentSearches(): RecentSearchSnapshot {
+  if (typeof window === 'undefined') return { items: [], status: 'ready' };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === 'string') : [];
+    if (raw == null) return { items: [], status: 'ready' };
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return { items: [], status: 'failed' };
+    return {
+      items: parsed.filter((s): s is string => typeof s === 'string'),
+      status: 'ready',
+    };
   } catch {
-    return [];
+    return { items: [], status: 'failed' };
   }
 }
 
@@ -28,26 +46,26 @@ function write(items: string[]): void {
   }
 }
 
-interface RecentSearchStore {
-  items: string[];
+interface RecentSearchStore extends RecentSearchSnapshot {
   push: (query: string) => void;
   clear: () => void;
 }
 
 export const useRecentSearches = create<RecentSearchStore>((set, get) => ({
-  items: read(),
+  ...readRecentSearches(),
   push: (query) => {
     const q = query.trim();
     if (!q) return;
     // De-dupe case-insensitively: pressing Enter twice on "mantu" shouldn't
-    // record two entries. Newest first.
+    // record two entries. Newest first. A new query is in memory even if the
+    // previous read failed, so the history is ready from this point.
     const filtered = get().items.filter((s) => s.toLowerCase() !== q.toLowerCase());
     const next = [q, ...filtered].slice(0, CAP);
     write(next);
-    set({ items: next });
+    set({ items: next, status: 'ready' });
   },
   clear: () => {
     write([]);
-    set({ items: [] });
+    set({ items: [], status: 'ready' });
   },
 }));
