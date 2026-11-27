@@ -2,6 +2,7 @@
 //   POST   /entities/:type/:id/lock    — acquire edit lock (5 min TTL)
 //   DELETE /entities/:type/:id/lock    — release edit lock
 //   GET    /presence/org               — snapshot of online users (polling fallback)
+//   POST   /presence/heartbeat         - refresh the caller's 30s presence row
 //   GET    /presence/entity/:type/:id  — users viewing a specific entity
 
 import type { FastifyPluginAsync } from 'fastify';
@@ -10,7 +11,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
 import { canOverrideOwnership } from '../lib/org-admin.js';
-import { getOrgPresence, getEntityPresence } from '../services/presence.service.js';
+import { getOrgPresence, getEntityPresence, upsertPresence } from '../services/presence.service.js';
 import { publish } from '../services/realtime.service.js';
 
 const LOCK_TTL_MINUTES = 5;
@@ -194,6 +195,37 @@ export const realtimeRoutes: FastifyPluginAsync = async (server) => {
       const { orgId } = req.auth;
       const entries = await getOrgPresence(orgId);
       return { users: entries };
+    },
+  );
+
+  // The team list reads the snapshot above. Redis drops a row after 30s, and
+  // the notification socket does not ping, so a signed-in person goes offline
+  // while they are still on the page. The list POSTs here to refresh its own
+  // row. The body has no fields. The id comes from the session, not the client.
+  app.post(
+    '/presence/heartbeat',
+    {
+      config: {
+        permission: 'comments:read',
+        rateLimit: { max: 30, timeWindow: '1 minute' },
+      },
+      schema: {
+        body: z.object({}).strict(),
+        response: { 204: z.null() },
+      },
+    },
+    async (req, reply) => {
+      await upsertPresence({
+        userId: req.auth.userId,
+        orgId: req.auth.orgId,
+        name: '',
+        avatarUrl: null,
+        currentEntityType: null,
+        currentEntityId: null,
+        sessionId: 'http',
+        lastSeenAt: Date.now(),
+      });
+      return reply.code(204).send(null);
     },
   );
 
