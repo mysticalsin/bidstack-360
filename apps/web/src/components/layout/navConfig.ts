@@ -26,6 +26,11 @@ export interface NavItem {
   labelKey: string;
   icon: IconName;
   badgeKey?: NavBadgeKey;
+  /**
+   * Other URLs that are this door. The href stays the list. The alias is
+   * how the rail knows the page still belongs here.
+   */
+  activeAliases?: readonly string[];
   /** When set, the item is hidden unless its module is enabled (OrgSettings). */
   featureKey?: NavFeatureKey;
   /** Exact-match active state. Use for section overviews whose sub-routes are
@@ -108,10 +113,16 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: 'pipeline',
     items: [
       { to: '/leads', label: 'Leads', labelKey: 'nav.leads', icon: 'zap' },
-      // Opportunities hosts both the list and the kanban board (List / Board
-      // toggle in-page); the standalone /pipeline route still works and is
-      // reached through that toggle, so it is no longer a separate rail entry.
-      { to: '/opportunities', label: 'Opportunities', labelKey: 'nav.opportunities', icon: 'target', badgeKey: 'openBids' },
+      // The kanban is /pipeline (g p, the dashboard, Quick Start), not its own
+      // door. activeAliases keeps this item current while the href stays the list.
+      {
+        to: '/opportunities',
+        label: 'Opportunities',
+        labelKey: 'nav.opportunities',
+        icon: 'target',
+        badgeKey: 'openBids',
+        activeAliases: ['/pipeline'],
+      },
       { to: '/territories', label: 'Territories', labelKey: 'nav.territories', icon: 'globe' },
     ],
   },
@@ -171,6 +182,31 @@ export interface NavModuleFlags {
   agentStudioEnabled?: boolean;
   appflowyEnabled?: boolean;
   serumEnabled?: boolean;
+}
+
+/** True when pathname is one of this item's aliases, not its href. */
+export function navAliasIsCurrent(
+  item: Pick<NavItem, 'activeAliases'>,
+  pathname: string,
+): boolean {
+  for (const alias of item.activeAliases ?? []) {
+    const path = alias.split('?')[0] ?? alias;
+    if (path.length === 0) continue;
+    if (pathname === path || pathname.startsWith(`${path}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Section ownership: the item's own path, a record under it, or an alias.
+ * Home is included. Callers that skip Home still can.
+ */
+export function navItemContainsPath(
+  item: Pick<NavItem, 'to' | 'activeAliases'>,
+  pathname: string,
+): boolean {
+  const path = item.to.split('?')[0] ?? item.to;
+  return pathname === path || pathname.startsWith(`${path}/`) || navAliasIsCurrent(item, pathname);
 }
 
 /** A nav item is visible if it has no featureKey, or its module is enabled.
