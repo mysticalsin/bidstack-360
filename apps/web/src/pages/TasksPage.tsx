@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { InlineTaskAdd } from '@/components/task/InlineTaskAdd';
+import { hideMineQuickAdd, isOwnFollowUp, mineHeader } from '@/components/task/task-mine-viewer';
+import { useMineViewerEmail } from '@/components/task/use-mine-viewer';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
 import { TaskRow } from '@/components/task/TaskRow';
 import { CreateTaskDialog } from '@/components/task/CreateTaskDialog';
@@ -23,9 +25,9 @@ import { Select } from '@/components/ui/Select';
 
 import type { TaskStatus } from '@bidstack/shared';
 
-type StatusFilter = 'all' | TaskStatus | 'overdue' | 'today';
+type StatusFilter = 'all' | 'mine' | TaskStatus | 'overdue' | 'today';
 
-const STATUS_LABELS: Record<Exclude<StatusFilter, 'all' | 'overdue' | 'today'>, string> = {
+const STATUS_LABELS: Record<Exclude<StatusFilter, 'all' | 'mine' | 'overdue' | 'today'>, string> = {
   open: 'Open',
   in_progress: 'In progress',
   blocked: 'Blocked',
@@ -34,6 +36,7 @@ const STATUS_LABELS: Record<Exclude<StatusFilter, 'all' | 'overdue' | 'today'>, 
 
 const VALID_FILTERS: StatusFilter[] = [
   'all',
+  'mine',
   'today',
   'overdue',
   'open',
@@ -55,17 +58,22 @@ export function TasksPage() {
   // actions for users without it instead of rendering controls that 403 on
   // click (matches ReportsListPage/CompaniesPage convention).
   const canWrite = useHasPermission('tasks:write');
+  // Mine is the signed-in address. Demo sign-in can replace that address
+  // without a new auth render, so this hook re-reads the stored session.
+  const viewerEmail = useMineViewerEmail();
   // Filter rides on the query string so the view is shareable + back/forward
   // navigable. Linking to "/tasks?filter=overdue" lands a coworker on the
   // exact same slice we were looking at.
   const [searchParams, setSearchParams] = useSearchParams();
   const filter = parseFilter(searchParams.get('filter'));
   // The four concrete statuses are filtered server-side so the result spans the
-  // whole tenant, not just the loaded page. 'overdue'/'today' are date filters
-  // the route doesn't model, so those stay client-side (see filteredItems) and
-  // therefore only reflect the pages currently loaded.
+  // whole tenant, not just the loaded page. 'mine'/'overdue'/'today' are not
+  // status filters the route models, so those stay client-side (see filteredItems)
+  // and therefore only reflect the pages currently loaded.
   const serverStatus =
-    filter === 'all' || filter === 'overdue' || filter === 'today' ? undefined : filter;
+    filter === 'all' || filter === 'overdue' || filter === 'today' || filter === 'mine'
+      ? undefined
+      : filter;
   const pager = useCursorPagination(filter);
   const { data, isLoading, isError, error } = useTasks({
     ...(serverStatus ? { status: serverStatus } : {}),
@@ -82,6 +90,7 @@ export function TasksPage() {
     const all = data?.items ?? [];
     return all.filter((t) => {
       if (filter === 'all') return true;
+      if (filter === 'mine') return isOwnFollowUp(t, viewerEmail);
       if (filter === 'today') {
         const d = daysUntil(t.dueDate);
         return d !== null && d === 0 && t.status !== 'done';
@@ -94,7 +103,7 @@ export function TasksPage() {
       // guard for the loaded page.
       return t.status === filter;
     });
-  }, [data?.items, filter]);
+  }, [data?.items, filter, viewerEmail]);
 
   // Sort. Default 'natural' = server order (createdAt desc on the backend).
   // 'due' sorts asc with nulls last so overdue surfaces at the top of the
@@ -160,6 +169,11 @@ export function TasksPage() {
     [items, setOrder, t],
   );
 
+  const mineCopy =
+    filter === 'mine' && !isLoading && !isError
+      ? mineHeader(items.length, data?.items.length ?? 0, viewerEmail)
+      : null;
+
   const view = (searchParams.get('view') as 'list' | 'calendar') ?? 'list';
   const setView = (next: 'list' | 'calendar') => {
     const params = new URLSearchParams(searchParams);
@@ -194,9 +208,19 @@ export function TasksPage() {
             {t('tasks.title', 'Tasks')}
           </h1>
           <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
-            })}
+            {mineCopy?.kind === 'unknown'
+              ? t('tasks.subtitleMineUnknown', "Couldn't tell which follow-ups are yours.")
+              : mineCopy?.kind === 'others'
+                ? t('tasks.subtitleMineOthers', 'None of these follow-ups are yours.')
+                : mineCopy?.kind === 'count' && mineCopy.count === 1
+                  ? t('tasks.subtitleMineOne', '1 of your follow-ups.')
+                  : mineCopy?.kind === 'count'
+                    ? t('tasks.subtitleMine', '{{count}} of your follow-ups.', {
+                        count: mineCopy.count,
+                      })
+                    : t('tasks.subtitle', '{{count}} active follow-ups.', {
+                        count: data?.items.length ?? 0,
+                      })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -237,6 +261,9 @@ export function TasksPage() {
         <div role="group" aria-label={t('tasks.filters.groupLabel', 'Filter tasks')} className="flex flex-wrap gap-2">
           <Chip active={filter === 'all'} onClick={() => switchFilter('all')}>
             {t('tasks.filters.all', 'All')}
+          </Chip>
+          <Chip active={filter === 'mine'} onClick={() => switchFilter('mine')}>
+            {t('tasks.filters.mine', 'Mine')}
           </Chip>
           <Chip active={filter === 'today'} onClick={() => switchFilter('today')}>
             {t('tasks.filters.today', 'Today')}
@@ -337,9 +364,13 @@ export function TasksPage() {
               <EmptyState
                 icon={filter === 'all' ? 'tasks' : 'search'}
                 title={
-                  filter === 'all'
-                    ? t('tasks.empty.headline', 'Nothing on the bid clock')
-                    : t('tasks.empty.filteredTitle', 'No tasks match this filter')
+                  mineCopy?.kind === 'others'
+                    ? t('tasks.empty.mineOthers', 'None of these follow-ups are yours.')
+                    : mineCopy?.kind === 'unknown'
+                      ? t('tasks.empty.mineUnknown', "Couldn't tell which follow-ups are yours.")
+                      : filter === 'all'
+                        ? t('tasks.empty.headline', 'Nothing on the bid clock')
+                        : t('tasks.empty.filteredTitle', 'No tasks match this filter')
                 }
                 action={filter === 'all' && canWrite ? <CreateTaskDialog /> : null}
               />
@@ -384,10 +415,14 @@ export function TasksPage() {
             {/* Inline quick-add — sits at the bottom of the list so power users
               don't need to open the dialog for a one-shot follow-up. Hidden
               (not just disabled) for read-only users, matching the primary-CTA
-              convention for POST /api/tasks (tasks:write). */}
-            {canWrite && <InlineTaskAdd />}
+              convention for POST /api/tasks (tasks:write). Also hidden on an
+              empty Mine view: a new follow-up is unassigned, so Mine would
+              still not show it. */}
+            {canWrite && !(filter === 'mine' && hideMineQuickAdd(items.length, viewerEmail)) ? (
+              <InlineTaskAdd />
+            ) : null}
             {/* Cursor pager — only meaningful on the list view. For the
-              client-side 'overdue'/'today' filters it pages the underlying
+              client-side 'mine'/'overdue'/'today' filters it pages the underlying
               status-unfiltered set, so a page may render fewer rows than the
               page size; that's expected until the route grows a date filter. */}
             {!isLoading && !isError && (items.length > 0 || pager.hasPrevious) ? (

@@ -35,6 +35,11 @@ vi.mock('@/hooks/useTasks', () => ({
 }));
 
 const capabilitiesMocks = vi.hoisted(() => ({ useHasPermission: vi.fn(() => true) }));
+vi.mock('@/lib/auth', () => ({
+  useUser: () => ({ user: null }),
+  DEMO_EMAIL_KEY: 'bidstack:demo-email',
+  DEMO_TOKEN_KEY: 'bidstack:demo-token',
+}));
 // Default to full access so an unrelated future test in this file isn't
 // silently affected by another test's override; gating tests below flip
 // this per-case.
