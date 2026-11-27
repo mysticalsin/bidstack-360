@@ -13,6 +13,7 @@
 
 import Redis from 'ioredis';
 import { publish } from './realtime.service.js';
+import { shouldRemovePresenceRow } from './presence-ownership.js';
 
 const PRESENCE_TTL_SECONDS = 30;
 
@@ -64,12 +65,32 @@ export async function upsertPresence(entry: PresenceEntry): Promise<void> {
   await publish(`presence:org:${entry.orgId}`, 'presence.update', value);
 }
 
+// Delete only when the value is still the one we decided to remove. A
+// heartbeat that landed between the read and the delete keeps its row.
+const DELETE_IF_UNCHANGED_LUA = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+else
+  return 0
+end
+`;
+
 /**
- * Remove a user's presence immediately (disconnect / tab close).
+ * Drop this socket's presence row. The close deletes the row only when its
+ * sessionId is still the one stored. A newer socket or the team-list
+ * heartbeat keeps the row, and a delete that did not land does not broadcast
+ * a leave.
  */
-export async function removePresence(orgId: string, userId: string): Promise<void> {
+export async function removePresence(
+  orgId: string,
+  userId: string,
+  sessionId: string,
+): Promise<void> {
   const key = presenceKey(orgId, userId);
-  await presenceRedis.del(key);
+  const raw = await presenceRedis.get(key);
+  if (typeof raw !== 'string' || !shouldRemovePresenceRow(raw, sessionId)) return;
+  const removed = await presenceRedis.eval(DELETE_IF_UNCHANGED_LUA, 1, key, raw);
+  if (Number(removed) !== 1) return;
 
   await publish(`presence:org:${orgId}`, 'presence.remove', { userId, orgId });
 }
