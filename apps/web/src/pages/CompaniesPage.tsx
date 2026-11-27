@@ -34,6 +34,7 @@ import { DuplicatesDialog } from '@/components/company/DuplicatesDialog';
 import { CompanyIntelView, IntelDirection } from '@bidstack/shared';
 
 import { CompanyRow } from './companiesPage/CompanyRow';
+import { companyListIsWholeBook } from './companiesPage/company-list-window';
 import { INTEL_COLUMNS } from './companiesPage/IntelCells';
 import { IntelImportProgress } from './companiesPage/IntelImportProgress';
 import { IntelViewsBar } from './companiesPage/IntelViewsBar';
@@ -344,7 +345,15 @@ export function CompaniesPage() {
                       count: items.length,
                       term: searchTerm,
                     })
-                : t('companies.showingLatest', 'Showing latest 50 companies')}
+                : !view &&
+                    !direction &&
+                    companyListIsWholeBook(items.length, Boolean(companies.data?.nextCursor))
+                  ? items.length === 1
+                    ? t('companies.showingAllOne', 'Showing 1 company')
+                    : t('companies.showingAllMany', 'Showing {{count}} companies', {
+                        count: items.length,
+                      })
+                  : t('companies.showingLatest', 'Showing latest 50 companies')}
             </span>
             {searchTerm ? (
               <Button
