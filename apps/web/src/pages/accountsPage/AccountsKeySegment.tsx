@@ -95,6 +95,11 @@ export function AccountsKeySegment() {
   const maxIndustryPipeline = Math.max(1, ...industryBreakdown.map((item) => item.pipeline));
   const selectedIndustryStats = industryBreakdown.find((item) => item.name === industry);
   const leadingIndustry = selectedIndustryStats ?? industryBreakdown[0] ?? null;
+  // A page with no visible rows is not a zero book. Loading, a truly empty
+  // strategic list, and a filter that matches nothing all have items.length 0.
+  // The industry signal ignores the industry filter, so it would still name a
+  // leader from the unfiltered read.
+  const pageHasRows = !accounts.isLoading && !accounts.isError && items.length > 0;
 
   return (
     <motion.div
@@ -169,7 +174,7 @@ export function AccountsKeySegment() {
         </FilterRow>
       </motion.div>
 
-      {!accounts.isError && industryBreakdown.length > 0 ? (
+      {pageHasRows && industryBreakdown.length > 0 ? (
         <motion.div variants={reducedMotion ? undefined : staggerChild}>
           <InsightPanel
             ariaLabel={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
@@ -238,7 +243,7 @@ export function AccountsKeySegment() {
           (this page) and labelling it a portfolio total would silently
           under-report and shift as the user pages. The 'On this page' eyebrow
           makes the page-scope explicit rather than overclaiming. */}
-      {!accounts.isError ? (
+      {pageHasRows ? (
         <motion.section
           variants={reducedMotion ? undefined : staggerChild}
           aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
