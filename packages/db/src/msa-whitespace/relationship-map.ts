@@ -3,6 +3,8 @@
 // projects, revenue and contacts, and who touched the account last.
 import { detectBusinessLines, type RelationshipMap, type RelationshipRow } from '@bidstack/shared';
 
+import { relationshipOpportunityAmount } from './relationship-opportunity-amount.js';
+
 import type { Prisma, PrismaClient } from '../../generated/client/index.js';
 
 const TAKE = 200;
@@ -161,8 +163,7 @@ export async function loadRelationshipMap(
       line: firstLine(`${o.name} ${o.industry ?? ''}`),
       owner: owner(o.ownerId),
       lastActivityAt: (last?.at ?? o.updatedAt).toISOString(),
-      valueMicros: toNumber(o.valueMicros),
-      currency: 'EUR',
+      ...relationshipOpportunityAmount(o.valueMicros),
     });
   }
   for (const p of projects) {
