@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MIGRATION_CONFLICT,
@@ -146,6 +146,7 @@ export function CsvImportWizard() {
   const job = useMigrationJob(jobId);
   const fields = TARGET_FIELDS[entity];
   const [previewResult, setPreviewResult] = useState<ImportPreviewResult | null>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const requiredMissing = useMemo(() => {
     const mapped = new Set(Object.values(mappings).filter(Boolean) as string[]);
@@ -188,6 +189,17 @@ export function CsvImportWizard() {
         ),
       );
     }
+  }
+
+  function onDropFile(event: DragEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    setDragOver(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (!file) {
+      setParseError(t('csvImport.upload.dropEmpty', 'Drop a CSV or Excel file.'));
+      return;
+    }
+    void onFile(file);
   }
 
   function onEntityChange(next: ImportEntity) {
@@ -239,6 +251,7 @@ export function CsvImportWizard() {
     setJobId(null);
     setParseError(null);
     setPreviewResult(null);
+    setDragOver(false);
   }
 
   return (
@@ -271,13 +284,33 @@ export function CsvImportWizard() {
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--border-strong)] py-10 text-[var(--fg-secondary)] transition-colors hover:border-[var(--brand-primary)] hover:text-[var(--fg-primary)]"
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDragOver(true);
+            }}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+              setDragOver(true);
+            }}
+            onDragLeave={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              setDragOver(false);
+            }}
+            onDrop={onDropFile}
+            className={`flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-10 transition-colors hover:border-[var(--brand-primary)] hover:text-[var(--fg-primary)] ${
+              dragOver
+                ? 'border-[var(--brand-primary)] text-[var(--fg-primary)]'
+                : 'border-[var(--border-strong)] text-[var(--fg-secondary)]'
+            }`}
           >
             <Icon name="upload" size={24} ariaHidden />
             <span className="text-sm font-medium">
               {t('csvImport.upload.chooseFile', 'Choose a CSV or Excel file')}
             </span>
             <span className="text-xs text-[var(--fg-tertiary)]">
+              {t('csvImport.upload.dropHint', 'Or drop a file here')}
+              {' · '}
               {t('csvImport.upload.maxRows', 'Up to {{rows}} rows', {
                 rows: MAX_ROWS.toLocaleString(),
               })}
@@ -294,7 +327,11 @@ export function CsvImportWizard() {
               e.target.value = '';
             }}
           />
-          {parseError && <p className="text-sm text-[var(--danger)]">{parseError}</p>}
+          {parseError && (
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {parseError}
+            </p>
+          )}
         </div>
       )}
 

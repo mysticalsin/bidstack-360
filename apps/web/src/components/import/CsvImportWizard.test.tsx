@@ -656,4 +656,37 @@ describe('CsvImportWizard', () => {
     fireEvent.click(confirm);
     expect(hookMocks.mutate).toHaveBeenCalledTimes(1);
   });
+
+  function uploadTarget() {
+    return screen.getByRole('button', { name: /Choose a CSV or Excel file/ });
+  }
+
+  it('reads a CSV dropped on the upload target and opens mapping', async () => {
+    // WHY: the dashed target looks like a drop zone. A file dropped on it
+    // was ignored, so the only way in was the hidden file input. A dropped
+    // CSV must reach the same parser as Choose file, before any API call.
+    stubHooks();
+    render(<CsvImportWizard />);
+    const file = csvFile('name,domain\nAcme,acme.com');
+    fireEvent.drop(uploadTarget(), { dataTransfer: { files: [file] } });
+    await screen.findByText(/1 row\. Match each column/);
+    expect(screen.getByText('name')).toBeTruthy();
+    expect(screen.getByText('Acme')).toBeTruthy();
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+    expect(hookMocks.previewMutate).not.toHaveBeenCalled();
+  });
+
+  it('says so when a drop has no file, and stays on upload', async () => {
+    // WHY: a drop that is not a file used to do nothing. The target looked
+    // dead. The operator stays on upload and gets a sentence they can act on.
+    stubHooks();
+    render(<CsvImportWizard />);
+    fireEvent.drop(uploadTarget(), { dataTransfer: { files: [] } });
+    expect(await screen.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'Drop a CSV or Excel file.',
+    );
+    expect(screen.queryByText(/Match each column/)).toBeNull();
+    expect(hookMocks.mutate).not.toHaveBeenCalled();
+  });
 });
