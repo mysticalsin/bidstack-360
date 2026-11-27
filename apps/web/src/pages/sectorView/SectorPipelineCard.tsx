@@ -11,20 +11,22 @@ import { ErrorState } from '@/components/ui/StateMessages';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useAllOpportunityRows } from '@/hooks/useOpportunityRows';
 
+import { sectorPipelinePhase } from './sector-pipeline-read';
+
 export function SectorPipelineCard() {
   const { t } = useTranslation('crm');
   const rows = useAllOpportunityRows();
   const [now] = useState(() => Date.now());
-  const data = sectorPipeline(rows.data?.items ?? [], now);
+  // A missing payload is not an empty chart. Empty is only a settled read.
+  const phase = sectorPipelinePhase(rows);
+  const data = sectorPipeline(phase === 'ready' ? (rows.data?.items ?? []) : [], now);
 
   return (
     <Card className="p-4" data-testid="sector-pipeline-iso">
       <h2 className="mb-3 text-base font-semibold text-fg-primary">
         {t('sectorView.pipelineIsoTitle', 'Pipeline by sector')}
       </h2>
-      {rows.isLoading ? (
-        <p className="py-6 text-center text-sm text-fg-secondary">{t('sectorView.pipelineIsoLoading', 'Loading pipeline.')}</p>
-      ) : rows.isError ? (
+      {phase === 'failed' ? (
         <ErrorState
           title={t('sectorView.pipelineIsoError', 'Could not load pipeline')}
           action={
@@ -33,6 +35,10 @@ export function SectorPipelineCard() {
             </Button>
           }
         />
+      ) : phase === 'unread' ? (
+        <p className="py-6 text-center text-sm text-fg-secondary" role="status">
+          {t('sectorView.pipelineIsoUnread', 'Checking pipeline. The chart has not arrived.')}
+        </p>
       ) : (
         <>
           {rows.data && !rows.data.complete ? (
