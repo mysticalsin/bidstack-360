@@ -10,6 +10,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { formatDate, formatMoney } from '@/lib/format';
 import type { IntelPayload } from '@bidstack/shared';
 
+import { opportunityIntelHasRecord } from './opportunity-intel-sections';
+
 // ── tiny utility used by all financial rows ──────────────────────────────────
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -28,16 +30,8 @@ export function DataFreshnessRibbon({ intel }: { intel: IntelPayload }) {
   const { t } = useTranslation('crm');
   // Nothing has ever been pulled for this opportunity — naming Crunchbase/
   // LinkedIn/EU register here would claim sources that were never queried.
-  const hasIntel = Boolean(
-    intel.refreshedAt ||
-      intel.financial ||
-      intel.winPrediction ||
-      intel.hiring ||
-      intel.triggers?.length ||
-      intel.competitors?.length ||
-      intel.news?.length ||
-      intel.decisionUnit?.length,
-  );
+  // An all-null financial shell is not a pull.
+  const hasIntel = opportunityIntelHasRecord(intel);
 
   if (!hasIntel) {
     return (
