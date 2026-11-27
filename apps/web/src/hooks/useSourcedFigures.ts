@@ -7,6 +7,7 @@ import type { CompanyFieldOverrideKey, KeyNumber, ManualRevenueCurrency } from '
 import { api } from '@/lib/api';
 
 import { useAccountKeyNumbers } from './useAccountPositioning';
+import { sourcedFigureAmount } from './sourced-figure-amount';
 
 const enc = encodeURIComponent;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,11 +80,24 @@ export function useSourcedFigures(companyId: string | undefined): { revenue: Key
   };
 }
 
+function hasNamedCurrency(currency: string | null | undefined): currency is string {
+  return typeof currency === 'string' && currency.trim().length > 0;
+}
+
 /** Display text for a revenue or employees key number, or null when it has no value. */
 export function figureText(n: KeyNumber | null): string | null {
   if (!n || n.value == null) return null;
-  if (n.unit === 'money_micros') return fmtMoneyShort(n.value / 1_000_000, 'EUR');
-  if (n.unit === 'money') return fmtMoneyShort(n.value, n.currency ?? 'EUR');
+  if (n.unit === 'money_micros') {
+    // A code that is already on the figure stays on the compact label this
+    // function already printed. A missing code is grouped units, not euros.
+    if (hasNamedCurrency(n.currency)) return fmtMoneyShort(n.value / 1_000_000, 'EUR');
+    return sourcedFigureAmount(n.value);
+  }
+  if (n.unit === 'money') {
+    if (hasNamedCurrency(n.currency)) return fmtMoneyShort(n.value, n.currency);
+    if (!Number.isSafeInteger(n.value)) return 'Not a number';
+    return sourcedFigureAmount(n.value * 1_000_000);
+  }
   return Math.round(n.value).toLocaleString('en-GB');
 }
 
