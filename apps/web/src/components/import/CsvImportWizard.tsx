@@ -335,7 +335,8 @@ export function CsvImportWizard() {
                   <tr key={header} className="border-t border-[var(--border-subtle)]">
                     <td className="px-3 py-2 font-medium text-[var(--fg-primary)]">{header}</td>
                     <td className="max-w-[12rem] truncate px-3 py-2 text-[var(--fg-tertiary)]">
-                      {parsed.rows[0]?.[header] || '—'}
+                      {columnSample(parsed.rows, header) ||
+                        t('csvImport.map.sampleEmpty', 'Empty')}
                     </td>
                     <td className="px-3 py-2">
                       <select
@@ -505,6 +506,15 @@ export function CsvImportWizard() {
       )}
     </div>
   );
+}
+
+/** First filled cell. The map sample is one example of the column, so a blank opening cell must not hide a later account. */
+function columnSample(rows: Record<string, string>[], header: string): string {
+  for (const row of rows) {
+    const value = (row[header] ?? '').trim();
+    if (value) return value;
+  }
+  return '';
 }
 
 function StepHeader({ step }: { step: Step }) {
