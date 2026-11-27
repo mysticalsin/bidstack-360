@@ -4061,6 +4061,7 @@
     "history": "Governance record",
     "historyEmpty": "No gate decisions recorded yet.",
     "historyError": "Could not load the governance record.",
+    "historyUnread": "Checking the governance record. The record has not arrived.",
     "justification": "Gate justification",
     "justificationPlaceholder": "Justification (optional)",
     "lifecycle": "10-stage lifecycle & RACI",

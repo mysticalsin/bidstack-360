@@ -34,6 +34,7 @@ import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useGateDecisions, useSaveClassification, useRecordGate } from '@/hooks/useBidGovernance';
+import { gateRecordPhase } from './gate-record-read';
 
 /** The saved assessment on the opportunity, if it has one. */
 export interface SavedClassification {
@@ -174,6 +175,13 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
   const saveClassification = useSaveClassification(opportunityId);
   const recordGate = useRecordGate(opportunityId);
   const gateDecisions = useGateDecisions(opportunityId);
+  const gatePhase = gateRecordPhase({
+    opportunityId,
+    data: gateDecisions.data,
+    isLoading: gateDecisions.isLoading,
+    isError: gateDecisions.isError,
+    status: gateDecisions.status,
+  });
 
   const onSave = () => {
     saveClassification.mutate(
@@ -468,19 +476,26 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 {t('bidClass.history', 'Governance record')}
               </p>
-              {gateDecisions.isLoading ? (
+              {gatePhase === 'loading' ? (
                 <div className="h-4 w-40 animate-pulse rounded bg-[var(--surface-sunken)]" />
-              ) : gateDecisions.isError ? (
+              ) : gatePhase === 'unread' ? (
+                <p role="status" className="text-xs text-[var(--fg-secondary)]">
+                  {t(
+                    'bidClass.historyUnread',
+                    'Checking the governance record. The record has not arrived.',
+                  )}
+                </p>
+              ) : gatePhase === 'failed' ? (
                 <p role="alert" className="text-xs text-[var(--danger)]">
                   {t('bidClass.historyError', 'Could not load the governance record.')}
                 </p>
-              ) : (gateDecisions.data?.items.length ?? 0) === 0 ? (
+              ) : gatePhase === 'empty' ? (
                 <p className="text-xs text-[var(--fg-tertiary)]">
                   {t('bidClass.historyEmpty', 'No gate decisions recorded yet.')}
                 </p>
-              ) : (
+              ) : gatePhase === 'ready' ? (
                 <ul className="space-y-1">
-                  {gateDecisions.data!.items.slice(0, 8).map((d) => (
+                  {(gateDecisions.data?.items ?? []).slice(0, 8).map((d) => (
                     <li key={d.id} className="flex flex-wrap items-center gap-2 text-xs">
                       <span className="font-medium text-[var(--fg-primary)]">
                         {d.gate === HANDOFF_GATE
@@ -506,7 +521,7 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
             </div>
           </div>
         ) : (

@@ -31,15 +31,23 @@ vi.mock('@/hooks/useCapabilities', () => capabilitiesMocks);
 
 const governanceMocks = vi.hoisted(() => ({
   gateItems: [] as Record<string, unknown>[],
+  gateRead: null as null | {
+    data?: { items: Record<string, unknown>[] };
+    isLoading?: boolean;
+    isError?: boolean;
+    status?: string;
+  },
   saveMutate: vi.fn(),
   recordMutate: vi.fn(),
 }));
 vi.mock('@/hooks/useBidGovernance', () => ({
-  useGateDecisions: () => ({
-    data: { items: governanceMocks.gateItems },
-    isLoading: false,
-    isError: false,
-  }),
+  useGateDecisions: () =>
+    governanceMocks.gateRead ?? {
+      data: { items: governanceMocks.gateItems },
+      isLoading: false,
+      isError: false,
+      status: 'success' as const,
+    },
   useSaveClassification: () => ({ mutate: governanceMocks.saveMutate, isPending: false }),
   useRecordGate: () => ({ mutate: governanceMocks.recordMutate, isPending: false }),
 }));
@@ -71,6 +79,7 @@ describe('BidGovernancePanel', () => {
   beforeEach(() => {
     capabilitiesMocks.useHasPermission.mockReturnValue(true);
     governanceMocks.gateItems = [];
+    governanceMocks.gateRead = null;
   });
   afterEach(() => {
     cleanup();
@@ -184,5 +193,45 @@ describe('BidGovernancePanel', () => {
   it('shows an empty state when nothing has been signed off yet', () => {
     renderPanel({ bidClass: 'C1', fteEstimate: 3, commitmentLevel: 'low' });
     expect(screen.getByText('No gate decisions recorded yet.')).toBeTruthy();
+  });
+
+  it('does not call a paused governance record empty', () => {
+    // WHY: a paused first read has isLoading false and no items. The panel
+    // said no gate decisions were recorded, while the record has not arrived.
+    governanceMocks.gateRead = {
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      status: 'pending',
+    };
+    renderPanel({ bidClass: 'C1', fteEstimate: 3, commitmentLevel: 'low' });
+    expect(screen.getByText('Checking the governance record. The record has not arrived.')).toBeTruthy();
+    expect(screen.queryByText('No gate decisions recorded yet.')).toBeNull();
+  });
+
+  it('does not call an in-flight governance record empty', () => {
+    // WHY: a slow read is not a bid with no sign-off. The empty line belongs
+    // to a record that arrived with nothing in it.
+    governanceMocks.gateRead = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      status: 'pending',
+    };
+    renderPanel({ bidClass: 'C1', fteEstimate: 3, commitmentLevel: 'low' });
+    expect(screen.queryByText('No gate decisions recorded yet.')).toBeNull();
+  });
+
+  it('does not call a failed governance record empty', () => {
+    // WHY: a failed read is not evidence that nobody has signed a gate.
+    governanceMocks.gateRead = {
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      status: 'error',
+    };
+    renderPanel({ bidClass: 'C1', fteEstimate: 3, commitmentLevel: 'low' });
+    expect(screen.getByRole('alert').textContent).toBe('Could not load the governance record.');
+    expect(screen.queryByText('No gate decisions recorded yet.')).toBeNull();
   });
 });
