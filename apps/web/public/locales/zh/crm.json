@@ -247,6 +247,7 @@
   "tasks": {
     "title": "任务",
     "subtitle": "{{count}} 个活动跟进。",
+    "subtitleOne": "1 个活动跟进。",
     "actions": {
       "exportCsv": "导出 CSV"
     },

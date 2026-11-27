@@ -256,6 +256,7 @@
     "relatedTo": "Relacionado con",
     "addNote": "Agregar nota",
     "subtitle": "{{count}} seguimientos activos.",
+    "subtitleOne": "1 seguimiento activo.",
     "actions": {
       "exportCsv": "Exportar CSV"
     },

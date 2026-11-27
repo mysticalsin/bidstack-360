@@ -247,6 +247,7 @@
   "tasks": {
     "title": "Tasks",
     "subtitle": "{{count}} active follow-ups.",
+    "subtitleOne": "1 active follow-up.",
     "actions": {
       "exportCsv": "Export CSV"
     },

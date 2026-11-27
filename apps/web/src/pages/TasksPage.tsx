@@ -72,6 +72,12 @@ export function TasksPage() {
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
   });
+  // Count loaded rows that are still open. Skip the sentence until the
+  // read has landed, so a loading or failed page does not print a zero.
+  const activeCount =
+    !isLoading && !isError && data
+      ? data.items.filter((task) => task.status !== 'done').length
+      : null;
   // useTransition keeps the filter-chip click snappy: the chip flips
   // immediately, the list re-filters as a non-urgent update so a slow
   // render won't block the press feedback.
@@ -193,11 +199,13 @@ export function TasksPage() {
           <h1 className="text-2xl font-bold text-[var(--fg-primary)] tracking-tight">
             {t('tasks.title', 'Tasks')}
           </h1>
-          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-            {t('tasks.subtitle', '{{count}} active follow-ups.', {
-              count: data?.items.length ?? 0,
-            })}
-          </p>
+          {activeCount !== null ? (
+            <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+              {activeCount === 1
+                ? t('tasks.subtitleOne', '1 active follow-up.')
+                : t('tasks.subtitle', '{{count}} active follow-ups.', { count: activeCount })}
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <Button
