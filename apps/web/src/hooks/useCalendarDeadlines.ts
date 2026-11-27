@@ -12,7 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
-export type CalendarDeadlineKind = 'opportunity' | 'proposal';
+export type CalendarDeadlineKind = 'opportunity' | 'proposal' | 'follow_up';
 
 export interface CalendarDeadline {
   kind: CalendarDeadlineKind;

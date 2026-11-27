@@ -72,11 +72,19 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
   const { className, filled, overdue, dueToday } = chipTone(deadline.dueDate);
 
   const isOpp = deadline.kind === 'opportunity';
+  const isFollowUp = deadline.kind === 'follow_up';
   const label =
     isOpp && deadline.customer ? `${deadline.customer} · ${deadline.name}` : deadline.name;
   const kindLabel = isOpp
     ? t('calendar.deadlineKindOpportunity', 'Bid deadline')
-    : t('calendar.deadlineKindProposal', 'Proposal deadline');
+    : isFollowUp
+      ? t('calendar.deadlineKindFollowUp', 'Follow-up')
+      : t('calendar.deadlineKindProposal', 'Proposal deadline');
+  const href = isOpp
+    ? `/opportunities/${deadline.id}`
+    : isFollowUp
+      ? `/tasks/${deadline.id}`
+      : `/proposals/${deadline.id}`;
   const stateSuffix = overdue
     ? t('calendar.deadlineOverdueSuffix', ', overdue')
     : dueToday
@@ -85,7 +93,7 @@ function DeadlineChip({ deadline }: { deadline: CalendarDeadline }) {
 
   return (
     <Link
-      to={isOpp ? `/opportunities/${deadline.id}` : `/proposals/${deadline.id}`}
+      to={href}
       title={`${kindLabel}: ${label}`}
       aria-label={
         `${kindLabel}: ${label}, ` +

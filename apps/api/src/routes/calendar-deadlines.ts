@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
 import { canViewAllRfps } from '../lib/rfp-visibility.js';
+import { followUpsInWindow, type FollowUpRow } from './calendar-follow-ups.js';
 
 const DeadlineQuery = z.object({
   /** Inclusive start of the window (date-only — dueDate columns are @db.Date). */
@@ -25,7 +26,7 @@ const DeadlineQuery = z.object({
 });
 
 const DeadlineItem = z.object({
-  kind: z.enum(['opportunity', 'proposal']),
+  kind: z.enum(['opportunity', 'proposal', 'follow_up']),
   id: z.string().uuid(),
   name: z.string(),
   /** Opportunity customer — null for proposals. */
@@ -56,7 +57,8 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
         throw server.httpErrors.badRequest('`from` must be before `to`');
       }
 
-      const [opportunities, proposals] = await Promise.all([
+      const canReadTasks = await server.hasPermission(req, 'tasks:read');
+      const [opportunities, proposals, taskRows] = await Promise.all([
         prisma.opportunity.findMany({
           where: {
             orgId,
@@ -84,6 +86,19 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
           take: 200,
           select: { id: true, name: true, dueDate: true },
         }),
+        canReadTasks
+          ? prisma.task.findMany({
+              where: {
+                orgId,
+                deletedAt: null,
+                status: { not: 'done' },
+                dueDate: { gte: from, lt: to },
+              },
+              orderBy: [{ dueDate: 'asc' }, { title: 'asc' }],
+              take: 200,
+              select: { id: true, title: true, status: true, dueDate: true },
+            })
+          : Promise.resolve([] as FollowUpRow[]),
       ]);
 
       const items = [
@@ -104,6 +119,7 @@ export const calendarDeadlineRoutes: FastifyPluginAsyncZod = async (server) => {
           code: null,
           dueDate: toDateOnly(p.dueDate as Date),
         })),
+        ...followUpsInWindow(taskRows, { from: req.query.from, to: req.query.to }),
       ].sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.name.localeCompare(b.name));
 
       return { items };

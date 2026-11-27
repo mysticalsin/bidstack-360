@@ -153,6 +153,34 @@ describe('DeadlinesRow', () => {
     expect(await screen.findByRole('link', { name: /overdue/ })).toBeTruthy();
   });
 
+  // WHY: demo follow-ups are due inside the visible week while bid dates are
+  // not. The chip has to sit on that day and open the follow-up, and it must
+  // not introduce a Google or Microsoft label.
+  it('places an open follow-up on its day instead of leaving that day empty', async () => {
+    const id = '44444444-4444-4444-8444-444444444444';
+    apiMock.mockResolvedValue({
+      items: [
+        {
+          kind: 'follow_up',
+          id,
+          name: 'Prepare pricing annex for IKEA',
+          customer: null,
+          code: null,
+          dueDate: '2026-03-14',
+        },
+      ],
+    });
+
+    const { container } = renderRow();
+
+    const chip = await screen.findByRole('link', { name: /Follow-up: Prepare pricing annex for IKEA/ });
+    expect(chip.getAttribute('href')).toBe(`/tasks/${id}`);
+    const saturday = container.querySelector('[data-date="2026-03-14"]');
+    expect(saturday?.contains(chip)).toBe(true);
+    expect(screen.queryByText('No deadlines')).toBeNull();
+    expect(chip.textContent).not.toMatch(/Google|Microsoft/);
+  });
+
   it('shows an empty state when the week has no deadlines', async () => {
     apiMock.mockResolvedValue({ items: [] });
 
