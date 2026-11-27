@@ -211,6 +211,19 @@ export function ProposalsPage() {
     () => selectProposals(items, input, ownerLabel),
     [items, input, ownerLabel],
   );
+  // The previous stage's window is not this stage. Demo writes a proposal in
+  // every stage. Filtering that cache to zero announced "0 proposals" while
+  // the stage's own request was still in flight (Draft to Won hid the winning
+  // bid). A stage or search that itself returns nothing is a filter miss, not
+  // an empty workspace.
+  const waitingOnThisStage =
+    windowQuery.isPlaceholderData && input.status !== 'all' && selection.rows.length === 0;
+  const narrowed =
+    input.status !== 'all' ||
+    input.owner !== 'all' ||
+    input.dueWindow !== 'all' ||
+    input.compliance !== 'all' ||
+    input.q !== '';
 
   // A hand-edited `?page=9` (or a bookmark taken before rows were archived)
   // would otherwise render an empty body. Every in-app filter write already
@@ -261,12 +274,12 @@ export function ProposalsPage() {
 
       {/* sr-only live region — announces the filtered count to AT. */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {showSkeleton
+        {showSkeleton || waitingOnThisStage
           ? ''
           : t('proposals.resultCount', '{{count}} proposals', { count: selection.total })}
       </p>
 
-      {truncated && (
+      {truncated && !waitingOnThisStage && (
         <p className="text-xs text-fg-tertiary" role="status">
           {t(
             'proposals.truncated',
@@ -282,7 +295,7 @@ export function ProposalsPage() {
         rows={selection.rows}
         total={selection.total}
         getRowId={(row) => row.id}
-        loading={showSpinner}
+        loading={showSpinner && !waitingOnThisStage}
         tabs={{
           id: 'status',
           allLabel: t('proposals.allStages', 'All stages'),
@@ -294,7 +307,13 @@ export function ProposalsPage() {
         facets={facets}
         leadingActions={<ProposalSearch value={query.q} onChange={query.setQ} />}
         onRowClick={(row) => navigate(`/proposals/${row.id}`)}
-        empty={showSkeleton ? <LoadingRows /> : <ProposalsEmpty filtered={items.length > 0} />}
+        empty={
+          showSkeleton || waitingOnThisStage ? (
+            <LoadingRows />
+          ) : (
+            <ProposalsEmpty filtered={narrowed} />
+          )
+        }
         // The table's own scroller is what makes the header sticky, so it needs a
         // bounded height — the page itself scrolls with the shell. Sizing, not
         // geometry: the design-law rule scopes to radius/shadow/spacing only.
