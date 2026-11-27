@@ -22,6 +22,7 @@ import {
   segmentMatches,
   sortRows,
   titleCase,
+  utcDay,
   type AccountSegmentKey,
   type SortKey,
 } from './accountUtils';
@@ -63,6 +64,7 @@ export function AccountsAllSegment() {
   const [page, setPage] = useState(0);
   const syncError = autopopulate.error instanceof Error ? autopopulate.error.message : null;
 
+  const todayUtc = useMemo(() => utcDay(), []);
   const allRows = useMemo(() => {
     if (!dashboard.data) return [];
     // Hide synthetic E2E/test-fixture accounts (SCOPE-*, KAMDraft-*, E2E …) from
@@ -70,8 +72,8 @@ export function AccountsAllSegment() {
     // org should not surface test residue; fresh orgs seed none.
     return dashboard.data.companies
       .filter((company) => !isSyntheticAccountName(company.name))
-      .map((company) => deriveAccount(company, dashboard.data!.deals));
-  }, [dashboard.data]);
+      .map((company) => deriveAccount(company, dashboard.data!.deals, todayUtc));
+  }, [dashboard.data, todayUtc]);
 
   const leverageIds = useMemo(
     () => new Set((leverage.data?.items ?? []).map((item) => item.companyId)),
@@ -139,6 +141,7 @@ export function AccountsAllSegment() {
     () => ({
       totalPipeline: rows.reduce((acc, r) => acc + r.pipelineMicros, 0),
       totalOpen: rows.reduce((acc, r) => acc + r.openDeals, 0),
+      pastClose: rows.reduce((acc, r) => acc + r.pastCloseDeals, 0),
       logoCoverage: rows.filter((r) => Boolean(r.company.logo?.url)).length,
       enrichedAccounts: rows.filter((r) => r.company.source === 'verified_data').length,
       techAccounts: rows.filter((r) => (r.company.technicalStack?.length ?? 0) > 0).length,
@@ -236,7 +239,8 @@ export function AccountsAllSegment() {
     );
   }
 
-  const { totalPipeline, totalOpen, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } = summaryStats;
+  const { totalPipeline, totalOpen, pastClose, logoCoverage, enrichedAccounts, techAccounts, avgCoverage } =
+    summaryStats;
   // Raw payload size (pre synthetic-name filter) — reflects the server cap
   // directly, so the caveat tracks the snapshot bound rather than demo-org noise.
   const loadedAccountCount = dashboard.data.companies.length;
@@ -280,7 +284,22 @@ export function AccountsAllSegment() {
                 : t('accounts.summary.companyCount_other', '{{count}} companies', {
                     count: rows.length,
                   })}{' '}
-              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
+              · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })}
+              {pastClose > 0 ? (
+                <>
+                  {' · '}
+                  <span>
+                    {pastClose === 1
+                      ? t('accounts.summary.pastClose_one', '{{count}} past close', {
+                          count: pastClose,
+                        })
+                      : t('accounts.summary.pastClose_other', '{{count}} past close', {
+                          count: pastClose,
+                        })}
+                  </span>
+                </>
+              ) : null}
+              {' · '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
                 amount: formatMoneyMicros(totalPipeline, 'EUR'),
               })}
@@ -371,7 +390,17 @@ export function AccountsAllSegment() {
         <StatTile
           label={t('accounts.stats.openDeals.label', 'Open deals')}
           value={totalOpen.toLocaleString()}
-          sublabel={t('accounts.stats.openDeals.detail', 'External CRM pipeline')}
+          sublabel={
+            pastClose === 1
+              ? t('accounts.stats.openDeals.pastClose_one', '{{count}} past close', {
+                  count: pastClose,
+                })
+              : pastClose > 1
+                ? t('accounts.stats.openDeals.pastClose_other', '{{count}} past close', {
+                    count: pastClose,
+                  })
+                : t('accounts.stats.openDeals.detail', 'External CRM pipeline')
+          }
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}

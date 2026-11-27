@@ -34,7 +34,7 @@ export const AccountCard = memo(function AccountCard({
 }) {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
-  const { company, openDeals, pipelineMicros, totalDeals, health } = row;
+  const { company, openDeals, pastCloseDeals, pipelineMicros, totalDeals, health } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
   const rankedTech = rankedTechFor(company);
@@ -58,9 +58,21 @@ export const AccountCard = memo(function AccountCard({
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
-          aria-label={t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
-            name: company.name,
-          })}
+          aria-label={
+            pastCloseDeals > 0
+              ? t(
+                  'account.openCockpitPastCloseAria',
+                  'Open {{name}} customer cockpit, {{count}} open {{deals}} past close',
+                  {
+                    name: company.name,
+                    count: pastCloseDeals,
+                    deals: pastCloseDeals === 1 ? 'deal' : 'deals',
+                  },
+                )
+              : t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
+                  name: company.name,
+                })
+          }
         >
           {imageUrl ? (
             <img
@@ -131,6 +143,18 @@ export const AccountCard = memo(function AccountCard({
               <dt>{t('account.openDeals', 'Open deals')}</dt>
               <dd>
                 <AnimatedMetric value={openDeals.toLocaleString()} />
+                {pastCloseDeals > 0 ? (
+                  <span
+                    className="mt-0.5 block text-xs font-semibold text-[var(--danger)]"
+                    data-testid="account-card-past-close"
+                  >
+                    {pastCloseDeals === 1
+                      ? t('account.pastClose_one', '{{count}} past close', { count: pastCloseDeals })
+                      : t('account.pastClose_other', '{{count}} past close', {
+                          count: pastCloseDeals,
+                        })}
+                  </span>
+                ) : null}
               </dd>
             </div>
             <div>

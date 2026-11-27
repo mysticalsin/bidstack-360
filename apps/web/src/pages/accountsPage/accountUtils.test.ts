@@ -122,3 +122,37 @@ describe('topTechFor', () => {
     expect(topTechFor(company())).toEqual([]);
   });
 });
+
+describe('deriveAccount past close', () => {
+  // WHY: the demo book leaves open bids on the calendar after their close day
+  // (CI Financial 2026-07-22, Rush 2026-06-30). The All-accounts card still
+  // folds that money into "open" pipeline and a Strong/Good health band.
+  // A previous UTC day is past close. The close day itself, a missing date,
+  // and a won or lost deal are not — those are not an open miss.
+  const today = '2026-11-25';
+
+  it('counts an open deal whose close date is a previous UTC day', () => {
+    const row = deriveAccount(
+      company(),
+      [deal({ closeDate: '2026-07-22', stage: 'proposal' })],
+      today,
+    );
+    expect(row.openDeals).toBe(1);
+    expect(row.pastCloseDeals).toBe(1);
+  });
+
+  it('does not count a deal that closes today, a deal with no date, or a decided deal', () => {
+    const row = deriveAccount(
+      company(),
+      [
+        deal({ id: 'due-today', closeDate: today, stage: 'proposal' }),
+        deal({ id: 'no-date', closeDate: null, stage: 'meeting' }),
+        deal({ id: 'won', closeDate: '2026-04-28', stage: 'closed_won' }),
+        deal({ id: 'lost', closeDate: '2026-04-12', stage: 'closed_lost' }),
+      ],
+      today,
+    );
+    expect(row.openDeals).toBe(2);
+    expect(row.pastCloseDeals).toBe(0);
+  });
+});

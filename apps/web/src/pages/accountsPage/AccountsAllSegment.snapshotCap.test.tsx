@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CrmCompany } from '@bidstack/shared';
+import type { CrmCompany, CrmDeal } from '@bidstack/shared';
 
 import { AccountsAllSegment } from './AccountsAllSegment';
 
@@ -128,16 +128,34 @@ function company(i: number): CrmCompany {
   } as CrmCompany;
 }
 
-function setDashboard(companyCount: number) {
+function setDashboard(companyCount: number, deals: CrmDeal[] = []) {
   dashboardState.current = {
     data: {
       companies: Array.from({ length: companyCount }, (_v, i) => company(i)),
-      deals: [],
+      deals,
       providerHealth: [],
     },
     isLoading: false,
     isError: false,
     error: null,
+  };
+}
+
+function deal(closeDate: string): CrmDeal {
+  return {
+    id: `deal-${closeDate}`,
+    source: 'external_crm',
+    companyId: 'c-0',
+    companyName: 'Acme 0',
+    name: 'Modernization',
+    stage: 'proposal',
+    amountMicros: 1_240_000_000_000,
+    currencyCode: 'EUR',
+    probability: 65,
+    closeDate,
+    ownerId: null,
+    ownerName: null,
+    updatedAt: '2026-01-01T00:00:00.000Z',
   };
 }
 
@@ -222,5 +240,34 @@ describe('AccountsAllSegment snapshot-cap honesty', () => {
     expect(
       screen.getByRole('link', { name: /import accounts from csv/i }),
     ).toBeTruthy();
+  });
+});
+
+describe('AccountsAllSegment past close', () => {
+  beforeEach(() => {
+    dashboardState.current = null;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // WHY: the cards are mocked here. The list header and the open-deals tile
+  // are the portfolio totals a salesperson reads before the cards. On the demo
+  // book every open bid is already past its close day, and those two lines
+  // still read as a live book. A close date years ahead must stay quiet.
+  it('says how many open deals in the loaded view are already past close', () => {
+    setDashboard(1, [deal('2020-01-01')]);
+    renderSegment();
+
+    expect(screen.getAllByText('1 past close')).toHaveLength(2);
+  });
+
+  it('stays quiet when every open deal closes on a later day', () => {
+    setDashboard(1, [deal('2099-01-01')]);
+    renderSegment();
+
+    expect(screen.queryByText(/past close/i)).toBeNull();
+    expect(screen.getByText('External CRM pipeline')).toBeTruthy();
   });
 });
