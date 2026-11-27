@@ -40,6 +40,9 @@ describe('FinancialsPanel table cells', () => {
     // R&D, acquisitions and headcount are null in this filing.
     expect(missing).toHaveLength(3);
     for (const cell of missing) expect(cell.getAttribute('title')).toBe('Not disclosed in ESEF (filings.xbrl.org)');
+    expect(within(row).getByRole('link', { name: 'ESEF (filings.xbrl.org)' }).getAttribute('href')).toBe(
+      'https://filings.xbrl.org/r-2025',
+    );
     expect(row.textContent).not.toMatch(/(^|\s)-(\s|$)/);
   });
 
@@ -49,5 +52,37 @@ describe('FinancialsPanel table cells', () => {
     expect(within(row).getByText(fmtMoney(29_900e6, 'EUR'))).toBeTruthy();
     expect(fmtMoney(29_900e6, 'EUR')).toBe('EUR 29.9bn');
     expect(row.textContent).not.toContain('30bn EUR');
+  });
+
+  it('does not present an empty sample book as a filing that was checked', () => {
+    // WHY: demo seeds store fixture years and point sourceUrl at a homepage.
+    // Empty lines then said "Not disclosed" and the source was a link, so the
+    // sample book read as a filing someone had checked.
+    render(
+      <FinancialsPanel
+        f={{
+          ...fin,
+          sample: true,
+          years: [
+            {
+              ...year,
+              source: 'Sample data',
+              sourceUrl: 'https://example.com/not-a-filing',
+              sample: true,
+              rnd: null,
+              acquisitions: null,
+              headcount: null,
+            },
+          ],
+        }}
+      />,
+    );
+    const row = screen.getByTestId('intel-fin-year-2025');
+    expect(within(row).queryByRole('link')).toBeNull();
+    expect(row.textContent).not.toMatch(/Not disclosed/i);
+    expect(within(row).getAllByText('Not in sample')).toHaveLength(3);
+    expect(within(row).getByText('Sample')).toBeTruthy();
+    expect(row.textContent).toContain(fmtMoney(29_900e6, 'EUR'));
+    expect(row.textContent).not.toContain('\u2014');
   });
 });
