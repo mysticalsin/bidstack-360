@@ -182,6 +182,13 @@ function MessageDrawer({ id }: { id: string }) {
   const [requestId, setRequestId] = useState(newRequestId);
   const [replayed, setReplayed] = useState(false);
   const d = detail.data;
+  // A read that has not arrived is not a missing message. A paused read has
+  // no payload and isLoading is false, so the failure sentence would say this
+  // message could not be loaded. An in-flight read is the same unread detail.
+  // A failed read with no payload keeps the error. A later failure keeps a
+  // body already on screen.
+  const detailHold: 'unread' | 'failed' | 'ready' =
+    d == null ? (detail.isError ? 'failed' : 'unread') : 'ready';
 
   const copyCurl = async () => {
     if (!d) return;
@@ -258,15 +265,15 @@ function MessageDrawer({ id }: { id: string }) {
       <p aria-live="polite" className="mb-3 text-sm text-[var(--fg-secondary)] empty:hidden">
         {announce}
       </p>
-      {detail.isLoading ? (
-        <p className="text-sm text-[var(--fg-secondary)]">
-          {t('webhooks.log.loadingDetail', 'Loading attempts…')}
+      {detailHold === 'unread' ? (
+        <p role="status" aria-busy="true" className="text-sm text-[var(--fg-secondary)]">
+          {t('webhooks.log.detailChecking', 'Checking this message. It has not arrived.')}
         </p>
-      ) : detail.isError || !d ? (
+      ) : detailHold === 'failed' ? (
         <p role="alert" className="text-sm text-[var(--error-fg)]">
           {t('webhooks.log.detailError', 'Could not load this message.')}
         </p>
-      ) : (
+      ) : d ? (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <StatusPill tone={TONE[d.message.status]}>{statusLabel(d.message.status)}</StatusPill>
@@ -333,7 +340,7 @@ function MessageDrawer({ id }: { id: string }) {
             ))}
           </ol>
         </div>
-      )}
+      ) : null}
     </SheetContent>
   );
 }
