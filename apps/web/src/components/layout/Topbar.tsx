@@ -8,7 +8,8 @@ import { useJarvisStore } from '@/components/command/jarvisStore';
 import { useHelpDrawer } from '@/components/help/useHelpDrawer';
 import { Icon } from '@/components/ui/Icon';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { useSignOut, useUser, useRole } from '@/lib/auth';
+import { useAuth, useSignOut, useUser, useRole } from '@/lib/auth';
+import { sessionBannerIdentity } from './session-banner';
 import { useThemeStore } from '@/stores/theme';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useUiStore } from '@/stores/ui';
@@ -83,17 +84,28 @@ export function Topbar() {
   const themeLabel = t(theme === 'dark' ? 'topbar.switchToLight' : 'topbar.switchToDark', {
     defaultValue: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`,
   });
+  const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useSignOut();
   const navigate = useNavigate();
   const { role } = useRole();
+  const session = sessionBannerIdentity({
+    signedIn: isSignedIn,
+    fullName: user?.fullName,
+    email: user?.primaryEmailAddress?.emailAddress,
+    role,
+    guest: t('app.guest', 'Guest'),
+    signedInNoName: t('app.signedIn', 'Signed in'),
+    notSignedIn: t('app.notSignedIn', 'Not signed in'),
+    noEmail: t('app.noEmail', 'No email on file'),
+  });
   const openHelp = useHelpDrawer((s) => s.setOpen);
   const openJarvis = useJarvisStore((s) => s.openJarvis);
   const mobileNavOpen = useUiStore((s) => s.mobileNavOpen);
   const toggleMobileNav = useUiStore((s) => s.toggleMobileNav);
   const startTour = useOnboardingStore((s) => s.startTour);
 
-  const seed = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Guest';
+  const seed = session.name;
 
   return (
     <header className="topbar" role="banner">
@@ -178,14 +190,14 @@ export function Topbar() {
       <div className="tb-user" title={user?.primaryEmailAddress?.emailAddress ?? ''}>
         <Avatar seed={seed} size={32} decorative className="av" />
         <div className="who">
-          <div className="name">{user?.fullName ?? t('app.guest', 'Guest')}</div>
+          <div className="name">{session.name}</div>
           <div className="role">
-            {role ? (
+            {session.role ? (
               <span className="mr-1.5 inline-flex items-center rounded border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                {role}
+                {session.role}
               </span>
             ) : null}
-            {user?.primaryEmailAddress?.emailAddress ?? t('app.notSignedIn', 'Not signed in')}
+            {session.detail}
           </div>
         </div>
         {clerkActive && (

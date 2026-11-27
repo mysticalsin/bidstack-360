@@ -267,7 +267,8 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
     cb?.();
   }, []);
 
-  const email = typeof window !== 'undefined' ? localStorage.getItem(DEMO_EMAIL_KEY) : null;
+  const storedEmail = typeof window !== 'undefined' ? localStorage.getItem(DEMO_EMAIL_KEY) : null;
+  const email = storedEmail?.trim() ? storedEmail.trim() : null;
 
   return (
     <AuthContext.Provider
@@ -279,11 +280,11 @@ function DemoAuthProvider({ children }: { children: ReactNode }) {
               id: 'demo-user',
               firstName: null,
               lastName: null,
-              fullName: email ?? 'Demo User',
+              fullName: email,
               primaryEmailAddress: email ? { emailAddress: email } : null,
             }
           : null,
-        role: 'admin',
+        role: signedIn ? 'admin' : null,
         signIn,
         signOut,
       }}

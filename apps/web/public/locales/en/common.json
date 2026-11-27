@@ -3,7 +3,9 @@
     "name": "Polo PreSales",
     "tagline": "Mantu · Bid & presales",
     "guest": "Guest",
-    "notSignedIn": "Not signed in"
+    "signedIn": "Signed in",
+    "notSignedIn": "Not signed in",
+    "noEmail": "No email on file"
   },
   "nav": {
     "primary": "Primary navigation",

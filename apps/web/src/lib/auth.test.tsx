@@ -21,10 +21,12 @@ import { useEffect, type ReactNode } from 'react';
 
 import {
   AuthProvider,
+  DEMO_EMAIL_KEY,
   DEMO_SIGNED_OUT_KEY,
   DEMO_TOKEN_KEY,
   isTransientMeFailure,
   useAuth,
+  useRole,
   useSignOut,
   useUser,
 } from './auth';
@@ -120,12 +122,15 @@ afterEach(() => {
 function Probe() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
+  const { role } = useRole();
   const { signOut } = useSignOut();
   return (
     <div data-testid="probe">
       <span data-testid="loaded">{String(isLoaded)}</span>
       <span data-testid="signed-in">{String(isSignedIn)}</span>
       <span data-testid="email">{user?.primaryEmailAddress?.emailAddress ?? 'none'}</span>
+      <span data-testid="name">{user?.fullName ?? 'none'}</span>
+      <span data-testid="role">{role ?? 'none'}</span>
       <button type="button" onClick={() => signOut()}>
         Sign out
       </button>
@@ -263,6 +268,53 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('does not invent a person or keep admin when the demo session has no email and then signs out', () => {
+    // WHY: the session banner reads fullName and role straight off this
+    // provider. An empty demo sign-in was named Demo User and the email line
+    // said Not signed in. Sign-out cleared the user and left role admin, so
+    // the same banner still wore an admin chip on an empty session.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ ok: true })));
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('name').textContent).toBe('none');
+    expect(screen.getByTestId('email').textContent).toBe('none');
+    expect(screen.getByTestId('role').textContent).toBe('admin');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
+    expect(screen.getByTestId('name').textContent).toBe('none');
+    expect(screen.getByTestId('role').textContent).toBe('none');
+    expect(localStorage.getItem(DEMO_EMAIL_KEY)).toBeNull();
+  });
+
+  it('keeps the stored demo email and admin role while that session is signed in', () => {
+    // WHY: dropping the invented name must not drop a real demo email, and
+    // the visitor is still the admin of their own demo workspace.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo-token-abc');
+    localStorage.setItem(DEMO_EMAIL_KEY, '  ada.visitor@example.test  ');
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByTestId('signed-in').textContent).toBe('true');
+    expect(screen.getByTestId('email').textContent).toBe('ada.visitor@example.test');
+    expect(screen.getByTestId('name').textContent).toBe('ada.visitor@example.test');
+    expect(screen.getByTestId('role').textContent).toBe('admin');
   });
 });
 
