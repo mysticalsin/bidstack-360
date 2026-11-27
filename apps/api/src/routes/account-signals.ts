@@ -27,13 +27,12 @@ import {
 import { canReadAccount } from '../lib/account-access.js';
 import { applyCompanyScope, getAccessScope } from '../lib/access-scope.js';
 import { visibleMeetingWhere } from '../meeting-intel/access.js';
+import { dealTimelineMarks } from '../services/account-signals/deal-timeline.js';
 import {
-  closedAtOf,
   groupMap,
   loadMomentumInputs,
   momentumFor,
   OPP_SELECT,
-  recordedOutcome,
   sourceStatus,
 } from '../services/account-signals/load.js';
 import { companiesWithLiveSignals, hideSampleWhere } from '../services/account-signals/live-signals.js';
@@ -116,7 +115,11 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           orderBy: { heldAt: 'desc' },
           take: 200,
         }),
-        prisma.opportunity.findMany({ where: { orgId, companyId: { in: ids }, deletedAt: null }, select: OPP_SELECT, take: 500 }),
+        prisma.opportunity.findMany({
+          where: { orgId, companyId: { in: ids }, deletedAt: null },
+          select: { ...OPP_SELECT, dueDate: true },
+          take: 500,
+        }),
         prisma.bidOpportunity.findMany({
           where: { orgId, deletedAt: null, buyer: { contains: escapeLike(company.name), mode: 'insensitive' }, OR: [{ importedAt: { gte: from } }, { dueDate: { gte: from } }] },
           select: { id: true, title: true, status: true, dueDate: true, importedAt: true, url: true, estimatedValueMicros: true },
@@ -148,16 +151,7 @@ export const accountSignalsRoutes: FastifyPluginAsyncZod = async (server) => {
           sample: false,
         });
       }
-      for (const o of opps) {
-        if (o.createdAt >= from) {
-          push({ id: `op:${o.id}:open`, at: o.createdAt.toISOString(), lane: 'ours', category: 'deal', title: `Deal opened: ${o.name}`, summary: `Stage ${o.stage.replace(/_/g, ' ')}`, source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: 45, implication: 'NEUTRAL', sample: false });
-        }
-        const closed = closedAtOf(o);
-        if (closed && closed >= from) {
-          const won = recordedOutcome(o) === 'won';
-          push({ id: `op:${o.id}:close`, at: closed.toISOString(), lane: 'ours', category: 'deal', title: `${won ? 'Won' : 'Lost'}: ${o.name}`, summary: won ? 'Closed won' : 'Closed lost', source: 'Pipeline', sourceUrl: null, href: `/opportunities/${o.id}`, importance: won ? 70 : 60, implication: won ? 'OPPORTUNITY' : 'RISK', sample: false });
-        }
-      }
+      for (const mark of dealTimelineMarks(opps, { from, now })) push(mark);
       for (const b of bids) {
         push({ id: `bid:${b.id}`, at: (b.dueDate ?? b.importedAt).toISOString(), lane: 'ours', category: 'bid', title: `Bid: ${b.title}`, summary: b.dueDate ? `Due ${b.dueDate.toISOString().slice(0, 10)}, ${b.status}` : b.status, source: 'Bids', sourceUrl: b.url, href: '/bid-matrix', importance: 50, implication: 'NEUTRAL', sample: false });
       }
