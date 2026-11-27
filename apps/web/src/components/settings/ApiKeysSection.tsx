@@ -3,7 +3,7 @@
 // creation, and revoke action. Secrets are SHA-256 hashed server-side; the
 // raw value is shown exactly once and never re-derivable.
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PERMISSION_KEYS } from '@bidstack/shared';
 
@@ -51,6 +51,8 @@ export function ApiKeysSection() {
   const [revealed, setRevealed] = useState<ApiKeyCreated | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const secretField = useRef<HTMLInputElement>(null);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -83,14 +85,19 @@ export function ApiKeysSection() {
         companyIds,
         msaIds,
       });
-      setRevealed(created);
+      const secret = typeof created.secret === 'string' ? created.secret : '';
+      setRevealed({ ...created, secret });
+      setCopied(false);
+      setCopyFailed(false);
       setOpen(false);
-      toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
-        description: t(
-          'apiKeys.toast.createdDescription',
-          'Copy the secret now — it will not be shown again.',
-        ),
-      });
+      if (secret.trim().length > 0) {
+        toast.success(t('apiKeys.toast.createdTitle', 'API key created'), {
+          description: t(
+            'apiKeys.toast.createdDescription',
+            'Copy the secret now — it will not be shown again.',
+          ),
+        });
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -125,14 +132,29 @@ export function ApiKeysSection() {
   };
 
   const copySecret = async () => {
-    if (!revealed) return;
+    if (!revealed || revealed.secret.trim().length === 0) {
+      setCopied(false);
+      setCopyFailed(false);
+      return;
+    }
     try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
       await navigator.clipboard.writeText(revealed.secret);
+      setCopyFailed(false);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard unavailable — the secret is still visible in the textbox */
+      setCopied(false);
+      setCopyFailed(true);
+      secretField.current?.focus();
+      secretField.current?.select();
     }
+  };
+
+  const dismissReveal = () => {
+    setRevealed(null);
+    setCopied(false);
+    setCopyFailed(false);
   };
 
   const items = list.data?.items ?? [];
@@ -319,20 +341,50 @@ export function ApiKeysSection() {
 
       {revealed ? (
         <div className="mx-5 mt-4 rounded-md border border-[var(--brand-primary)] bg-[var(--brand-primary-tint)] p-3">
-          <div className="text-xs font-semibold text-[var(--fg-primary)]">
-            {t('apiKeys.reveal.warning', "Copy your new key now — it won't be shown again.")}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <code className="block flex-1 select-all overflow-x-auto rounded bg-[var(--surface-card)] px-2 py-1 font-mono text-xs text-[var(--fg-primary)]">
-              {revealed.secret}
-            </code>
-            <Button size="sm" variant="secondary" onClick={copySecret}>
-              {copied ? t('apiKeys.reveal.copied', 'Copied!') : t('apiKeys.reveal.copy', 'Copy')}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setRevealed(null)}>
-              {t('apiKeys.reveal.dismiss', 'Dismiss')}
-            </Button>
-          </div>
+          {revealed.secret.trim().length === 0 ? (
+            <div className="flex items-start justify-between gap-3">
+              <p role="alert" className="text-xs font-semibold text-[var(--danger)]">
+                {t('apiKeys.reveal.empty', 'This key came back empty. Nothing was copied.')}
+              </p>
+              <Button size="sm" variant="ghost" onClick={dismissReveal}>
+                {t('apiKeys.reveal.dismiss', 'Dismiss')}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="text-xs font-semibold text-[var(--fg-primary)]">
+                {t('apiKeys.reveal.warning', "Copy your new key now — it won't be shown again.")}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  ref={secretField}
+                  readOnly
+                  spellCheck={false}
+                  autoComplete="off"
+                  aria-label={t('apiKeys.reveal.secretLabel', 'API key secret')}
+                  value={revealed.secret}
+                  onFocus={(event) => event.currentTarget.select()}
+                  className="block min-w-0 flex-1 select-all overflow-x-auto rounded bg-[var(--surface-card)] px-2 py-1 font-mono text-xs text-[var(--fg-primary)]"
+                />
+                <Button size="sm" variant="secondary" onClick={() => void copySecret()}>
+                  {copied
+                    ? t('apiKeys.reveal.copied', 'Copied!')
+                    : t('apiKeys.reveal.copy', 'Copy')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={dismissReveal}>
+                  {t('apiKeys.reveal.dismiss', 'Dismiss')}
+                </Button>
+              </div>
+              {copyFailed ? (
+                <p role="alert" className="mt-2 text-xs text-[var(--danger)]">
+                  {t(
+                    'apiKeys.reveal.copyFailed',
+                    'Copy failed. Select the key and copy it.',
+                  )}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
 
