@@ -33,7 +33,7 @@ type FormatMoney = (micros: number, currency?: string) => string;
 export function ForecastProjection() {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
-  const projection = useForecastProjection();
+  const projection = useForecastProjection({ rereadOnOpen: true });
   const [selected, setSelected] = useState<string | null>(null);
 
   const periods = projection.data?.periods ?? [];
