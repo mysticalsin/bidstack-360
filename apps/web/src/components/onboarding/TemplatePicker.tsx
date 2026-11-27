@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { useTemplates, useInstallTemplate, type TemplateKey } from '@/hooks/useOnboarding';
+import { templateCatalogPhase } from './template-catalog-read';
 
 export function TemplatePicker() {
   const open = useOnboardingStore((s) => s.templatePickerOpen);
@@ -25,6 +26,8 @@ export function TemplatePicker() {
   const { t } = useTranslation('onboarding');
 
   const templates = useTemplates();
+  // A missing payload is not an empty catalog. Empty is only a settled read.
+  const phase = templateCatalogPhase(templates);
   const install = useInstallTemplate();
   const [selected, setSelected] = useState<TemplateKey | null>(null);
 
@@ -83,13 +86,18 @@ export function TemplatePicker() {
         </p>
 
         <div className="mt-5 space-y-2">
-          {templates.isError ? (
+          {phase === 'failed' ? (
             <ErrorState
               title={t('templatePicker.loadErrorTitle', "Couldn't load templates")}
               message={(templates.error as Error)?.message ?? t('templatePicker.tryAgain', 'Please try again.')}
             />
-          ) : templates.isLoading ? (
-            <LoadingSkeleton rows={4} />
+          ) : phase === 'unread' ? (
+            <>
+              <p role="status" className="mb-3 text-sm text-[var(--fg-secondary)]">
+                {t('templatePicker.unread', 'Checking starter templates. The list has not arrived.')}
+              </p>
+              <LoadingSkeleton rows={4} />
+            </>
           ) : (
             (templates.data ?? []).map((tpl) => {
               const isSelected = selected === tpl.key;
