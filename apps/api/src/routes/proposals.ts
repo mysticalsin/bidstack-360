@@ -21,6 +21,7 @@ import {
   proposalApprovalRoutes,
   proposalIsImmutable,
 } from './proposals.approval.js';
+import { rollupProposalAnalytics } from './proposal-analytics.js';
 import { DEFAULT_SECTIONS, serializeProposal } from './proposals.helpers.js';
 
 // DEFAULT_SECTIONS and serializeProposal extracted to ./proposals.helpers.ts (BS-R1)
@@ -141,41 +142,45 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const orgId = req.auth.orgId;
-      // Aggregate in SQL: COUNT + SUM(linked opportunity value) grouped by status
-      // and owner in one pass. A grouped $queryRaw (not a findMany) bypasses the dev
-      // query-guard's row cap and stays correct at any org size. Parameterized +
-      // org-scoped; status cast to text and the bigint sum to text for safe transport.
+      // One slice per status, owner, and linked bid. MAX keeps the bid's value
+      // (the proposals share it). A grouped $queryRaw (not a findMany) bypasses
+      // the dev query-guard's row cap. Parameterized and org-scoped. A deleted
+      // opportunity contributes no value.
       const rows = await prisma.$queryRaw<
-        Array<{ status: string; owner_id: string | null; cnt: number; val: string }>
+        Array<{
+          status: string;
+          owner_id: string | null;
+          opportunity_id: string | null;
+          cnt: number;
+          val: string;
+        }>
       >`
         SELECT p.status::text AS status,
                p.owner_id      AS owner_id,
+               p.opportunity_id AS opportunity_id,
                COUNT(*)::int   AS cnt,
-               COALESCE(SUM(o.value_micros), 0)::text AS val
+               COALESCE(MAX(o.value_micros), 0)::text AS val
         FROM proposals p
-        LEFT JOIN opportunities o ON o.id = p.opportunity_id AND o.org_id = p.org_id
+        LEFT JOIN opportunities o ON o.id = p.opportunity_id
+          AND o.org_id = p.org_id
+          AND o.deleted_at IS NULL
         WHERE p.org_id = ${orgId}::uuid AND p.deleted_at IS NULL
-        GROUP BY p.status, p.owner_id
+        GROUP BY p.status, p.owner_id, p.opportunity_id
       `;
 
-      const statusCounts = new Map<string, number>();
-      const ownerAgg = new Map<string, { count: number; value: bigint }>();
-      let totalValue = BigInt(0);
-      let totalCount = 0;
-      for (const r of rows) {
-        const cnt = Number(r.cnt);
-        const val = BigInt(r.val);
-        totalCount += cnt;
-        totalValue += val;
-        statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + cnt);
-        const key = r.owner_id ?? '';
-        const cur = ownerAgg.get(key) ?? { count: 0, value: BigInt(0) };
-        cur.count += cnt;
-        cur.value += val;
-        ownerAgg.set(key, cur);
-      }
+      const rollup = rollupProposalAnalytics(
+        rows.map((r) => ({
+          status: r.status,
+          ownerId: r.owner_id,
+          opportunityId: r.opportunity_id,
+          count: Number(r.cnt),
+          valueMicros: BigInt(r.val),
+        })),
+      );
 
-      const ownerIds = [...ownerAgg.keys()].filter((k) => k.length > 0);
+      const ownerIds = rollup.byOwner
+        .map((row) => row.ownerId)
+        .filter((id): id is string => id !== null);
       const users = ownerIds.length
         ? await prisma.user.findMany({
             where: { id: { in: ownerIds }, orgId, deletedAt: null },
@@ -186,17 +191,17 @@ export const proposalRoutes: FastifyPluginAsyncZod = async (server) => {
       const nameById = new Map(users.map((u) => [u.id, u.name ?? u.email]));
 
       return {
-        totalCount,
-        wonCount: statusCounts.get('won') ?? 0,
-        lostCount: statusCounts.get('lost') ?? 0,
-        totalValueMicros: totalValue.toString(),
-        byStatus: [...statusCounts.entries()].map(([status, count]) => ({ status, count })),
-        byOwner: [...ownerAgg.entries()]
-          .map(([ownerId, agg]) => ({
-            ownerId: ownerId || null,
-            ownerName: ownerId ? (nameById.get(ownerId) ?? 'Unknown') : 'Unassigned',
-            count: agg.count,
-            totalValueMicros: agg.value.toString(),
+        totalCount: rollup.totalCount,
+        wonCount: rollup.wonCount,
+        lostCount: rollup.lostCount,
+        totalValueMicros: rollup.totalValueMicros.toString(),
+        byStatus: rollup.byStatus,
+        byOwner: rollup.byOwner
+          .map((row) => ({
+            ownerId: row.ownerId,
+            ownerName: row.ownerId ? (nameById.get(row.ownerId) ?? 'Unknown') : 'Unassigned',
+            count: row.count,
+            totalValueMicros: row.totalValueMicros.toString(),
           }))
           .sort((a, b) => b.count - a.count),
       };
