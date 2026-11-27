@@ -14,10 +14,13 @@ import { CompanyLogo } from '@/components/company/CompanyLogo';
 import { KeyAccountBadge } from '@/components/company/AccountTierBadges';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { CursorPager } from '@/components/ui/CursorPager';
+import {
+  formatUnspecifiedAmount,
+  UNSPECIFIED_CURRENCY_BASIS,
+} from '@/components/dashboard/unspecified-currency';
 import { useKeyAccounts, useAccountIndustries } from '@/hooks/useKeyAccounts';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springSoft, staggerChild, staggerParent } from '@/lib/motion';
 
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
@@ -34,7 +37,6 @@ export function AccountsKeySegment() {
   const reducedMotion = useReducedMotion();
   const [search, setSearch] = useState('');
   const [industry, setIndustry] = useState<string>('');
-  const { formatMoney } = useFormatMoney();
   // Debounce the value that feeds the query keys so a server fetch fires once the
   // user pauses typing — not on every keystroke. `search` still drives the input
   // display for responsive typing.
@@ -182,12 +184,18 @@ export function AccountsKeySegment() {
                 : t('keyAccounts.industrySignalFallback', 'No industry signal')
             }
             sub={
-              leadingIndustry
-                ? t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
+              leadingIndustry ? (
+                <>
+                  {t('keyAccounts.industrySignalDetail', '{{count}} accounts / {{pipeline}} pipeline', {
                     count: leadingIndustry.count,
-                    pipeline: formatMoney(leadingIndustry.pipeline, 'EUR'),
-                  })
-                : t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
+                    pipeline: formatUnspecifiedAmount(leadingIndustry.pipeline),
+                  })}
+                  {' · '}
+                  <span>{UNSPECIFIED_CURRENCY_BASIS}</span>
+                </>
+              ) : (
+                t('keyAccounts.industrySignalEmpty', 'Add industries to companies to unlock the split.')
+              )
             }
           >
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -254,7 +262,8 @@ export function AccountsKeySegment() {
             />
             <StatTile
               label={t('keyAccounts.statTotalPipeline', 'Total pipeline')}
-              value={formatMoney(totalPipeline, 'EUR')}
+              value={formatUnspecifiedAmount(totalPipeline)}
+              sublabel={UNSPECIFIED_CURRENCY_BASIS}
             />
             <StatTile
               label={t('keyAccounts.statOpenDeals', 'Open deals')}
@@ -346,9 +355,12 @@ export function AccountsKeySegment() {
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
-                              {formatMoney(account.totalValue, 'EUR')}
+                              {formatUnspecifiedAmount(account.totalValue)}
                             </span>{' '}
                             {t('keyAccounts.metricPipeline', 'pipeline')}
+                            <span className="mt-0.5 block text-xs text-[var(--fg-tertiary)]">
+                              {UNSPECIFIED_CURRENCY_BASIS}
+                            </span>
                           </span>
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">
