@@ -4,6 +4,7 @@ import { useDocumentTemplate } from '@/hooks/useDocumentTemplates';
 import { DocumentPreviewIframe } from '../DocumentPreviewIframe';
 import { cn } from '@/lib/cn';
 import { type Recipient, FieldLabel, inputClass } from './signatureModalShared';
+import { signatureReviewPhase } from './signature-review-read';
 
 interface Props {
   templateId: string;
@@ -27,7 +28,13 @@ export function ReviewStep({
   isSending,
 }: Props) {
   const { t } = useTranslation('signatures');
-  const { data: template } = useDocumentTemplate(templateId);
+  const templateQuery = useDocumentTemplate(templateId);
+  const phase = signatureReviewPhase({
+    data: templateQuery.data,
+    isError: templateQuery.isError,
+    status: templateQuery.status,
+  });
+  const template = phase === 'ready' ? templateQuery.data : undefined;
 
   // Substitute variables into template body for the live preview.
   const previewHtml = template
@@ -39,15 +46,25 @@ export function ReviewStep({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Document preview */}
-      {previewHtml && (
+      {phase === 'unread' ? (
+        <p role="status">
+          {t(
+            'reviewStep.checking',
+            'Checking this document. The preview has not arrived.',
+          )}
+        </p>
+      ) : null}
+      {phase === 'failed' ? (
+        <p role="alert">{t('reviewStep.loadError', 'Could not load this document.')}</p>
+      ) : null}
+      {previewHtml ? (
         <DocumentPreviewIframe
           src={previewHtml}
           srcdoc
           title={template?.name ?? t('reviewStep.previewTitle', 'Document preview')}
           height={300}
         />
-      )}
+      ) : null}
 
       {/* Optional message to recipients */}
       <div>
