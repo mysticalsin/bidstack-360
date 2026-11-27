@@ -15,12 +15,18 @@ interface Props {
   snapshot: CrmDashboardSnapshot;
   overdueCount: number;
   tasksLoading: boolean;
+  /**
+   * The tasks list failed and there is no payload to keep. A missing list
+   * is not zero overdue.
+   */
+  tasksFailed?: boolean;
 }
 
 export const KpiSidebar = memo(function KpiSidebar({
   snapshot,
   overdueCount,
   tasksLoading,
+  tasksFailed = false,
 }: Props) {
   const { t } = useTranslation('crm');
   const reducedMotion = useReducedMotion();
@@ -61,9 +67,15 @@ export const KpiSidebar = memo(function KpiSidebar({
         />
         <PulseRow
           label={t('kpiSidebar.overdueTasks', 'Overdue tasks')}
-          value={tasksLoading ? '...' : overdueCount.toString()}
-          tone={overdueCount > 0 ? 'rose' : 'jade'}
-          progress={Math.min(100, overdueCount * 18)}
+          value={
+            tasksFailed
+              ? t('kpiSidebar.overdueNotLoaded', 'Not loaded')
+              : tasksLoading
+                ? '...'
+                : overdueCount.toString()
+          }
+          tone={tasksFailed || tasksLoading ? 'amber' : overdueCount > 0 ? 'rose' : 'jade'}
+          progress={tasksFailed || tasksLoading ? 0 : Math.min(100, overdueCount * 18)}
           index={3}
           reducedMotion={Boolean(reducedMotion)}
         />

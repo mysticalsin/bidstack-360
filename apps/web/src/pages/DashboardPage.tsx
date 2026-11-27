@@ -352,6 +352,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
                 snapshot={snapshot}
                 overdueCount={overdueCount}
                 tasksLoading={tasks.isLoading}
+                tasksFailed={tasks.isError && !tasks.data}
               />
             </Reveal>
           )}
