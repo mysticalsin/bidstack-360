@@ -11,6 +11,9 @@ import { z } from 'zod';
 
 import { Prisma, prisma } from '@bidstack/db';
 
+import { fixtureWorkloadTasksNotOverdue } from '../demo/fixture-workload-task-due.js';
+import { getPoloDataMode } from '../lib/polo-mode.js';
+
 const WorkloadOwner = z.object({
   /** null = the unassigned bucket (open bids/tasks nobody owns). */
   ownerId: z.string().uuid().nullable(),
@@ -82,6 +85,10 @@ async function aggregateTasks(orgId: string): Promise<TaskAgg> {
   const startOfTodayUTC = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
+  // Aged fixture rows still hold a May due date. Leave those out of the
+  // overdue count when demo slides them onto today or later. A live task,
+  // and a fixture row whose date was edited, stays on dueDate.
+  const held = fixtureWorkloadTasksNotOverdue(now, getPoloDataMode());
   const [openRows, overdueRows] = await Promise.all([
     prisma.task.groupBy({
       by: ['assigneeId'],
@@ -90,7 +97,15 @@ async function aggregateTasks(orgId: string): Promise<TaskAgg> {
     }),
     prisma.task.groupBy({
       by: ['assigneeId'],
-      where: { orgId, deletedAt: null, status: { not: 'done' }, dueDate: { lt: startOfTodayUTC } },
+      where: {
+        orgId,
+        deletedAt: null,
+        status: { not: 'done' },
+        dueDate: { lt: startOfTodayUTC },
+        ...(held.length > 0
+          ? { NOT: { OR: held.map((row) => ({ id: row.id, dueDate: row.dueDate })) } }
+          : {}),
+      },
       _count: { _all: true },
     }),
   ]);
@@ -100,7 +115,11 @@ async function aggregateTasks(orgId: string): Promise<TaskAgg> {
   };
 }
 
-function emptyRow(ownerId: string | null, name: string | null, email: string | null): WorkloadOwnerRow {
+function emptyRow(
+  ownerId: string | null,
+  name: string | null,
+  email: string | null,
+): WorkloadOwnerRow {
   return {
     ownerId,
     name,
