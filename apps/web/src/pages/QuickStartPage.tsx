@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { useChecklistProposalCount } from '@/hooks/useOnboarding';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
@@ -31,12 +32,22 @@ export function QuickStartPage() {
   // they kick off an action with no cheap "is it done" signal.
   const summary = useOrgSummary();
   const users = useUsers();
+  const proposals = useChecklistProposalCount();
+  // Only a settled read may decide the RFP row. While it is loading, or when
+  // the visitor cannot read proposals, the row stays click-acknowledged.
+  const proposalKnown = proposals.isSuccess;
+  const hasProposal = proposalKnown && (proposals.data ?? 0) > 0;
   const derived: Partial<Record<ChecklistItem, boolean>> = {
     first_lead: (summary.data?.leads ?? 0) > 0,
     first_deal: (summary.data?.opportunities ?? 0) > 0,
     invite_team: (users.data?.length ?? 0) > 1,
+    ...(proposalKnown ? { connect_email: hasProposal } : {}),
   };
   const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
+  // Demo sign-in already seeds leads, deals, and RFP responses. "Get from
+  // zero" is the empty-workspace line; a populated book should say so.
+  const workspaceStarted =
+    (summary.data?.leads ?? 0) > 0 || (summary.data?.opportunities ?? 0) > 0 || hasProposal;
 
   const ITEMS: ChecklistItemDef[] = [
     {
@@ -123,7 +134,12 @@ export function QuickStartPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[var(--fg-primary)]">{t('quickStart.title', 'Quick Start')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {t('quickStart.subtitle', 'Get from zero to piloting your first bid.')}
+          {workspaceStarted
+            ? t(
+                'quickStart.subtitleStarted',
+                'This workspace already has bid records. Finish the steps that are still open.',
+              )
+            : t('quickStart.subtitle', 'Get from zero to piloting your first bid.')}
         </p>
       </div>
 
