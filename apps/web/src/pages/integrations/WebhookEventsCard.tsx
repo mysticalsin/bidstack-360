@@ -9,9 +9,10 @@
 import { useTranslation } from 'react-i18next';
 
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { relativeTime } from '@/lib/format';
 
 import { webhookStatusTone } from './integration-helpers';
@@ -21,15 +22,21 @@ import type { WebhookEvent } from './types';
 export function WebhookEventsCard({
   events,
   isLoading,
+  isError = false,
   pageContinues = false,
+  onRetry,
 }: {
   events: WebhookEvent[];
   isLoading: boolean;
+  /** True when the event read failed. Missing rows are not an empty stream. */
+  isError?: boolean;
   /** True when the list read one row past the page and dropped it. */
   pageContinues?: boolean;
+  onRetry?: () => void;
 }) {
   const { t } = useTranslation('integrations');
   const errorCount = events.filter((event) => event.status === 'error').length;
+  const awaiting = isLoading || isError;
 
   return (
     <Card className="overflow-hidden border-[var(--border-subtle)] bg-[var(--surface-primary)]">
@@ -44,12 +51,20 @@ export function WebhookEventsCard({
               )
         }
         action={
-          <Badge tone={errorCount > 0 ? 'tomato' : events.length > 0 ? 'jade' : 'gray'}>
-            {errorCount > 0
-              ? t('webhookEvents.statusErrors', '{{count}} errors', { count: errorCount })
-              : events.length > 0
-                ? t('webhookEvents.statusProcessing', 'processing')
-                : t('webhookEvents.statusQuiet', 'quiet')}
+          <Badge
+            tone={
+              awaiting ? 'gray' : errorCount > 0 ? 'tomato' : events.length > 0 ? 'jade' : 'gray'
+            }
+          >
+            {isLoading
+              ? t('webhookEvents.statusChecking', 'checking')
+              : isError
+                ? t('webhookEvents.statusNotLoaded', 'not loaded')
+                : errorCount > 0
+                  ? t('webhookEvents.statusErrors', '{{count}} errors', { count: errorCount })
+                  : events.length > 0
+                    ? t('webhookEvents.statusProcessing', 'processing')
+                    : t('webhookEvents.statusQuiet', 'quiet')}
           </Badge>
         }
       />
@@ -57,6 +72,17 @@ export function WebhookEventsCard({
         <div className="p-5">
           <LoadingSkeleton rows={4} />
         </div>
+      ) : isError ? (
+        <ErrorState
+          title={t('webhookEvents.errorTitle', 'Could not load webhook events')}
+          action={
+            onRetry ? (
+              <Button variant="secondary" size="sm" onClick={onRetry}>
+                {t('webhookEvents.errorRetry', 'Retry')}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : events.length === 0 ? (
         <div className="grid min-h-[220px] place-items-center px-6 py-10 text-center">
           <div className="max-w-sm">

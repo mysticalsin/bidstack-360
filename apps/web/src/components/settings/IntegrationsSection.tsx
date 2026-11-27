@@ -156,7 +156,9 @@ export function IntegrationsSection() {
           <WebhookEventsCard
             events={events.data?.items ?? []}
             isLoading={events.isLoading}
+            isError={events.isError}
             pageContinues={eventsContinue}
+            onRetry={() => void events.refetch()}
           />
         </TabsContent>
 
