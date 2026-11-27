@@ -16,6 +16,7 @@ import { useAccountIntel, useExtractDocument } from '@/hooks/useAccountIntel';
 import { toast } from '@/components/ui/Toast';
 import { staggerParent, staggerChild } from '@/lib/motion';
 
+import { intakeFilesPhase } from './intake-files-read';
 import { STEPS, type StepId } from './intake/intakeConfig';
 import { ReceiveStep } from './intake/ReceiveStep';
 import { ExtractStep } from './intake/ExtractStep';
@@ -39,6 +40,16 @@ export function IntakePage() {
   const { t } = useTranslation('crm');
 
   const files = useFiles(accountId || undefined);
+  // No account means the file query is disabled. That is not a paused read.
+  const filesPhase = accountId
+    ? intakeFilesPhase({ data: files.data, isError: files.isError, status: files.status })
+    : 'ready';
+  // A settled null payload is an empty list. The query union does not accept
+  // that replacement without a cast, and undefined data never reaches here.
+  const receiveFiles =
+    accountId && filesPhase === 'ready' && files.data == null
+      ? ({ ...files, data: { items: [] } } as unknown as typeof files)
+      : files;
   const extract = useExtractDocument(accountId || undefined);
 
   // Poll intel while extractions are in progress
@@ -187,16 +198,26 @@ export function IntakePage() {
       </motion.div>
 
       {/* Step content */}
-      {step === 'receive' && (
+      {step === 'receive' && filesPhase === 'unread' ? (
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('intake.filesUnread', 'Checking documents. The file list has not arrived.')}
+        </p>
+      ) : null}
+      {step === 'receive' && filesPhase === 'failed' ? (
+        <p role="alert" className="text-sm text-[var(--fg-secondary)]">
+          {t('crm.receiveStep.loadFailedTitle', 'Failed to load files')}
+        </p>
+      ) : null}
+      {step === 'receive' && filesPhase === 'ready' ? (
         <ReceiveStep
           accountId={accountId}
-          files={files}
+          files={receiveFiles}
           selectedDocs={selectedDocs}
           onToggle={toggleDoc}
           onNext={() => setStep('extract')}
           onSelectAccount={selectAccount}
         />
-      )}
+      ) : null}
       {step === 'extract' && (
         <ExtractStep
           selectedCount={selectedDocs.size}
