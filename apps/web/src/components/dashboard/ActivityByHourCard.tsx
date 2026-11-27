@@ -9,11 +9,25 @@ import { useActivityFeed } from '@/hooks/useActivityFeed';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { browserTimeZone } from '@/lib/timezone';
 
+import { activityHourPhase } from './activity-hour-read';
+
+const CHECKING = 'Checking activity by hour. The log has not arrived.';
+const FAILED = 'Could not load activity.';
+const EMPTY = 'No activity logged yet.';
+
 export function ActivityByHourCard() {
   const canRead = useHasPermission('activities:read');
-  const { data, isLoading, isError } = useActivityFeed(100, canRead);
+  const feed = useActivityFeed(100, canRead);
   const tz = browserTimeZone();
-  const hours = useMemo(() => activityByHour(data?.items ?? [], tz), [data, tz]);
+  const phase = activityHourPhase({
+    data: feed.data,
+    isError: feed.isError,
+    status: feed.status,
+  });
+  const hours = useMemo(
+    () => activityByHour(phase === 'ready' && feed.data ? feed.data.items : [], tz),
+    [feed.data, phase, tz],
+  );
 
   if (!canRead) return null;
 
@@ -24,23 +38,45 @@ export function ActivityByHourCard() {
     },
     { label: '', n: 0 },
   );
+  const summary =
+    phase === 'unread'
+      ? CHECKING
+      : phase === 'failed'
+        ? FAILED
+        : hours.total
+          ? `${hours.total} activities, busiest at ${busiest.label}:00 with ${busiest.n}.`
+          : EMPTY;
+  const meta =
+    phase === 'ready'
+      ? feed.data && feed.data.total > hours.total
+        ? `Latest ${hours.total} of ${feed.data.total}`
+        : `${hours.total} logged`
+      : undefined;
 
   return (
     <ChartCard
       testId="dashboard-activity-hours"
       title="Activity by hour"
-      meta={data && data.total > hours.total ? `Latest ${hours.total} of ${data.total}` : `${hours.total} logged`}
+      meta={meta}
       interactive
-      summary={hours.total ? `${hours.total} activities, busiest at ${busiest.label}:00 with ${busiest.n}.` : 'No activity logged yet.'}
-      table={{
-        columns: ['Hour', ...hours.series.map((s) => s.label)],
-        rows: hours.labels.map((h, i) => [`${h}:00`, ...hours.series.map((s) => s.values[i] ?? 0)]),
-      }}
+      summary={summary}
+      table={
+        phase === 'ready'
+          ? {
+              columns: ['Hour', ...hours.series.map((s) => s.label)],
+              rows: hours.labels.map((h, i) => [`${h}:00`, ...hours.series.map((s) => s.values[i] ?? 0)]),
+            }
+          : undefined
+      }
     >
-      {isLoading ? (
-        <p className="viz-empty">Loading activity.</p>
-      ) : isError ? (
-        <p className="viz-empty">Could not load activity.</p>
+      {phase === 'unread' ? (
+        <p role="status" className="viz-empty">
+          {CHECKING}
+        </p>
+      ) : phase === 'failed' ? (
+        <p role="alert" className="viz-empty">
+          {FAILED}
+        </p>
       ) : hours.total ? (
         <RadialDots
           title="Activity by hour"
@@ -50,7 +86,7 @@ export function ActivityByHourCard() {
           axis={[0, 6, 12, 18]}
         />
       ) : (
-        <p className="viz-empty">No activity logged yet.</p>
+        <p className="viz-empty">{EMPTY}</p>
       )}
     </ChartCard>
   );
