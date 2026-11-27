@@ -200,9 +200,20 @@ function MobileNavContent({ onClose }: { onClose: () => void }) {
         aria-label="Primary navigation"
         className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-2"
       >
-        {sections.map((section) => (
-          <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
-        ))}
+        {sections.map((section) =>
+          section.key === 'home' ? (
+            // Home is pinned, same as the rail: no disclosure. A collapse here
+            // used to remove Dashboard and Quick Start, so the open drawer was
+            // only section headers and Settings.
+            <div key={section.key} className="py-1">
+              {section.items.map((item) => (
+                <MobileNavItem key={item.to} item={item} badges={badges} onNavigate={onClose} />
+              ))}
+            </div>
+          ) : (
+            <MobileNavSection key={section.key} section={section} badges={badges} onNavigate={onClose} />
+          ),
+        )}
 
         {favorites.length > 0 && (
           <NavGroup title={t('nav.starred', 'Starred')}>
@@ -241,9 +252,10 @@ function NavGroup({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
-// Collapsible primary section (accordion, mirrors the desktop sidebar):
-// collapsed by default unless it holds the active route; the user's tap is
-// persisted. Keeps the mobile drawer tidy and reachable without long scrolls.
+// Collapsible primary section (accordion, mirrors the desktop sidebar).
+// Home is not rendered here: the rail pins it, and the drawer does too.
+// Other sections are collapsed by default unless they hold the active route;
+// the user's tap is persisted. Keeps the drawer tidy without a long scroll.
 function MobileNavSection({
   section,
   badges,
