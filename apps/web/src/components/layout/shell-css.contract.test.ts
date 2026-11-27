@@ -59,4 +59,20 @@ describe('console shell CSS', () => {
     expect(block('.mobile-nav-drawer')).toContain('var(--ease-drawer)');
     expect(css).toMatch(/\.mobile-nav-root\[data-motion='instant'\][^{]*\{\s*transition-duration: 0s !important;/);
   });
+
+  it('phone drawer controls stay at least 44px when the pointer is fine', () => {
+    // WHY: below 56rem the drawer is the only primary nav, including a demo
+    // window resized to a phone. That window keeps pointer:fine, so the
+    // coarse-pointer 44px floor never applies. A section button's min-h-9
+    // (36px) also beats that element rule. The rail items are already 44px
+    // with no pointer query. The drawer has to match, or the control that
+    // opens a section is shorter than the rail row it replaces.
+    const coarse = mediaBlock('(pointer: coarse)');
+    const rest = css.replace(coarse, '');
+    const rule = rest.match(/\.mobile-nav-drawer button,\s*\.mobile-nav-drawer a \{[^}]*\}/);
+    expect(rule, 'drawer buttons and links need a 44px floor outside pointer:coarse').not.toBeNull();
+    const body = rule?.[0] ?? '';
+    expect(body).toMatch(/min-height:\s*44px/);
+    expect(body).toMatch(/min-width:\s*44px/);
+  });
 });
