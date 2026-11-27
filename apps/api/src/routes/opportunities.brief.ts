@@ -1,4 +1,5 @@
 import { formatMicrosDecimal } from '@bidstack/shared';
+import { opportunityBriefIndustry } from './opportunity-brief-industry.js';
 
 interface BriefOpportunity {
   code: string;
@@ -115,7 +116,7 @@ export function buildOpportunityBrief(input: OpportunityBriefInput): string {
     '',
     `**Opportunity:** ${opportunity.name} (${opportunity.code})`,
     `**Stage:** ${stage} | **Value:** ${formatMoneyMicros(opportunity.valueMicros)} | **Probability:** ${opportunity.probability}% | **Due:** ${formatDate(opportunity.dueDate)}`,
-    opportunity.industry ? `**Industry:** ${opportunity.industry}` : '**Industry:** not set',
+    `**Industry:** ${opportunityBriefIndustry(opportunity.industry)}`,
     '',
     '## Current Read',
     `${opportunity.customer} is pursuing ${opportunity.name}. The CRM signal shows ${stage} maturity, ${opportunity.probability}% win probability, and ${formatMoneyMicros(opportunity.valueMicros)} in potential value. ${latestNote ? `Most recent account signal: "${latestNote.title}" - ${compactMarkdown(latestNote.bodyMd)}.` : 'There is no recent account note, so discovery assumptions need confirmation.'}`,
