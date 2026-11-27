@@ -34,6 +34,10 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import {
+  columnIdForStageTitle,
+  omitInventedDuplicateTitles,
+} from './pipelineBoard/board-stage-title';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -96,7 +100,11 @@ export function PipelinePage() {
   // records happen to be present in the current page. This keeps empty stages
   // visible and avoids pagination hiding parts of the funnel.
   const stages = useMemo(
-    () => getPipelineStages(data?.items ?? [], configuredStageOptions),
+    () =>
+      omitInventedDuplicateTitles(
+        getPipelineStages(data?.items ?? [], configuredStageOptions),
+        configuredStageOptions,
+      ),
     [configuredStageOptions, data?.items],
   );
 
@@ -104,9 +112,17 @@ export function PipelinePage() {
     () => new Map(stages.map((stage) => [getPipelineStageBusinessKey(stage), stage.id])),
     [stages],
   );
+  const stageIds = useMemo(() => new Set(stages.map((stage) => stage.id)), [stages]);
   const getVisibleStageId = useCallback(
-    (opp: Opportunity) => stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp),
-    [stageIdByBusinessKey],
+    (opp: Opportunity) => {
+      const keyed =
+        stageIdByBusinessKey.get(getOpportunityStageBusinessKey(opp)) ?? getStageId(opp);
+      // A demo title with no stage row is not a column id. The configured
+      // column of that title is the column the bid was filed on.
+      if (stageIds.has(keyed)) return keyed;
+      return columnIdForStageTitle(opp.stage, stages) ?? keyed;
+    },
+    [stageIdByBusinessKey, stageIds, stages],
   );
 
   // Group items by pipelineStageId once per data change so each column doesn't
