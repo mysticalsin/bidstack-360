@@ -162,6 +162,15 @@ export function CollaborativeRichTextEditor({
   // ─── Connection status badge ───────────────────────────────────────────
 
   const statusLabel = statusBadgeLabel(connectionState, t);
+  const noteLength = yText?.length ?? 0;
+  // A local document with no text has not arrived until the server init
+  // reply. Showing the empty invitation, or a blank editor, would say the
+  // note was checked and there is nothing in it.
+  const read = collaborativeNotesRead({
+    connection: connectionState,
+    documentReady: yText !== null,
+    textLength: noteLength,
+  });
 
   return (
     <div className={`collaborative-editor relative ${className}`} data-connection={connectionState}>
@@ -198,27 +207,27 @@ export function CollaborativeRichTextEditor({
           .filter(Boolean)
           .join(' ')}
       >
-        {!yText &&
-          // Shown while Y.Doc is loading: the caller's placeholder text if
-          // provided, otherwise shimmer text lines from the shared skeleton
-          // system (never a bare "Loading…" string).
-          (placeholder ? (
-            <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
-              {placeholder}
-            </p>
-          ) : (
-            <div
-              className="space-y-2"
-              aria-busy="true"
-              aria-live="polite"
-              aria-label={t('collaborativeRichTextEditor.loading', 'Loading…')}
-            >
-              <span className="bs-shimmer block h-3 w-3/4" aria-hidden />
-              <span className="bs-shimmer block h-3 w-full" aria-hidden />
-              <span className="bs-shimmer block h-3 w-2/3" aria-hidden />
-            </div>
-          ))}
-        {yText && <EditorContent editor={editor} />}
+        {read === 'failed' ? (
+          <p role="alert" className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'collaborativeRichTextEditor.failed',
+              'Could not load collaborative notes. The notes have not arrived.',
+            )}
+          </p>
+        ) : read === 'checking' ? (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('collaborativeRichTextEditor.checking', 'Checking collaborative notes.')}
+          </p>
+        ) : (
+          <>
+            {noteLength === 0 && placeholder ? (
+              <p className="text-[var(--text-muted)] text-sm pointer-events-none select-none">
+                {placeholder}
+              </p>
+            ) : null}
+            {yText ? <EditorContent editor={editor} /> : null}
+          </>
+        )}
       </div>
 
       {/* CSS: cursor glide animation — disabled when prefers-reduced-motion */}
@@ -266,6 +275,17 @@ function ConnectionBadge({ label, state }: { label: string; state: ConnectionSta
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
+
+export function collaborativeNotesRead(input: {
+  connection: ConnectionState;
+  documentReady: boolean;
+  textLength: number;
+}): 'checking' | 'failed' | 'ready' {
+  if (input.textLength > 0) return 'ready';
+  if (input.connection === 'connected' && input.documentReady) return 'ready';
+  if (input.connection === 'error') return 'failed';
+  return 'checking';
+}
 
 function statusBadgeLabel(state: ConnectionState, t: TFunction): string {
   switch (state) {
