@@ -11,7 +11,9 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma, syncCalendarEventActivity } from '@bidstack/db';
-import { CALENDAR_PUSH, mayWriteCalendar } from '@bidstack/shared';
+import { CALENDAR_PUSH, calendarRowsForWindow, fixtureCalendarMode, mayWriteCalendar } from '@bidstack/shared';
+
+import { fixtureCalendarLookup } from '../demo/fixture-calendar-where.js';
 import { Queue } from 'bullmq';
 import { redis } from '../redis.js';
 
@@ -78,6 +80,8 @@ const EVENT_SELECT = {
   opportunityId: true,
   createdAt: true,
 } as const;
+
+const CLOCK_SELECT = { ...EVENT_SELECT, clientRequestId: true } as const;
 
 type EventRow = {
   id: string;
@@ -235,26 +239,47 @@ export const calendarRoutes: FastifyPluginAsyncZod = async (server) => {
     },
     async (req) => {
       const { from, to, limit } = req.query;
-
+      const now = new Date();
+      const mode = process.env.POLO_DATA_MODE;
+      const base = {
+        orgId: req.auth.orgId,
+        ownerId: req.auth.userId,
+        deletedAt: null,
+        isCancelled: false,
+        syncState: { not: 'DELETED_REMOTE' as const },
+      };
+      // Overlap predicate, not containment — an event that starts before
+      // `from` or ends after `to` still belongs on screen for that range
+      // (multi-day events, week-boundary meetings).
       const items = await prisma.calendarEvent.findMany({
         where: {
-          orgId: req.auth.orgId,
-          ownerId: req.auth.userId,
-          deletedAt: null,
-          isCancelled: false,
-          syncState: { not: 'DELETED_REMOTE' },
-          // Overlap predicate, not containment — an event that starts before
-          // `from` or ends after `to` still belongs on screen for that range
-          // (multi-day events, week-boundary meetings).
+          ...base,
           ...(to ? { startAt: { lt: new Date(to) } } : {}),
           ...(from ? { endAt: { gt: new Date(from) } } : {}),
         },
         orderBy: { startAt: 'asc' },
         take: limit,
-        select: EVENT_SELECT,
+        select: CLOCK_SELECT,
       });
+      // Aged fixture rows sit outside this range. Load the ones that still
+      // hold the seed instants so the demo clock can slide them into view.
+      const lookup = fixtureCalendarLookup(now, mode);
+      const extra = lookup
+        ? await prisma.calendarEvent.findMany({
+            where: { ...base, ...lookup },
+            orderBy: { startAt: 'asc' },
+            take: lookup.clientRequestId.in.length,
+            select: CLOCK_SELECT,
+          })
+        : [];
+      const byId = new Map<string, (typeof items)[number]>();
+      for (const row of [...items, ...extra]) byId.set(row.id, row);
+      const clocked = calendarRowsForWindow([...byId.values()], {
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      }, now, fixtureCalendarMode(mode) === 'demo' ? 'demo' : mode);
 
-      return { items: items.map(toResponse) };
+      return { items: clocked.slice(0, limit).map(toResponse) };
     },
   );
 
