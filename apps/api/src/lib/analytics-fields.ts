@@ -20,6 +20,11 @@ export interface AnalyticsFieldSpec {
   /** WHY: Postgres enum columns need a ::text cast before text comparison. */
   isDbEnum?: boolean;
   enumValues?: string[];
+  /**
+   * Postgres `date` (no time). A calendar-day filter compares the date itself.
+   * Timestamp columns are not marked, so the same filter covers the whole day.
+   */
+  dateOnly?: boolean;
 }
 
 export interface AnalyticsEntitySpec {
@@ -87,7 +92,7 @@ const OPPORTUNITY_FIELDS: AnalyticsFieldSpec[] = [
   // Money is stored in micros (integer x 1e6); emitted raw — format at the edge.
   { key: 'valueMicros', label: 'Value (micros)', type: 'number', column: 'value_micros' },
   { key: 'probability', label: 'Probability', type: 'number', column: 'probability' },
-  { key: 'dueDate', label: 'Due date', type: 'date', column: 'due_date' },
+  { key: 'dueDate', label: 'Due date', type: 'date', column: 'due_date', dateOnly: true },
   { key: 'industry', label: 'Industry', type: 'string', column: 'industry' },
   { key: 'country', label: 'Country', type: 'string', column: 'country' },
   { key: 'viewCount', label: 'Views', type: 'number', column: 'view_count' },
@@ -146,7 +151,7 @@ const TASK_FIELDS: AnalyticsFieldSpec[] = [
     isDbEnum: true,
     enumValues: ['open', 'in_progress', 'done', 'blocked'],
   },
-  { key: 'dueDate', label: 'Due date', type: 'date', column: 'due_date' },
+  { key: 'dueDate', label: 'Due date', type: 'date', column: 'due_date', dateOnly: true },
   { key: 'createdAt', label: 'Created', type: 'date', column: 'created_at' },
 ];
 

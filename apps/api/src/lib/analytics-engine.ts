@@ -130,22 +130,86 @@ function isGroup(node: AnalyticsFilterCondition | AnalyticsFilterGroup): node is
   return typeof node === 'object' && node !== null && 'logic' in node && 'conditions' in node;
 }
 
-function buildCondition(spec: AnalyticsEntitySpec, cond: AnalyticsFilterCondition): Prisma.Sql {
+const CALENDAR_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A date-picker value is a calendar day, not an instant. Timestamp columns
+ * store the time of day, so equality with midnight misses every demo row
+ * written later that day and the report looks empty.
+ */
+function calendarDay(value: unknown): string | null {
+  if (typeof value !== 'string' || !CALENDAR_DAY_RE.test(value) || value.startsWith('0000')) {
+    return null;
+  }
+  if (Number.isNaN(Date.parse(`${value}T00:00:00Z`))) return null;
+  return value;
+}
+
+function dayStart(day: string, timezone: string): Prisma.Sql {
+  return Prisma.sql`(${day}::timestamp AT TIME ZONE ${timezone})`;
+}
+
+function dayEnd(day: string, timezone: string): Prisma.Sql {
+  return Prisma.sql`((${day}::date + 1)::timestamp AT TIME ZONE ${timezone})`;
+}
+
+function calendarDayCompare(
+  col: Prisma.Sql,
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte',
+  day: string,
+  timezone: string,
+): Prisma.Sql {
+  const start = dayStart(day, timezone);
+  const end = dayEnd(day, timezone);
+  switch (operator) {
+    case 'eq':
+      return Prisma.sql`(${col} >= ${start} AND ${col} < ${end})`;
+    case 'neq':
+      return Prisma.sql`(${col} < ${start} OR ${col} >= ${end})`;
+    case 'gte':
+      return Prisma.sql`${col} >= ${start}`;
+    case 'gt':
+      return Prisma.sql`${col} >= ${end}`;
+    case 'lt':
+      return Prisma.sql`${col} < ${start}`;
+    case 'lte':
+      return Prisma.sql`${col} < ${end}`;
+  }
+}
+
+function compareScalar(
+  field: AnalyticsFieldSpec,
+  col: Prisma.Sql,
+  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte',
+  value: unknown,
+  timezone: string,
+): Prisma.Sql {
+  const day = field.type === 'date' && !field.dateOnly ? calendarDay(value) : null;
+  if (day) return calendarDayCompare(col, operator, day, timezone);
+  if (operator === 'eq') return Prisma.sql`${col} = ${coerceScalar(field, value)}`;
+  if (operator === 'neq') return Prisma.sql`${col} <> ${coerceScalar(field, value)}`;
+  if (field.type === 'boolean') {
+    fail(`Operator ${operator} not valid for boolean field ${field.key}`);
+  }
+  const op = { gt: '>', gte: '>=', lt: '<', lte: '<=' }[operator];
+  return Prisma.sql`${col} ${Prisma.raw(op)} ${coerceScalar(field, value)}`;
+}
+
+function buildCondition(
+  spec: AnalyticsEntitySpec,
+  cond: AnalyticsFilterCondition,
+  timezone: string,
+): Prisma.Sql {
   const field = requireField(spec, cond.field, 'filter');
   const col = columnExpr(field);
   switch (cond.operator) {
     case 'eq':
-      return Prisma.sql`${col} = ${coerceScalar(field, cond.value)}`;
     case 'neq':
-      return Prisma.sql`${col} <> ${coerceScalar(field, cond.value)}`;
     case 'gt':
     case 'gte':
     case 'lt':
-    case 'lte': {
-      if (field.type === 'boolean') fail(`Operator ${cond.operator} not valid for boolean field ${field.key}`);
-      const op = { gt: '>', gte: '>=', lt: '<', lte: '<=' }[cond.operator];
-      return Prisma.sql`${col} ${Prisma.raw(op)} ${coerceScalar(field, cond.value)}`;
-    }
+    case 'lte':
+      return compareScalar(field, col, cond.operator, cond.value, timezone);
     case 'contains':
     case 'startsWith': {
       if (field.type !== 'string' && field.type !== 'enum') {
@@ -186,6 +250,7 @@ function buildFilterGroup(
   group: AnalyticsFilterGroup,
   depth: number,
   budget: FilterBudget,
+  timezone: string,
 ): Prisma.Sql {
   if (depth > ANALYTICS_MAX_FILTER_DEPTH) {
     fail(`Filter tree exceeds max depth of ${ANALYTICS_MAX_FILTER_DEPTH}`);
@@ -194,13 +259,13 @@ function buildFilterGroup(
   const parts: Prisma.Sql[] = [];
   for (const node of group.conditions) {
     if (isGroup(node)) {
-      parts.push(buildFilterGroup(spec, node, depth + 1, budget));
+      parts.push(buildFilterGroup(spec, node, depth + 1, budget, timezone));
     } else {
       budget.conditions += 1;
       if (budget.conditions > ANALYTICS_MAX_FILTER_CONDITIONS) {
         fail(`Filter tree exceeds max of ${ANALYTICS_MAX_FILTER_CONDITIONS} conditions`);
       }
-      parts.push(buildCondition(spec, node));
+      parts.push(buildCondition(spec, node, timezone));
     }
   }
   // An empty group has no defensible identity element (TRUE silently widens
@@ -385,13 +450,16 @@ function buildOrderBy(query: AnalyticsQuery, plan: SelectPlan): Prisma.Sql[] {
 export function compileAnalyticsQuery(orgId: string, query: AnalyticsQuery): Prisma.Sql {
   const spec = getEntitySpec(query.entity) ?? fail(`Unknown entity: ${query.entity}`);
   const plan = buildSelectPlan(spec, query);
+  // Calendar-day filters need a zone even when the query does not bucket.
+  // Omitted zone is UTC, the same default the schema documents for buckets.
+  const timezone = query.timezone ? requireTimezone(query.timezone) : 'UTC';
 
   const where: Prisma.Sql[] = [Prisma.sql`org_id = ${orgId}::uuid`];
   if (spec.softDelete) where.push(Prisma.sql`deleted_at IS NULL`);
   // An empty TOP-LEVEL group is the builder UI's "no filters yet" shape —
   // treat it as absent. Empty nested groups still reject in buildFilterGroup.
   if (query.filters && query.filters.conditions.length > 0) {
-    where.push(buildFilterGroup(spec, query.filters, 1, { conditions: 0 }));
+    where.push(buildFilterGroup(spec, query.filters, 1, { conditions: 0 }, timezone));
   }
   const orderParts = buildOrderBy(query, plan);
 

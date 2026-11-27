@@ -357,6 +357,76 @@ describe('analytics-engine compile', () => {
     ).toThrow(AnalyticsQueryError);
   });
 
+  // A demo opportunity is written during the day (seed uses now, not midnight).
+  // The date picker sends a calendar day. Comparing that day to midnight makes
+  // "created on this day" and "created on or before this day" miss the row, and
+  // the preview says the report is empty.
+  it('treats a calendar day on a timestamp as that whole day, not midnight', () => {
+    const { text, values } = compile({
+      entity: 'opportunity',
+      timezone: 'America/New_York',
+      filters: {
+        logic: 'AND',
+        conditions: [{ field: 'createdAt', operator: 'eq', value: '2026-11-25' }],
+      },
+    });
+    expect(text).not.toMatch(/created_at = \$\d+::timestamptz/);
+    expect(text).toMatch(
+      /created_at >= \(\$\d+::timestamp AT TIME ZONE \$\d+\) AND created_at < \(\(\$\d+::date \+ 1\)::timestamp AT TIME ZONE \$\d+\)/,
+    );
+    expect(values).toContain('2026-11-25');
+    expect(values).toContain('America/New_York');
+  });
+
+  it('includes the rest of a UTC day when the filter is on or before a calendar date', () => {
+    const { text, values } = compile({
+      entity: 'opportunity',
+      filters: {
+        logic: 'AND',
+        conditions: [{ field: 'createdAt', operator: 'lte', value: '2026-11-25' }],
+      },
+    });
+    expect(text).not.toMatch(/created_at <= \$\d+::timestamptz/);
+    expect(text).toMatch(/created_at < \(\(\$\d+::date \+ 1\)::timestamp AT TIME ZONE \$\d+\)/);
+    expect(values).toContain('2026-11-25');
+    expect(values).toContain('UTC');
+  });
+
+  it('starts the next calendar day when the filter is after that date', () => {
+    const { text } = compile({
+      entity: 'activity',
+      filters: {
+        logic: 'AND',
+        conditions: [{ field: 'occurredAt', operator: 'gt', value: '2026-11-25' }],
+      },
+    });
+    expect(text).toMatch(/occurred_at >= \(\(\$\d+::date \+ 1\)::timestamp AT TIME ZONE \$\d+\)/);
+  });
+
+  it('keeps an exact instant when the filter value includes a time', () => {
+    const { text } = compile({
+      entity: 'opportunity',
+      filters: {
+        logic: 'AND',
+        conditions: [{ field: 'createdAt', operator: 'gte', value: '2026-11-25T15:04:00.000Z' }],
+      },
+    });
+    expect(text).toContain('created_at >= $2::timestamptz');
+  });
+
+  it('rejects an unknown zone on a calendar-day filter', () => {
+    expect(() =>
+      compile({
+        entity: 'opportunity',
+        timezone: 'Mars/Olympus',
+        filters: {
+          logic: 'AND',
+          conditions: [{ field: 'createdAt', operator: 'eq', value: '2026-11-25' }],
+        },
+      }),
+    ).toThrow(/Unknown timezone/);
+  });
+
   it('coerces date filter values and rejects garbage dates', () => {
     const { text, values } = compile({
       entity: 'task',

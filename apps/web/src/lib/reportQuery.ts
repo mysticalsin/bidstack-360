@@ -17,6 +17,18 @@ import type {
   SortField,
 } from '@/hooks/useAnalyticsReports';
 
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A date-picker value is a calendar day. The engine widens it only when the
+ *  query names the zone those digits were chosen in. */
+function hasCalendarDay(group: FilterGroup | null): boolean {
+  if (!group) return false;
+  return group.conditions.some((c) => {
+    if ('logic' in c) return hasCalendarDay(c);
+    return typeof c.value === 'string' && CALENDAR_DAY.test(c.value);
+  });
+}
+
 /** Drop empty/blank filter conditions and prune empty nested groups (the engine
  *  rejects empty nested groups with a 400). Returns null when nothing is left. */
 export function pruneFilters(group: FilterGroup): FilterGroup | null {
@@ -108,5 +120,12 @@ export function buildQuery(input: {
   if (sort.length > 0) q.sort = sort;
 
   if (input.limit) q.limit = Math.max(1, Math.min(1000, input.limit));
+
+  // The date the author picked, and a month bucket, belong to their zone.
+  // Leaving this off makes the engine read the day as UTC midnight, so a
+  // demo row written later that day is missing and the report looks empty.
+  if (groupBy.some((g) => g.timeBucket) || hasCalendarDay(pruned)) {
+    q.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
   return q;
 }
