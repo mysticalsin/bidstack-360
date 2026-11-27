@@ -59,4 +59,19 @@ describe('console shell CSS', () => {
     expect(block('.mobile-nav-drawer')).toContain('var(--ease-drawer)');
     expect(css).toMatch(/\.mobile-nav-root\[data-motion='instant'\][^{]*\{\s*transition-duration: 0s !important;/);
   });
+
+  it('drawer content clears the notch and the home indicator', () => {
+    // index.html sets viewport-fit=cover, so these env() values are the real
+    // status-bar, home-indicator, and landscape-notch bands. The panel stays
+    // on the screen edge (a gap would show the page beside the scrim). The
+    // content box is what has to move, or the close control and the last row
+    // sit under the system chrome on a phone.
+    const drawer = block('.mobile-nav-drawer');
+    expect(drawer).toMatch(/top:\s*0/);
+    expect(drawer).toMatch(/left:\s*0/);
+    expect(drawer).toMatch(/bottom:\s*0/);
+    expect(drawer).toContain('padding-top: env(safe-area-inset-top, 0px)');
+    expect(drawer).toContain('padding-bottom: env(safe-area-inset-bottom, 0px)');
+    expect(drawer).toContain('padding-left: env(safe-area-inset-left, 0px)');
+  });
 });

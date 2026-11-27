@@ -2810,6 +2810,12 @@ select:focus-visible {
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
+  /* Panel stays on the screen edge. The content box clears the status bar,
+     the home indicator, and a landscape notch. viewport-fit=cover makes these
+     env() values the real bands; a desktop where they are 0 is unchanged. */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
   /* Clip at the drawer edge so only the inner <nav> scrolls (vertically): no
      drawer-level horizontal/vertical overflow or rubber-band. */
   overflow: hidden;
