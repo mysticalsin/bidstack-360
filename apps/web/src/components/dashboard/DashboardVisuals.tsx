@@ -16,8 +16,8 @@ import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bkl
 import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
-  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
-  winRateByQuarter, wonByQuarter, type OppRow,
+  accountBars, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  winRateByQuarter, wonByQuarter, wonThisYear, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
 
@@ -42,7 +42,7 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
   const [now] = useState(() => Date.now());
-  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  const wonTotal = wonThisYear(rows, now);
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
   return (
