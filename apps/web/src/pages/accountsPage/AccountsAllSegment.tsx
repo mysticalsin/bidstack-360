@@ -4,17 +4,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { SmartCompanyDialog } from '@/components/company/SmartCompanyDialog';
+import { UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, EmptyStateLink, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import { AUTOPOPULATE_MAX, useAutopopulateSalesCompanies } from '@/hooks/useAutopopulateSalesCompanies';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { springSoft } from '@/lib/motion';
 
 import { AccountCard } from './AccountCard';
+import { accountPipelineAmount } from './accountPipelineAmount';
 import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from './AccountsChrome';
 import { isSyntheticAccountName } from './testDataFilter';
 import {
@@ -48,7 +49,6 @@ const SNAPSHOT_ACCOUNT_CAP = 200;
 
 export function AccountsAllSegment() {
   const { t } = useTranslation('crm');
-  const { formatMoneyMicros } = useFormatMoney();
   const dashboard = useCrmDashboard();
   const autopopulate = useAutopopulateSalesCompanies();
   const reducedMotion = useReducedMotion();
@@ -282,8 +282,9 @@ export function AccountsAllSegment() {
                   })}{' '}
               · {t('accounts.summary.openDeals', '{{count}} open deals', { count: totalOpen })} ·{' '}
               {t('accounts.summary.weightedPipeline', '{{amount}} weighted pipeline', {
-                amount: formatMoneyMicros(totalPipeline, 'EUR'),
-              })}
+                amount: accountPipelineAmount(totalPipeline),
+              })}{' '}
+              ({t('accounts.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)})
             </>
           }
           actions={
@@ -375,8 +376,8 @@ export function AccountsAllSegment() {
         />
         <StatTile
           label={t('accounts.stats.weightedPipeline.label', 'Weighted pipeline')}
-          value={formatMoneyMicros(totalPipeline, 'EUR')}
-          sublabel={t('accounts.stats.weightedPipeline.detail', 'bid and presales')}
+          value={accountPipelineAmount(totalPipeline)}
+          sublabel={t('accounts.currencyBasis', UNSPECIFIED_CURRENCY_BASIS)}
         />
         <StatTile
           label={t('accounts.stats.coverage.label', 'Avg coverage')}
