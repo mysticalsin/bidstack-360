@@ -18,6 +18,23 @@ export function forecastGroupCaption(
 }
 
 /**
+ * Caption under Forecast Details.
+ *
+ * The sign-in demo has bids and no manual forecast rows. "0 forecast groups"
+ * reads as the forecast itself. The projection above is the book. A zero
+ * count is not a forecast total, so that caption is omitted. A saved row
+ * keeps "N forecast groups". A continued page keeps the truncation caption.
+ */
+export function forecastDetailsCaption(
+  count: number,
+  pageContinues: boolean,
+  latest: number,
+): string | null {
+  if (!pageContinues && count === 0) return null;
+  return forecastGroupCaption(count, pageContinues, latest);
+}
+
+/**
  * Note above the manual-override amounts. Those sums are the loaded page.
  * A continued page is not every forecast. A shorter page keeps the old totals
  * label. No forecast total is invented.
