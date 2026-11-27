@@ -22,7 +22,7 @@ import type { Forecast } from '@bidstack/shared';
 
 import { ForecastChart } from './forecasts/ForecastChart';
 import { ForecastProjection } from './forecasts/ForecastProjection';
-import { ForecastList } from './forecasts/ForecastList';
+import { ForecastList, type ForecastListRead } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
 import { forecastTotalsNote } from './forecasts/forecast-list-caption';
 import {
@@ -32,6 +32,16 @@ import {
   type ForecastRow,
   type PeriodFilter,
 } from './forecasts/forecastsConfig';
+
+function forecastListRead(forecasts: {
+  data?: { items?: unknown } | null;
+  isError: boolean;
+}): ForecastListRead {
+  if (forecasts.isError) return 'failed';
+  if (forecasts.data == null) return 'checking';
+  if (!Array.isArray(forecasts.data.items)) return 'failed';
+  return 'settled';
+}
 
 export function ForecastsPage() {
   const { t } = useTranslation('crm');
@@ -279,6 +289,7 @@ export function ForecastsPage() {
           rows={rows}
           isLoading={forecasts.isLoading}
           isError={forecasts.isError}
+          listRead={forecastListRead(forecasts)}
           errorMessage={forecasts.error?.message}
           onRetry={() => void forecasts.refetch()}
           onNewForecast={() => setDialogOpen(true)}
