@@ -118,6 +118,22 @@ describe('OrgDashboard first-run state', () => {
     expect(screen.queryByTestId('dashboard-hero')).toBeNull();
   });
 
+  it('does not treat an unread summary as an empty org', () => {
+    // WHY: a paused read has isLoading false and no payload. That is not a
+    // brand-new workspace. Getting started would hide the synthetic portfolio.
+    vi.mocked(useOrgSummary).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    renderDashboard();
+
+    expect(screen.queryByTestId('getting-started')).toBeNull();
+    expect(screen.queryByTestId('kpi-row')).toBeNull();
+    expect(screen.getByText('Checking the workspace')).toBeTruthy();
+  });
+
   it('renders the command center once any record exists', () => {
     vi.mocked(useOrgSummary).mockReturnValue({
       data: { ...emptySummary, leads: 1 },
