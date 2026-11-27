@@ -6,10 +6,10 @@ import type { AccountConversation } from '@bidstack/shared';
 import { Badge, type BadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useAccountConversations, useRefileMeeting } from '@/hooks/useAccountConversations';
 import { useHasPermission } from '@/hooks/useCapabilities';
 
+import { accountConversationsPhase } from './account-conversations-read';
 import { OpenInTeamsLink, TeamsImportSheet } from './TeamsImportSheet';
 
 const COMPANY_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -154,13 +154,39 @@ export function AccountConversations({ companyId, companyName }: { companyId: st
   const canWrite = useHasPermission('activities:write');
   const [teamsOpen, setTeamsOpen] = useState(false);
   const eligible = canRead && COMPANY_ID_RE.test(companyId);
-  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useAccountConversations(eligible ? companyId : undefined);
+  const conversations = useAccountConversations(eligible ? companyId : undefined);
 
   if (!eligible) return null;
 
+  const phase = accountConversationsPhase({
+    data: conversations.data,
+    isError: conversations.isError,
+    status: conversations.status,
+  });
+
+  if (phase === 'failed') {
+    return (
+      <div role="alert" className="flex items-center justify-between gap-3 px-4 py-4 text-sm">
+        <span className="text-[var(--fg-secondary)]">Conversations did not load.</span>
+        <Button variant="secondary" size="sm" onClick={() => void conversations.refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+        Checking conversations. The list has not arrived.
+      </p>
+    );
+  }
+
+  const data = conversations.data;
   const items = data?.pages.flatMap((p) => p.items) ?? [];
   const options = data?.pages[0]?.openOpportunities ?? [];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = conversations;
 
   return (
     <Card>
@@ -189,18 +215,7 @@ export function AccountConversations({ companyId, companyName }: { companyId: st
         />
       )}
       <div className="px-4">
-        {isLoading ? (
-          <div className="py-4">
-            <LoadingSkeleton rows={3} />
-          </div>
-        ) : isError || !data ? (
-          <div role="alert" className="flex items-center justify-between gap-3 py-4 text-sm">
-            <span className="text-[var(--fg-secondary)]">Conversations did not load.</span>
-            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
-              Retry
-            </Button>
-          </div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <p className="py-4 text-sm text-[var(--fg-secondary)]">No synced meetings or emails yet.</p>
         ) : (
           <>
