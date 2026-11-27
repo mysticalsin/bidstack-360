@@ -12,19 +12,21 @@ import type { TechnicalStackCategory } from '@bidstack/shared';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompanyTechnicalStack, useSaveCompanyTechnicalStack } from '@/hooks/useCompanyTechnicalStack';
 
 import { TechCoverageLine, TechEvidenceChip } from './TechEvidence';
 import { TechLogo } from './TechLogo';
+import { techStackPhase } from './tech-stack-read';
 
 const MAIN_STACK = 'Main stack';
 
 export function CompanyTechStackSection({ companyId }: { companyId: string }) {
   // The API resolves a Company row by id; a name key only resolves when an
   // enrichment row exists, so name lookups 404 for plain accounts.
-  const { data, isLoading, isError, refetch } = useCompanyTechnicalStack(companyId);
+  const { data, isError, status, refetch } = useCompanyTechnicalStack(companyId);
+  const phase = techStackPhase({ data, isError, status });
   const save = useSaveCompanyTechnicalStack(companyId);
   const canEdit = useHasPermission('companies:write');
   const [draft, setDraft] = useState<{ companyId: string; stack: TechnicalStackCategory[] } | null>(null);
@@ -32,7 +34,8 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
   // The account page can keep this section mounted across company routes.
   // A draft is only editable for the company it was opened on.
   const activeDraft = draft?.companyId === companyId ? draft.stack : null;
-  const categories = (data?.effectiveStack ?? []).filter((cat) => cat.items.length > 0);
+  const settled = phase === 'ready' ? data : undefined;
+  const categories = (settled?.effectiveStack ?? []).filter((cat) => cat.items.length > 0);
   const groups = groupByStack(categories);
   const editing = activeDraft !== null;
 
@@ -59,18 +62,18 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
       <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-[var(--fg-primary)]">Technology stack</h2>
-          {data?.coverage ? (
+          {settled?.coverage ? (
             <div className="mt-1">
-              <TechCoverageLine coverage={data.coverage} />
+              <TechCoverageLine coverage={settled.coverage} />
             </div>
           ) : null}
         </div>
-        {canEdit && data && !editing ? (
+        {canEdit && settled && !editing ? (
           <button type="button" onClick={startEdit} className={SECONDARY_BTN}>
             Edit
           </button>
         ) : null}
-        {editing ? (
+        {editing && phase === 'ready' ? (
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={() => setDraft(null)} className={SECONDARY_BTN}>
               Cancel
@@ -82,15 +85,17 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
         ) : null}
       </div>
       <div className="p-4">
-        {activeDraft ? (
+        {phase === 'ready' && activeDraft ? (
           <TechStackEditor
             draft={activeDraft}
             onChange={(stack) => setDraft({ companyId, stack })}
             saveError={saveError && draft?.companyId === companyId}
           />
-        ) : isLoading ? (
-          <LoadingSkeleton rows={3} />
-        ) : isError && !data ? (
+        ) : phase === 'unread' ? (
+          <p className="text-sm text-[var(--fg-secondary)]">
+            Checking the technology stack. The stack has not arrived.
+          </p>
+        ) : phase === 'failed' ? (
           <ErrorState
             title="Could not load technology stack"
             action={
