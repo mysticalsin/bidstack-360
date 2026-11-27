@@ -1,10 +1,13 @@
 /**
- * Slice 14 demo fixtures: sample organization data and job postings for every
- * demo company, then the list summary for each. Every row is source 'fixture'
- * (sample=true on postings, provenance source 'fixture' on firmographics), so
- * the UI labels it "Sample data". Organization-level fields only, never people.
+ * Slice 14 demo fixtures: sample organization data, job postings, and one
+ * sample post for every demo company that does not already have one, then the
+ * list summary for each. Every row is source 'fixture' (sample=true on
+ * postings and posts, provenance source 'fixture' on firmographics), so the UI
+ * labels it "Sample data". Organization-level fields only, never people.
  * Idempotent: upserts on the natural keys.
  */
+import { classifyPost, type IntelPostKind } from '@bidstack/shared';
+
 import type { Prisma, PrismaClient } from '../generated/client/index.js';
 
 import { intelConnections, recomputeCompanyIntelSummary } from './company-intel-summary.js';
@@ -110,6 +113,106 @@ const ORGS: FixtureOrg[] = [
   },
 ];
 
+/**
+ * seed-account-intel already writes posts for these three. A second fixture
+ * post would become the headline the summary shows.
+ */
+export const ACCOUNTS_WITH_ACCOUNT_INTEL_POSTS = ['DNB Bank', 'MAHLE', 'MAPFRE'] as const;
+
+/**
+ * Demo companies in this seed that have firmographics and postings, and no
+ * company post, unless this host writes one. db:seed does not run seed:signals.
+ */
+export const HOSTED_SIGNAL_ACCOUNTS = [
+  'CI Financial',
+  'Logistec Corporation',
+  'Rush University System for Health',
+  'Aritzia',
+  'NOS',
+  'Mantu',
+  'Northwind Pharma',
+] as const;
+
+/** Newest sample-signal headline for the five catalog accounts, plus one synthetic post for the two it does not name. */
+const HOSTED_NEWS: Record<(typeof HOSTED_SIGNAL_ACCOUNTS)[number], { title: string; excerpt: string; daysAgo: number }> = {
+  'CI Financial': {
+    title: 'CI Financial third-quarter profit rose 12% on record assets',
+    excerpt: 'Assets under management reached a record; US wealth drove most of the growth.',
+    daysAgo: 6,
+  },
+  'Logistec Corporation': {
+    title: 'Logistec Corporation acquired by private equity consortium',
+    excerpt: 'The new owners plan to invest in terminal automation.',
+    daysAgo: 70,
+  },
+  'Rush University System for Health': {
+    title: 'Rush University System for Health launches new patient app',
+    excerpt: 'Scheduling, results and virtual visits in one app.',
+    daysAgo: 23,
+  },
+  Aritzia: {
+    title: 'Aritzia opens new boutiques in the US as expansion accelerates',
+    excerpt: 'Ten new US boutiques planned this fiscal year; ecommerce up 20%.',
+    daysAgo: 11,
+  },
+  NOS: {
+    title: 'NOS partners with Ericsson on 5G standalone network',
+    excerpt: 'Network slicing for enterprise customers from next year.',
+    daysAgo: 19,
+  },
+  Mantu: {
+    title: 'Mantu expands its cloud consulting practice',
+    excerpt: 'The practice adds cloud platform work for existing clients in Europe.',
+    daysAgo: 12,
+  },
+  'Northwind Pharma': {
+    title: 'Northwind Pharma expands a regulated cloud programme',
+    excerpt: 'The programme covers clinical and manufacturing systems in the demo fixture.',
+    daysAgo: 12,
+  },
+};
+
+export interface HostedSignalPost {
+  externalId: 'org-sample-news-0';
+  title: string;
+  excerpt: string;
+  kind: IntelPostKind;
+  theme: string | null;
+  url: string;
+  publishedAt: Date;
+  sample: true;
+}
+
+/** Names this seed summarises, in seed order. */
+export function demoCompanyIntelNames(): string[] {
+  return ORGS.map((o) => o.name);
+}
+
+/**
+ * One sample post for a demo company that otherwise has none.
+ * Null for DNB, MAHLE and MAPFRE, and for any other name.
+ * The day is `daysAgo` before `now`, so a re-seed stays inside the six-month window.
+ */
+export function hostedSignalPost(name: string, domain: string | null, now: Date): HostedSignalPost | null {
+  if ((ACCOUNTS_WITH_ACCOUNT_INTEL_POSTS as readonly string[]).includes(name)) return null;
+  const news = HOSTED_NEWS[name as keyof typeof HOSTED_NEWS];
+  if (!news) return null;
+  const title = `Sample: ${news.title}`;
+  const excerpt = `Sample post. Synthetic demo data, not a fetched article. ${news.excerpt}`;
+  const classified = classifyPost(title, excerpt);
+  const host = domain && domain.length > 0 ? domain : 'example.com';
+  return {
+    externalId: 'org-sample-news-0',
+    title,
+    excerpt,
+    kind: classified.kind,
+    theme: classified.theme,
+    url: `https://www.${host}/`,
+    publishedAt: new Date(now.getTime() - news.daysAgo * DAY),
+    sample: true,
+  };
+}
+
 /** Seed sample organization data and summaries for the demo companies. Returns companies summarised. */
 export async function seedCompanyIntel(prisma: PrismaClient, orgId: string, now: Date = new Date()): Promise<number> {
   const fetchedAt = new Date(now.getTime() - DAY);
@@ -151,6 +254,31 @@ export async function seedCompanyIntel(prisma: PrismaClient, orgId: string, now:
         where: { orgId_companyId_source_externalId: { orgId, companyId, source: 'fixture', externalId: `org-sample-${i}` } },
         create: { orgId, companyId, source: 'fixture', externalId: `org-sample-${i}`, ...posting },
         update: posting,
+      });
+    }
+    const hosted = hostedSignalPost(o.name, company.domain, now);
+    if (hosted) {
+      const post = {
+        url: hosted.url,
+        title: hosted.title,
+        excerpt: hosted.excerpt,
+        kind: hosted.kind,
+        theme: hosted.theme,
+        publishedAt: hosted.publishedAt,
+        fetchedAt,
+        sample: true,
+      };
+      await prisma.companyPost.upsert({
+        where: {
+          orgId_companyId_source_externalId: {
+            orgId,
+            companyId,
+            source: 'fixture',
+            externalId: hosted.externalId,
+          },
+        },
+        create: { orgId, companyId, source: 'fixture', externalId: hosted.externalId, ...post },
+        update: post,
       });
     }
     await recomputeCompanyIntelSummary(prisma, orgId, companyId, { now, connections });
