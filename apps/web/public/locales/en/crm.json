@@ -247,6 +247,12 @@
   "tasks": {
     "title": "Tasks",
     "subtitle": "{{count}} active follow-ups.",
+    "subtitleTodayEmpty": "Nothing due today.",
+    "subtitleTodayOne": "1 due today.",
+    "subtitleToday": "{{count}} due today.",
+    "subtitleOverdueEmpty": "Nothing overdue in this list.",
+    "subtitleOverdueOne": "1 overdue.",
+    "subtitleOverdue": "{{count}} overdue.",
     "actions": {
       "exportCsv": "Export CSV"
     },

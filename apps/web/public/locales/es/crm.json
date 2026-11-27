@@ -256,6 +256,12 @@
     "relatedTo": "Relacionado con",
     "addNote": "Agregar nota",
     "subtitle": "{{count}} seguimientos activos.",
+    "subtitleTodayEmpty": "Nada vence hoy.",
+    "subtitleTodayOne": "1 vence hoy.",
+    "subtitleToday": "{{count}} vencen hoy.",
+    "subtitleOverdueEmpty": "Nada vencido en esta lista.",
+    "subtitleOverdueOne": "1 vencida.",
+    "subtitleOverdue": "{{count}} vencidas.",
     "actions": {
       "exportCsv": "Exportar CSV"
     },

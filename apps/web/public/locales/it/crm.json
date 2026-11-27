@@ -247,6 +247,12 @@
   "tasks": {
     "title": "Attività",
     "subtitle": "{{count}} follow-up attivi.",
+    "subtitleTodayEmpty": "Niente in scadenza oggi.",
+    "subtitleTodayOne": "1 in scadenza oggi.",
+    "subtitleToday": "{{count}} in scadenza oggi.",
+    "subtitleOverdueEmpty": "Niente in ritardo in questo elenco.",
+    "subtitleOverdueOne": "1 in ritardo.",
+    "subtitleOverdue": "{{count}} in ritardo.",
     "actions": {
       "exportCsv": "Esporta CSV"
     },

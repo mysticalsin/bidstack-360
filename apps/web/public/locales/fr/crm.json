@@ -256,6 +256,12 @@
     "relatedTo": "Lié à",
     "addNote": "Ajouter une note",
     "subtitle": "{{count}} relances actives.",
+    "subtitleTodayEmpty": "Rien pour aujourd'hui.",
+    "subtitleTodayOne": "1 pour aujourd'hui.",
+    "subtitleToday": "{{count}} pour aujourd'hui.",
+    "subtitleOverdueEmpty": "Rien en retard dans cette liste.",
+    "subtitleOverdueOne": "1 en retard.",
+    "subtitleOverdue": "{{count}} en retard.",
     "actions": {
       "exportCsv": "Exporter en CSV"
     },
