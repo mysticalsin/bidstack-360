@@ -6,11 +6,15 @@ import { useRfpRequirements } from '@/hooks/rfp/useRfpRequirements';
 import { useRfpPipelineStore } from '@/stores/rfpPipeline';
 import { extractedRequirementCaption, shownExtractedRequirements } from './requirement-caption';
 import { RequirementRow } from './RequirementRow';
+import { requirementsListPhase } from './requirements-list-read';
 
 export function RequirementsList() {
   const { t } = useTranslation('rfp');
   const bidWorkspaceId = useRfpPipelineStore((s) => s.bidWorkspaceId);
-  const { data, isLoading, isError, error } = useRfpRequirements(bidWorkspaceId);
+  const requirementsQuery = useRfpRequirements(bidWorkspaceId);
+  const { data, error } = requirementsQuery;
+  // A missing payload is not an empty extract. Empty is only a settled read.
+  const phase = requirementsListPhase(requirementsQuery);
   const page = shownExtractedRequirements(data?.items ?? [], data?.requirementsContinue);
 
   return (
@@ -28,36 +32,39 @@ export function RequirementsList() {
         </div>
       </div>
 
-      {isLoading && (
+      {phase === 'unread' ? (
         <div className="p-4">
+          <p role="status" className="mb-2 text-sm text-[var(--fg-secondary)]">
+            {t('requirements.unread', 'Checking requirements. The list has not arrived.')}
+          </p>
           <LoadingSkeleton rows={4} />
         </div>
-      )}
+      ) : null}
 
-      {isError && (
+      {phase === 'failed' ? (
         <div className="p-4">
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {error instanceof Error ? error.message : t('states.error')}
           </p>
         </div>
-      )}
+      ) : null}
 
-      {!isLoading && !isError && (!data || page.items.length === 0) && (
+      {phase === 'ready' && page.items.length === 0 ? (
         <div className="p-6">
           <EmptyState
             title={t('requirements.emptyTitle')}
             message={t('requirements.emptyMessage')}
           />
         </div>
-      )}
+      ) : null}
 
-      {data && page.items.length > 0 && (
+      {phase === 'ready' && page.items.length > 0 ? (
         <ul aria-label={t('requirements.listLabel')} role="list">
           {page.items.map((req) => (
             <RequirementRow key={req.id} requirement={req} />
           ))}
         </ul>
-      )}
+      ) : null}
     </Card>
   );
 }
