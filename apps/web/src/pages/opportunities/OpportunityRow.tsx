@@ -8,6 +8,7 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -30,6 +31,7 @@ import { prefetchRoute } from '@/lib/prefetch';
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { DateCell, NumberCell, StageCell } from './OppInlineEditCells';
+import { opportunityPlace, placeLocale, type OpportunityPlaceColumn } from './opportunity-place';
 
 // Amaris bid-class severity tone (simple C0 → strategic C4).
 const ROW_BID_CLASS_TONE: Record<string, 'jade' | 'blue' | 'amber' | 'tomato' | 'rose'> = {
@@ -67,6 +69,7 @@ export const Row = memo(function Row({
   onToggleSelect,
   patch,
   canWrite,
+  placeColumn,
 }: {
   opp: Opportunity;
   stageOptions: PipelineStage[];
@@ -76,7 +79,10 @@ export const Row = memo(function Row({
   /** False when the signed-in user lacks opportunities:write — the backend
    * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
   canWrite: boolean;
+  /** Country when this page has no territory names. Territory when it does. */
+  placeColumn: OpportunityPlaceColumn;
 }) {
+  const { t, i18n } = useTranslation('crm');
   const fireConfetti = useConfetti((s) => s.fire);
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
@@ -105,6 +111,11 @@ export const Row = memo(function Row({
     setSaving((s) => ({ ...s, [field]: true }));
   const endSave = (field: 'stage' | 'value' | 'probability' | 'dueDate') =>
     setSaving((s) => ({ ...s, [field]: false }));
+
+  const place = opportunityPlace(
+    { territoryName: opp.territoryName, country: opp.country },
+    placeLocale(i18n.resolvedLanguage || i18n.language),
+  );
 
   const savedToast = (field: string) => toast.success(`${field} updated`, { duration: 2200 });
   const errorToast = (err: unknown) =>
@@ -142,7 +153,10 @@ export const Row = memo(function Row({
       </td>
 
       <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-[var(--fg-tertiary)]">
-        <Link to={`/opportunities/${opp.id}`} className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]">
+        <Link
+          to={`/opportunities/${opp.id}`}
+          className="hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
+        >
           {opp.code}
         </Link>
       </td>
@@ -169,12 +183,38 @@ export const Row = memo(function Row({
       </td>
 
       <td className="px-5 py-3">
-        {opp.territoryName ? (
-          <Badge tone="teal">{opp.territoryName}</Badge>
-        ) : opp.country ? (
-          <span className="text-xs text-[var(--fg-tertiary)]">{opp.country}</span>
+        {place.kind === 'territory' ? (
+          <Badge tone="teal">{place.label}</Badge>
+        ) : place.kind === 'country' ? (
+          <span className="text-xs text-[var(--fg-secondary)]">
+            {placeColumn === 'territory' ? (
+              <span className="sr-only">
+                {t(
+                  'opportunities.place.countryOnTerritoryPage',
+                  'Country: {{name}}. No territory on this bid.',
+                  { name: place.label },
+                )}
+              </span>
+            ) : null}
+            <span aria-hidden={placeColumn === 'territory' ? true : undefined}>{place.label}</span>
+          </span>
+        ) : place.kind === 'code' ? (
+          <span className="text-xs text-[var(--fg-secondary)]">
+            <span className="sr-only">
+              {t(
+                'opportunities.place.countryCode',
+                'Country code {{code}}. No territory on this bid.',
+                { code: place.code },
+              )}
+            </span>
+            <span aria-hidden="true">{place.code}</span>
+          </span>
         ) : (
-          <span className="text-xs text-[var(--fg-tertiary)]">—</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">
+            {placeColumn === 'country'
+              ? t('opportunities.place.noCountry', 'No country')
+              : t('opportunities.place.noTerritory', 'No territory')}
+          </span>
         )}
       </td>
 

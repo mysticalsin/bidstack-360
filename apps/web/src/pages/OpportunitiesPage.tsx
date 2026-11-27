@@ -45,6 +45,7 @@ import {
   type DueQuickFilter,
 } from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
+import { opportunityPlaceColumn } from './opportunities/opportunity-place';
 
 export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
@@ -73,7 +74,8 @@ export function OpportunitiesPage() {
   // A1 (bid clock) quick filters — "due" is independent of stage, so both can
   // be active together (e.g. "S2 Sent, overdue").
   const dueParam = searchParams.get('due');
-  const dueFilter: DueQuickFilter = dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
+  const dueFilter: DueQuickFilter =
+    dueParam === 'within7' || dueParam === 'overdue' ? dueParam : null;
   const setDueFilter = (next: DueQuickFilter) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('due', next);
@@ -155,6 +157,7 @@ export function OpportunitiesPage() {
     else params.set('sort', `${next.key}.${next.dir}`);
     setSearchParams(params, { replace: true });
   };
+  const placeColumn = opportunityPlaceColumn(rawItems);
   const { sorted: items } = useTableSort(rawItems, accessors, {
     state: sortState,
     onChange: setSortState,
@@ -309,24 +312,28 @@ export function OpportunitiesPage() {
     const stamp = new Date().toISOString().slice(0, 10);
     setIsExporting(true);
     try {
-      await downloadFromApi('/api/opportunities/export', `polo-presales-opportunities-${stamp}.csv`, {
-        // Mirror the list query's stage branching: a configured stage is a UUID
-        // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
-        // legacy enum as pipelineStageId 400s the export.
-        // Export must send the same filters as the list query.
-        querystring: {
-          ...(stageFilter
-            ? isPipelineStageIdUuid(stageFilter)
-              ? { pipelineStageId: stageFilter }
-              : isLegacyOpportunityStage(stageFilter)
-                ? { stage: stageFilter }
-                : {}
-            : {}),
-          ...(search ? { search } : {}),
-          ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
-          ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
+      await downloadFromApi(
+        '/api/opportunities/export',
+        `polo-presales-opportunities-${stamp}.csv`,
+        {
+          // Mirror the list query's stage branching: a configured stage is a UUID
+          // (pipelineStageId), a legacy stage is an enum string (stage). Sending a
+          // legacy enum as pipelineStageId 400s the export.
+          // Export must send the same filters as the list query.
+          querystring: {
+            ...(stageFilter
+              ? isPipelineStageIdUuid(stageFilter)
+                ? { pipelineStageId: stageFilter }
+                : isLegacyOpportunityStage(stageFilter)
+                  ? { stage: stageFilter }
+                  : {}
+              : {}),
+            ...(search ? { search } : {}),
+            ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
+            ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
+          },
         },
-      });
+      );
       toast.success(t('opportunities.toast.exportComplete', 'Export complete'));
     } catch {
       toast.error(t('opportunities.toast.exportFailed', 'Export failed'), {
@@ -450,9 +457,7 @@ export function OpportunitiesPage() {
         ) : isError ? (
           <ErrorState
             title={t('opportunities.error.title', "Couldn't load opportunities")}
-            message={
-              error?.message ?? t('opportunities.error.message', 'Try again in a moment.')
-            }
+            message={error?.message ?? t('opportunities.error.message', 'Try again in a moment.')}
           />
         ) : data?.items.length === 0 ? (
           <EmptyState
@@ -488,6 +493,7 @@ export function OpportunitiesPage() {
                 allSelected={allSelected}
                 someSelected={someSelected}
                 toggleAll={toggleAll}
+                placeColumn={placeColumn}
               />
               <tbody className="divide-y divide-[var(--border-subtle)]">
                 {items.map((opp) => (
@@ -499,6 +505,7 @@ export function OpportunitiesPage() {
                     onToggleSelect={toggleOne}
                     patch={patch}
                     canWrite={canWrite}
+                    placeColumn={placeColumn}
                   />
                 ))}
               </tbody>
