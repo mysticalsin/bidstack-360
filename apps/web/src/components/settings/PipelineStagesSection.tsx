@@ -12,6 +12,7 @@ import {
   type PipelineStageSettings,
 } from '@/hooks/usePipelineStages';
 import { stageListCaption } from './stage-list-caption';
+import { lockedStageProbability } from './stage-probability-lock';
 
 export function PipelineStagesSection() {
   const { t } = useTranslation('settings');
@@ -104,8 +105,12 @@ function StageRow({
   const [name, setName] = useState(stage.name);
   const [probability, setProbability] = useState(String(stage.probability));
   const [color, setColor] = useState(stage.color ?? '#64748b');
+  const lockedProbability = lockedStageProbability(stage);
+  const probabilityId = `pipeline-stage-probability-${stage.id}`;
+  const lockMessageId = `pipeline-stage-probability-lock-${stage.id}`;
 
-  const parsedProbability = Math.max(0, Math.min(100, Math.round(Number(probability))));
+  const parsedProbability =
+    lockedProbability ?? Math.max(0, Math.min(100, Math.round(Number(probability))));
   const dirty =
     name.trim() !== stage.name ||
     parsedProbability !== stage.probability ||
@@ -147,17 +152,43 @@ function StageRow({
           ) : null}
         </span>
       </label>
-      <label className="text-xs text-[var(--fg-secondary)]">
-        {t('pipelineStages.probabilityLabel', 'Probability')}
-        <input
-          className="input mt-1 w-full text-sm"
-          type="number"
-          min={0}
-          max={100}
-          value={probability}
-          onChange={(e) => setProbability(e.target.value)}
-        />
-      </label>
+      <div>
+        <label className="text-xs text-[var(--fg-secondary)]" htmlFor={probabilityId}>
+          {t('pipelineStages.probabilityLabel', 'Probability')}
+          <input
+            id={probabilityId}
+            className="input mt-1 w-full text-sm read-only:cursor-not-allowed read-only:opacity-70"
+            type="number"
+            min={0}
+            max={100}
+            value={lockedProbability !== null ? String(lockedProbability) : probability}
+            readOnly={lockedProbability !== null}
+            aria-disabled={lockedProbability !== null || undefined}
+            aria-label={
+              lockedProbability !== null
+                ? t('pipelineStages.lockedProbabilityField', 'Probability, {{stage}}', {
+                    stage: stage.name,
+                  })
+                : undefined
+            }
+            aria-describedby={lockedProbability !== null ? lockMessageId : undefined}
+            onChange={(e) => {
+              if (lockedProbability !== null) return;
+              setProbability(e.target.value);
+            }}
+          />
+        </label>
+        {lockedProbability === 100 ? (
+          <p id={lockMessageId} className="mt-1 text-xs text-[var(--fg-tertiary)]">
+            {t('pipelineStages.wonProbabilityLocked', 'A won stage stays at 100.')}
+          </p>
+        ) : null}
+        {lockedProbability === 0 ? (
+          <p id={lockMessageId} className="mt-1 text-xs text-[var(--fg-tertiary)]">
+            {t('pipelineStages.lostProbabilityLocked', 'A lost stage stays at 0.')}
+          </p>
+        ) : null}
+      </div>
       <label className="text-xs text-[var(--fg-secondary)]">
         {t('pipelineStages.colorLabel', 'Color')}
         <input
@@ -168,7 +199,16 @@ function StageRow({
         />
       </label>
       <div className="flex items-end">
-        <Button type="submit" size="sm" disabled={!dirty || isSaving || !name.trim()}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!dirty || isSaving || !name.trim()}
+          aria-label={
+            lockedProbability !== null
+              ? t('pipelineStages.saveLockedStage', 'Save {{stage}}', { stage: stage.name })
+              : undefined
+          }
+        >
           {isSaving ? t('pipelineStages.savingButton', 'Saving...') : t('pipelineStages.saveButton', 'Save')}
         </Button>
       </div>

@@ -611,6 +611,10 @@
     "wonStageBadge": "Won stage",
     "lostStageBadge": "Lost stage",
     "probabilityLabel": "Probability",
+    "lockedProbabilityField": "Probability, {{stage}}",
+    "wonProbabilityLocked": "A won stage stays at 100.",
+    "lostProbabilityLocked": "A lost stage stays at 0.",
+    "saveLockedStage": "Save {{stage}}",
     "colorLabel": "Color",
     "savingButton": "Saving...",
     "saveButton": "Save"
