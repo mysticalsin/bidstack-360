@@ -45,7 +45,11 @@ const ALL: Category[] = ['company', 'market', 'procurement', 'logo', 'people', '
 
 export function ConnectorsSection() {
   const { t } = useTranslation('integrations');
-  const { data, isLoading, isError, error, refetch } = useConnectorCatalog();
+  const { data, isLoading, isPending, isError, error, refetch, fetchStatus } =
+    useConnectorCatalog();
+  // A paused or in-flight catalog has no payload. That is not an empty list.
+  const catalogUnread =
+    !data && !isError && (isLoading || isPending || fetchStatus === 'paused');
   const [filter, setFilter] = useState<Category | 'all'>('all');
   // Gmail and Microsoft 365 live on WorkspaceAccountsCard, one card per provider.
   const items = useMemo(
@@ -96,15 +100,35 @@ export function ConnectorsSection() {
         )}
         action={
           <Badge
-            tone={statusCounts.down > 0 ? 'tomato' : statusCounts.degraded > 0 ? 'amber' : 'jade'}
+            tone={
+              catalogUnread || isError
+                ? 'gray'
+                : statusCounts.down > 0
+                  ? 'tomato'
+                  : statusCounts.degraded > 0
+                    ? 'amber'
+                    : 'jade'
+            }
           >
-            {t('connectors.header.sourcesBadge', '{{count}} sources', { count: items.length })}
+            {catalogUnread
+              ? t('connectors.header.checking', 'Checking')
+              : isError
+                ? t('connectors.header.notLoaded', 'Not loaded')
+                : t('connectors.header.sourcesBadge', '{{count}} sources', {
+                    count: items.length,
+                  })}
           </Badge>
         }
       />
-      {isLoading ? (
-        <div className="p-5">
-          <LoadingSkeleton rows={4} />
+      {catalogUnread ? (
+        <div className="p-5" role="status">
+          <p className="text-sm font-medium text-[var(--fg-primary)]">
+            {t('connectors.unread.title', 'Checking connectors')}
+          </p>
+          <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+            {t('connectors.unread.body', 'The catalog has not arrived.')}
+          </p>
+          {isLoading ? <LoadingSkeleton rows={4} /> : null}
         </div>
       ) : isError ? (
         <ErrorState
