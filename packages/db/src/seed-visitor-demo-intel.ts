@@ -43,6 +43,24 @@ const ROLES = [
   { title: 'Sample: Security engineer', fn: 'security', skills: [] as string[], daysAgo: 16 },
 ] as const;
 
+// Northwind carries the HEMA MSA used by the whitespace dismissal test. Words
+// such as cloud, data, or engineer collapse that flag to a single IT line, and
+// dismissing the last open line leaves it on the flag.
+const NORTHWIND_ROLES = [
+  { title: 'Sample: Clinical research associate', fn: 'operations', skills: [] as string[], daysAgo: 4 },
+  { title: 'Sample: Medical science liaison', fn: 'operations', skills: [] as string[], daysAgo: 11 },
+  { title: 'Sample: Regulatory affairs specialist', fn: 'operations', skills: [] as string[], daysAgo: 16 },
+] as const;
+
+function rolesFor(name: string) {
+  return name === 'Northwind Pharma' ? NORTHWIND_ROLES : ROLES;
+}
+
+function postTitle(name: string): string {
+  if (name === 'Northwind Pharma') return 'Sample: Northwind Pharma opens a clinical research site';
+  return `Sample: ${name} expands a cloud programme`;
+}
+
 function techFor(industry: string): string[] {
   if (industry === 'Healthcare') return ['Veeva', 'AWS'];
   if (industry === 'Financial Services') return ['Salesforce', 'Microsoft Azure'];
@@ -110,7 +128,7 @@ export function hostedIntelSummaryInput(
       provenance,
       fetchedAt,
     },
-    postings: ROLES.map((role, i) => ({
+    postings: rolesFor(account.name).map((role, i) => ({
       id: `visitor-demo-${i}`,
       title: role.title,
       function: role.fn,
@@ -128,7 +146,7 @@ export function hostedIntelSummaryInput(
     posts: [
       {
         kind: 'expansion',
-        title: `Sample: ${account.name} expands a cloud programme`,
+        title: postTitle(account.name),
         url: `https://${account.domain}/`,
         publishedAt: new Date(now.getTime() - 12 * DAY).toISOString(),
         sourceLabel: 'Sample data',

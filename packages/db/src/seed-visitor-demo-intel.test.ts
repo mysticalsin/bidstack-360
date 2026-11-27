@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { buildIntelSummary } from '@bidstack/shared';
+import { buildIntelSummary, EXPANSION_LINES, linesInText } from '@bidstack/shared';
 import { describe, expect, it } from 'vitest';
 
 import { VISITOR_DEMO_ACCOUNTS } from './seed-org-data.js';
@@ -61,6 +61,24 @@ describe('visitor demo company intel', () => {
       const published = Date.parse(summary.signal!.publishedAt!);
       expect(NOW.getTime() - published).toBeLessThanOrEqual(180 * DAY);
     }
+  });
+
+  it('keeps the Northwind sample off the HEMA expansion lines', () => {
+    // WHY: Northwind's HEMA MSA is the whitespace fixture. IT-shaped roles
+    // collapse its open lines to only "it". Dismissing that last line leaves
+    // it on the flag.
+    const account = VISITOR_DEMO_ACCOUNTS.find((row) => row.name === 'Northwind Pharma');
+    expect(account).toBeTruthy();
+    const input = hostedIntelSummaryInput(account!, NOW, 'company-1');
+    const texts = [
+      ...input.postings.map((posting) => `${posting.title} ${posting.skills.join(' ')}`),
+      ...input.posts.map((post) => post.title),
+    ];
+    for (const text of texts) {
+      expect(linesInText(text).filter((line) => (EXPANSION_LINES as readonly string[]).includes(line))).toEqual([]);
+    }
+    expect(input.postings.length).toBeGreaterThan(0);
+    expect(input.posts.length).toBeGreaterThan(0);
   });
 
   it('gives each sample posting its own fetch time', () => {
