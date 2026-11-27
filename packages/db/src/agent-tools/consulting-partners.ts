@@ -11,7 +11,7 @@
  */
 import { z } from 'zod';
 
-import { composeConsultingPartners, FirmKey } from '@bidstack/shared';
+import { composeConsultingPartners, FirmKey, type PartnerRunStatus } from '@bidstack/shared';
 
 import {
   countPartnerEngagements,
@@ -30,6 +30,15 @@ const MAX_PARTNERS = 12;
 const EVIDENCE_CAP = 50;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const NOTE = 'Scores and angles cite evidence ids listed under evidence. A dimension with no evidence shows no_evidence, not a guess. Lines marked inferred are derived by rules.';
+const UNREAD_NOTE = 'Checking consulting partners. The list has not arrived.';
+const FAILED_NOTE = "Couldn't load consulting partners.";
+
+/** A missing or in-flight scan is not an empty partner list. A failed scan with no rows is not one either. */
+function consultingPartnerScanRead(status: PartnerRunStatus['status']): 'unread' | 'failed' | 'ready' {
+  if (status === 'failed') return 'failed';
+  if (status === 'never' || status === 'queued' || status === 'running') return 'unread';
+  return 'ready';
+}
 
 const Input = z
   .object({
@@ -84,7 +93,7 @@ function clean<T>(value: T): T {
 /** consulting_partners: who the client works with and how we position against each firm. */
 export const consultingPartners = {
   description:
-    'Consulting firms that work with an account (for example KPMG, Accenture, Capgemini) with relationship type, domains, first and last seen, strength, a cited us vs partner score card (quality, price, speed, domain depth, relationship) and 1 to 3 cited positioning angles.',
+    'Consulting firms that work with an account (for example KPMG, Accenture, Capgemini) with relationship type, domains, first and last seen, strength, a cited us vs partner score card (quality, price, speed, domain depth, relationship) and 1 to 3 cited positioning angles. An empty partners array is only a settled scan. A scan that has not arrived, or that failed with no rows, omits partners and says so in note.',
   input: Input,
   inputJsonSchema: {
     type: 'object',
@@ -130,8 +139,22 @@ export const consultingPartners = {
       angles: p.angles.map((a) => ({ ...a, evidenceIds: keep(a.evidenceIds) })),
     }));
     const citations: AgentCitation[] = [{ kind: 'account', label: company.name, href: `/accounts/${company.id}` }];
+    const read = consultingPartnerScanRead(run.status);
+    // Stored rows are a payload that already arrived. Only an empty book
+    // from a scan that has not settled is withheld.
+    if (read !== 'ready' && partners.length === 0) {
+      return clean({
+        account: company.name,
+        read,
+        lastFetchedAt: run.lastFetchedAt,
+        sample: false,
+        note: read === 'failed' ? FAILED_NOTE : UNREAD_NOTE,
+        citations,
+      });
+    }
     return clean({
       account: company.name,
+      read: 'ready' as const,
       partners,
       evidence: evidence
         .filter((e) => cited.has(e.id))
