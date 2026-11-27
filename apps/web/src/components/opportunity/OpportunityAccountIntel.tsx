@@ -35,12 +35,20 @@ export function OpportunityAccountIntel({ accountId }: Props) {
     );
   }
 
-  if (intel.isLoading) {
+  // isLoading is false while a read is paused, so an unread snapshot looked
+  // like an empty extract. A paused read has no solutions yet.
+  if (intel.isPending) {
     return (
       <Card>
         <SectionHeader title={t('opportunityAccountIntel.title', 'Account intel')} />
         <div className="p-4">
-          <TableSkeleton rows={3} columns={1} headless />
+          {intel.isLoading ? (
+            <TableSkeleton rows={3} columns={1} headless />
+          ) : (
+            <p role="status" className="text-sm text-[var(--fg-secondary)]">
+              {t('opportunityAccountIntel.checking', 'Checking account intelligence.')}
+            </p>
+          )}
         </div>
       </Card>
     );
