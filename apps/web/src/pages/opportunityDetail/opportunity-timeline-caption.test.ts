@@ -43,6 +43,7 @@ describe('deal activity timeline page', () => {
     expect(fn).not.toMatch(/take:\s*limit\s*[,}]/);
     expect(fn).toContain('timelineContinues');
     expect(fn).toContain('.default(50)');
+    expect(fn).toContain('dueDate: task.dueDate ? task.dueDate.toISOString() : null');
 
     const view = readFileSync(
       path.resolve(process.cwd(), 'src/pages/opportunityDetail/TimelinePanel.tsx'),

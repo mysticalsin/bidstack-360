@@ -118,7 +118,10 @@ export const opportunityTimelineRoutes: FastifyPluginAsyncZod = async (server) =
           text: `Task created: ${task.title}`,
           actorName: task.assignee?.name ?? null,
           createdAt: task.createdAt.toISOString(),
-          metadata: { status: task.status, dueDate: task.dueDate },
+          metadata: {
+            status: task.status,
+            dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+          },
         });
       }
 
