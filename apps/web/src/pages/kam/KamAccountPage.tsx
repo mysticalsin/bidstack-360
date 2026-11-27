@@ -31,6 +31,9 @@ import {
 export default function KamAccountPage() {
   const { data, isLoading, isError, error, refetch } = useKamAccounts();
   const accounts = data?.items ?? [];
+  // An idle or paused read has no payload, and isLoading is false, so the
+  // zero state would say there are no key accounts before the list arrives.
+  const listUnread = data == null && !isLoading && !isError;
   const [companyId, setCompanyId] = useState('');
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [designateOpen, setDesignateOpen] = useState(false);
@@ -53,6 +56,14 @@ export default function KamAccountPage() {
 
       {isLoading ? (
         <LoadingSkeleton rows={4} />
+      ) : listUnread ? (
+        <p
+          role="status"
+          aria-busy="true"
+          className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--fg-secondary)]"
+        >
+          Checking key accounts. They have not arrived.
+        </p>
       ) : isError ? (
         <ErrorState
           title="Couldn't load key accounts"
