@@ -8,6 +8,7 @@
  * schedule timer re-renders only this span, not the whole row.
  */
 import { memo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { announceStageChange } from '@/components/a11y/useAnnouncer';
@@ -77,7 +78,9 @@ export const Row = memo(function Row({
    * 403s the PATCH otherwise, so every inline-edit cell renders read-only. */
   canWrite: boolean;
 }) {
+  const { t } = useTranslation('crm');
   const fireConfetti = useConfetti((s) => s.fire);
+  const owner = opp.owner?.trim() ?? '';
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -166,6 +169,11 @@ export const Row = memo(function Row({
           <span>{opp.customer}</span>
           <UpdatedAgo iso={opp.updatedAt} />
         </div>
+        {owner ? (
+          <div className="truncate text-xs text-[var(--fg-secondary)]" title={owner}>
+            {t('opportunityRow.ownedBy', 'Owned by {{owner}}', { owner })}
+          </div>
+        ) : null}
       </td>
 
       <td className="px-5 py-3">
