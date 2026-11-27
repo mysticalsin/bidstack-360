@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useUsersPage, useUpdateUserRole, useOrgPresence } from '@/hooks/useUsers';
+import { useUsersPage, useOrgPresence } from '@/hooks/useUsers';
 import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -11,6 +11,13 @@ import { OnlineDot } from '@/components/ui/Avatar';
 import { formatDate } from '@/lib/format';
 import { useIsAdmin } from '@/lib/auth';
 import { UserRolesManager } from './UserRolesManager';
+import {
+  TEAM_STORED_ROLE_CAPTION,
+  TEAM_STORED_ROLE_COLUMN,
+  TEAM_STORED_ROLE_HINT,
+  storedRoleGrantsOrgAdmin,
+  teamStoredRoleLabel,
+} from './team-stored-role';
 
 export function TeamSection() {
   const { t } = useTranslation('settings');
@@ -19,7 +26,6 @@ export function TeamSection() {
   // the prior flat useUsers() capped the Team list at the first 100.
   const pager = useCursorPagination('team');
   const users = useUsersPage({ limit: 50, ...(pager.cursor ? { cursor: pager.cursor } : {}) });
-  const updateRole = useUpdateUserRole();
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   // 6 columns when admin (status, name, email, role, joined, actions).
   const expandedColSpan = 6;
@@ -32,7 +38,7 @@ export function TeamSection() {
     <Card>
       <SectionHeader
         title={t('team.title', 'Team')}
-        caption={t('team.caption', 'Members of your workspace. Admins can manage roles.')}
+        caption={t('team.caption', TEAM_STORED_ROLE_CAPTION)}
       />
       <div className="p-5">
         {users.isLoading ? (
@@ -59,7 +65,10 @@ export function TeamSection() {
                     {t('team.col.email', 'Email')}
                   </th>
                   <th scope="col" className="py-2 pr-4 font-medium">
-                    {t('team.col.role', 'Role')}
+                    {t('team.col.role', TEAM_STORED_ROLE_COLUMN)}
+                    <span className="sr-only">
+                      . {t('team.col.roleHint', TEAM_STORED_ROLE_HINT)}
+                    </span>
                   </th>
                   <th scope="col" className="py-2 pr-4 font-medium">
                     {t('team.col.joined', 'Joined')}
@@ -75,6 +84,7 @@ export function TeamSection() {
                 {users.data.items.map((u) => {
                   const isOnline = presence.data?.has(u.id) ?? false;
                   const expanded = isAdmin && expandedUserId === u.id;
+                  const storedRole = teamStoredRoleLabel(u.role);
                   return (
                     <Fragment key={u.id}>
                     <tr
@@ -95,7 +105,9 @@ export function TeamSection() {
                       <td className="py-2 pr-4 text-[var(--fg-primary)]">{u.name ?? '—'}</td>
                       <td className="py-2 pr-4 text-[var(--fg-secondary)]">{u.email}</td>
                       <td className="py-2 pr-4">
-                        <Badge tone={u.role === 'admin' ? 'purple' : 'gray'}>{u.role}</Badge>
+                        <Badge tone={storedRoleGrantsOrgAdmin(storedRole) ? 'purple' : 'gray'}>
+                          {storedRole}
+                        </Badge>
                       </td>
                       <td className="py-2 pr-4 text-[var(--fg-secondary)]">
                         {formatDate(u.createdAt)}
@@ -114,25 +126,6 @@ export function TeamSection() {
                               ? t('team.action.hideRoles', 'Hide roles')
                               : t('team.action.manageRoles', 'Manage roles')}
                           </button>
-                          {u.role === 'admin' ? (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              disabled={updateRole.isPending}
-                              onClick={() => updateRole.mutate({ id: u.id, role: 'member' })}
-                            >
-                              {t('team.action.demote', 'Demote to member')}
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              disabled={updateRole.isPending}
-                              onClick={() => updateRole.mutate({ id: u.id, role: 'admin' })}
-                            >
-                              {t('team.action.promote', 'Promote to admin')}
-                            </button>
-                          )}
                         </td>
                       ) : null}
                     </tr>
