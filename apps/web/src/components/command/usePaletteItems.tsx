@@ -174,6 +174,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
     ) => {
       entries.push({
         score,
+        route,
         item: {
           ...partial,
           onSelect: () => {
