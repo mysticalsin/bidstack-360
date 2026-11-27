@@ -21,10 +21,13 @@ interface ReviewStepProps {
 export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
   const { t } = useTranslation('crm');
   const intel = useAccountIntel(accountId || undefined);
-  const solutions = (intel.data?.solutions ?? []) as ExtractedItem[];
-  const products = (intel.data?.products ?? []) as ExtractedItem[];
   const deleteSolution = useDeleteSolution(accountId || undefined);
   const deleteProduct = useDeleteProduct(accountId || undefined);
+  // A missing snapshot is not an empty extract. Pending and failed reads
+  // have no rows yet; only a successful payload may count zero.
+  const arrived = intel.isSuccess && intel.data != null;
+  const solutions = (arrived ? (intel.data?.solutions ?? []) : []) as ExtractedItem[];
+  const products = (arrived ? (intel.data?.products ?? []) : []) as ExtractedItem[];
 
   // onError toasts removed: useDeleteSolution/useDeleteProduct now toast at the
   // hook level, so a callsite onError here would double-fire.
@@ -44,7 +47,11 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
     <Card className="p-5 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
-          {t('reviewStep.heading', 'Review extracted data')}
+          {arrived
+            ? t('reviewStep.heading', 'Review extracted data')
+            : intel.isError
+              ? t('reviewStep.failedHeading', 'Extracted data is not loaded')
+              : t('reviewStep.checkingHeading', 'Checking the extracted data')}
         </h2>
         <Button variant="ghost" size="sm" onClick={() => intel.refetch()}>
           <Icon name="refresh" size={14} />
@@ -52,27 +59,14 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
         </Button>
       </div>
 
-      {intel.isLoading ? (
-        // Shimmer blocks shaped like the two extracted-data groups — shared
-        // bs-shimmer system, not a bare "Loading…" string.
-        <div
-          className="space-y-4"
-          aria-busy="true"
-          aria-live="polite"
-          aria-label={t('reviewStep.loading', 'Loading…')}
-        >
-          {Array.from({ length: 2 }).map((_, g) => (
-            <div key={g} className="space-y-2" aria-hidden>
-              <span className="bs-shimmer block h-4 w-28" />
-              <div className="flex flex-wrap gap-2">
-                <span className="bs-shimmer h-6 w-24 rounded-full" />
-                <span className="bs-shimmer h-6 w-32 rounded-full" />
-                <span className="bs-shimmer h-6 w-20 rounded-full" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
+      {intel.isError ? (
+        <p role="alert" className="text-xs text-[var(--fg-secondary)]">
+          {t(
+            'reviewStep.failed',
+            'Could not load the extracted data. The saved extractions have not arrived.',
+          )}
+        </p>
+      ) : arrived ? (
         <>
           <ExtractedGroup
             title={t('reviewStep.groupSolutions', 'Solutions')}
@@ -87,13 +81,19 @@ export function ReviewStep({ accountId, onNext, onBack }: ReviewStepProps) {
             isDeleting={deleteProduct.isPending}
           />
         </>
+      ) : (
+        <p className="text-xs text-[var(--fg-secondary)]" aria-live="polite">
+          {t('reviewStep.checking', 'Checking the extracted data.')}
+        </p>
       )}
 
       <div className="flex items-center gap-2">
         <Button variant="secondary" onClick={onBack}>
           {t('reviewStep.back', '← Back')}
         </Button>
-        <Button onClick={onNext}>{t('reviewStep.publish', 'Publish →')}</Button>
+        {arrived ? (
+          <Button onClick={onNext}>{t('reviewStep.publish', 'Publish →')}</Button>
+        ) : null}
       </div>
     </Card>
   );
