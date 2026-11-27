@@ -155,6 +155,13 @@ export function ReferencesPage() {
   }, [t, allReferences.data]);
 
   const filtered = hasActiveReferenceFilters(input);
+  // A read that has not arrived is not an empty library. Idle and paused
+  // reads have no payload and isLoading is false, so the table would say
+  // "No references yet" and the status would count zero case studies. An
+  // in-flight read is the same unread library. A failed read with no payload
+  // keeps the error. A later failure keeps the rows already on screen. A
+  // payload that arrived empty still says there are no references yet.
+  const listArrived = references.data != null;
 
   return (
     <motion.div
@@ -179,20 +186,34 @@ export function ReferencesPage() {
         )}
       </motion.header>
 
-      {/* sr-only live region — announces filter/search result count to AT */}
-      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {showSkeleton ? '' : t('references.resultCount', '{{count}} references', { count: total })}
-      </p>
+      {/* sr-only live region. Announces the filter and search result count
+          only after the payload arrives, so an unread library is not "0 references". */}
+      {listArrived ? (
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {t('references.resultCount', '{{count}} references', { count: total })}
+        </p>
+      ) : null}
 
-      {references.isError ? (
-        <ErrorState
-          title={t('references.errorTitle', 'Could not load references')}
-          message={
-            references.error instanceof Error
-              ? references.error.message
-              : t('references.errorMessage', 'Please try again in a moment.')
-          }
-        />
+      {!listArrived ? (
+        references.isError ? (
+          <ErrorState
+            title={t('references.errorTitle', 'Could not load references')}
+            message={
+              references.error instanceof Error
+                ? references.error.message
+                : t('references.errorMessage', 'Please try again in a moment.')
+            }
+            action={
+              <Button variant="secondary" size="sm" onClick={() => void references.refetch()}>
+                {t('references.retry', 'Retry')}
+              </Button>
+            }
+          />
+        ) : (
+          <p role="status" aria-busy="true" className="text-sm text-fg-secondary">
+            {t('references.checking', 'Checking references. They have not arrived.')}
+          </p>
+        )
       ) : (
         <DataTable<Reference, Reference>
           query={query}
@@ -202,10 +223,8 @@ export function ReferencesPage() {
           getRowId={(row) => row.id}
           facets={facets}
           expandable={REFERENCE_EXPANDABLE}
-          // The table frame, its header and the toolbar render on the first
-          // paint and never unmount: a cold load shows the in-body spinner, a
-          // filter change keeps the previous rows (ROUND2-ULTRAPLAN risk #7,
-          // "no blank table frame").
+          // Previous rows stay put on a refetch. The empty copy below is only
+          // for a payload that arrived with nothing to show.
           loading={showSkeleton || showSpinner}
           leadingActions={
             <div className="relative w-full sm:w-64">
