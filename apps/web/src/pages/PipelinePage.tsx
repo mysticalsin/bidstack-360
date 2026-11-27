@@ -370,8 +370,13 @@ export function PipelinePage() {
               0,
             );
             const totalReached = items.length + advanced;
+            // The rate counts later columns. A stage filter hides those
+            // columns, so the chip would name bids that are not on screen.
             const conversion =
-              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
+              stageFilter ||
+              stage.name === 'Closed Won' ||
+              stage.name === 'Closed Lost' ||
+              totalReached === 0
                 ? null
                 : Math.round((advanced / totalReached) * 100);
             return (
