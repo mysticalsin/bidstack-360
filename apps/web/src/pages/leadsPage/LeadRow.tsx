@@ -36,6 +36,9 @@ export function LeadRow({
   );
 
   // Localized option labels, memoized to keep array identity stable across renders.
+  // 'converted' is only reachable through Convert, which creates the opportunity
+  // and contact. The API rejects a status PATCH into or out of converted, so
+  // offering it here paints a Converted badge the server rolls back.
   const leadStatusOpts = useMemo(
     () => [
       { value: 'new' as const, label: t('leadRow.statusNew', 'New') },
@@ -43,7 +46,6 @@ export function LeadRow({
       { value: 'qualified' as const, label: t('leadRow.statusQualified', 'Qualified') },
       { value: 'nurture' as const, label: t('leadRow.statusNurture', 'Nurture') },
       { value: 'disqualified' as const, label: t('leadRow.statusDisqualified', 'Disqualified') },
-      { value: 'converted' as const, label: t('leadRow.statusConverted', 'Converted') },
     ],
     [t],
   );
@@ -97,7 +99,7 @@ export function LeadRow({
       {/* A2 — status is inline-editable. Read mode shows the styled badge;
           edit mode swaps in a <select> and blur/Enter commits immediately. */}
       <td className="px-4 py-3">
-        {canWrite ? (
+        {canWrite && lead.status !== 'converted' ? (
           <InlineEditSelect
             value={lead.status}
             options={leadStatusOpts}
