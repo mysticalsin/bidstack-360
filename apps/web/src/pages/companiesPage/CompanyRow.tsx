@@ -11,6 +11,7 @@ import { Icon } from '@/components/ui/Icon';
 import { SpotlightTableRow } from '@/components/ui/SpotlightTable';
 import { confirm as confirmDialog } from '@/components/ui/ConfirmDialog';
 import type { CompanyListItem } from '@/hooks/useCompanies';
+import { formatStage } from '@/lib/format';
 
 import { INTEL_COLUMNS, IntelCellFor } from './IntelCells';
 
@@ -42,7 +43,7 @@ export const CompanyRow = memo(function CompanyRow({
   return (
     <SpotlightTableRow
       query={query}
-      searchableText={`${company.name} ${company.legalName ?? ''} ${company.domain ?? ''} ${company.industry ?? ''}`}
+      searchableText={`${company.name} ${company.legalName ?? ''} ${company.domain ?? ''} ${company.industry ?? ''} ${company.industry ? formatStage(company.industry) : ''}`}
       data-selected={selected}
     >
       <td>
@@ -99,7 +100,9 @@ export const CompanyRow = memo(function CompanyRow({
         </td>
       )}
       {isVisible('industry') && (
-        <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.industry ?? DASH}</td>
+        <td className="px-4 py-3 text-[var(--fg-secondary)]">
+          {company.industry ? formatStage(company.industry) : DASH}
+        </td>
       )}
       {isVisible('countryCode') && (
         <td className="px-4 py-3 text-[var(--fg-secondary)]">{company.countryCode ?? DASH}</td>
