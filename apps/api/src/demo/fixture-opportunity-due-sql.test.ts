@@ -19,6 +19,7 @@ describe('projected opportunity due SQL', () => {
     const demo = projectedOpportunityDueSql(AGED, 'demo');
     const text = demo.strings.join('?');
     expect(text).toContain('WHEN o.code = ?');
+    expect(text).toContain('CAST(? AS integer)');
     expect(text).toContain('ELSE o.due_date END');
     expect(demo.values).toContain('OP-2043');
     expect(demo.values).toContain('2026-06-30');

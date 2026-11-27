@@ -11,7 +11,7 @@ export function projectedOpportunityDueSql(now: Date, mode: string | undefined):
   if (shift === 0) return Prisma.sql`o.due_date`;
   const branches = Object.entries(FIXTURE_OPEN_DUE_DATES).map(
     ([code, date]) =>
-      Prisma.sql`WHEN o.code = ${code} AND o.due_date = ${date}::date AND o.stage::text NOT IN ('closed_won', 'closed_lost') THEN (o.due_date + ${shift})::date`,
+      Prisma.sql`WHEN o.code = ${code} AND o.due_date = ${date}::date AND o.stage::text NOT IN ('closed_won', 'closed_lost') THEN (o.due_date + CAST(${shift} AS integer))`,
   );
   return Prisma.sql`(CASE ${Prisma.join(branches, ' ')} ELSE o.due_date END)`;
 }
