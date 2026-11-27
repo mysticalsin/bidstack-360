@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
+import { useChecklistProfileNamed } from '@/hooks/usePoloIdentity';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
 
@@ -26,17 +27,28 @@ export function QuickStartPage() {
   const { completedChecklist, markChecklistItem, startTour, tourActive, openTemplatePicker } =
     useOnboardingStore();
 
-  // Steps backed by real workspace state reflect reality instead of a click, so
-  // the progress bar stops being theatre. The rest stay click-acknowledged —
-  // they kick off an action with no cheap "is it done" signal.
+  // Lead, deal, and team follow the workspace. The profile row follows the
+  // signed-in user's stored name once that read settles. The rest stay
+  // click-acknowledged: they kick off an action with no cheap "is it done" signal.
   const summary = useOrgSummary();
   const users = useUsers();
+  const profileNamed = useChecklistProfileNamed();
   const derived: Partial<Record<ChecklistItem, boolean>> = {
     first_lead: (summary.data?.leads ?? 0) > 0,
     first_deal: (summary.data?.opportunities ?? 0) > 0,
     invite_team: (users.data?.length ?? 0) > 1,
   };
-  const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
+  const isDone = (key: ChecklistItem) => {
+    if (key === 'profile') {
+      // A settled read wins, including a blank name, so opening settings cannot
+      // close the row. A read still in flight, or a denied read, keeps a stored
+      // click and does not invent a name. Leads, deals, and teammates are not
+      // this signal.
+      if (profileNamed.isSuccess) return profileNamed.data === true;
+      return completedChecklist.includes(key);
+    }
+    return derived[key] ?? completedChecklist.includes(key);
+  };
 
   const ITEMS: ChecklistItemDef[] = [
     {
@@ -173,8 +185,9 @@ export function QuickStartPage() {
                 type="button"
                 onClick={() => {
                   item.action();
-                  // Only click-acknowledge non-derived steps; derived ones
-                  // (lead/deal/team) follow the real workspace, not the click.
+                  // The profile row follows a stored name. Opening settings is
+                  // not one. Lead, deal, and team follow the workspace.
+                  if (item.key === 'profile') return;
                   if (!(item.key in derived) && !done) markChecklistItem(item.key);
                 }}
                 className={cn(
