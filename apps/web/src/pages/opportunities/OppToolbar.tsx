@@ -26,6 +26,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
+export type DueQuickFilter = 'within7' | 'overdue' | null;
+
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
 /**
@@ -121,23 +123,26 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
 export function OppPageHeader({
   search,
   stageFilter,
+  dueFilter,
   stageOptions,
   itemCount,
   hasData,
   isExporting = false,
   onClearSearch,
-  onClearStageFilter,
+  onClearFilters,
   onExportCsv,
 }: {
   search: string | undefined;
   stageFilter: string | null;
+  dueFilter: DueQuickFilter;
   stageOptions: PipelineStage[];
   itemCount: number;
   hasData: boolean;
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
   onClearSearch: () => void;
-  onClearStageFilter: () => void;
+  /** Clears the stage and due chips named in the subtitle. Search has its own control. */
+  onClearFilters: () => void;
   onExportCsv: () => void;
 }) {
   const { t } = useTranslation('crm');
@@ -146,6 +151,21 @@ export function OppPageHeader({
   const stageFilterLabel = stageFilter
     ? (stageOptions.find((s) => s.id === stageFilter)?.name ?? formatStage(stageFilter))
     : '';
+  const stageName = stageFilterLabel.toLowerCase();
+  const filterPhrase =
+    stageName && dueFilter === 'overdue'
+      ? t('oppToolbar.stageOverdueOpportunities', '{{stage}} opportunities that are overdue', {
+          stage: stageName,
+        })
+      : stageName && dueFilter === 'within7'
+        ? t('oppToolbar.stageDueSoonOpportunities', '{{stage}} opportunities due within 7 days', {
+            stage: stageName,
+          })
+        : stageName
+          ? t('oppToolbar.stageOpportunities', '{{stage}} opportunities', { stage: stageName })
+          : dueFilter === 'overdue'
+            ? t('oppToolbar.overdueOpportunities', 'overdue opportunities')
+            : t('oppToolbar.dueSoonOpportunities', 'opportunities due within 7 days');
   const clearBtnClass =
     'ml-2 rounded text-xs text-[var(--fg-tertiary)] underline hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]';
 
@@ -165,13 +185,11 @@ export function OppPageHeader({
                 {t('oppToolbar.clear', 'clear')}
               </button>
             </>
-          ) : stageFilter ? (
+          ) : stageFilter || dueFilter ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
-              {t('oppToolbar.stageOpportunities', '{{stage}} opportunities', {
-                stage: stageFilterLabel.toLowerCase(),
-              })}
-              <button type="button" onClick={onClearStageFilter} className={clearBtnClass}>
+              {filterPhrase}
+              <button type="button" onClick={onClearFilters} className={clearBtnClass}>
                 {t('oppToolbar.clearFilter', 'clear filter')}
               </button>
             </>
@@ -265,8 +283,6 @@ export function OppStageChips({
 // action — "due soon" and "already missed". Same toggle-pill pattern as
 // OppStageChips (click again to clear) so the two chip rows read as one
 // filtering language, not two different UI idioms.
-
-export type DueQuickFilter = 'within7' | 'overdue' | null;
 
 export function OppDueChips({
   dueFilter,
