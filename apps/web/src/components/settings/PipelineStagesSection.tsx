@@ -4,19 +4,22 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   usePatchPipelineStage,
   usePipelineStages,
   type PipelineStageSettings,
 } from '@/hooks/usePipelineStages';
+import { pipelineStageListPhase } from './pipeline-stage-list-read';
 import { stageListCaption } from './stage-list-caption';
 
 export function PipelineStagesSection() {
   const { t } = useTranslation('settings');
   const stages = usePipelineStages();
   const patch = usePatchPipelineStage();
+  // A missing payload is not an empty catalog. Empty is only a settled read.
+  const phase = pipelineStageListPhase(stages);
 
   return (
     <Card>
@@ -35,9 +38,14 @@ export function PipelineStagesSection() {
         }
       />
       <div className="p-5">
-        {stages.isLoading ? (
-          <LoadingSkeleton rows={5} />
-        ) : stages.isError ? (
+        {phase === 'unread' ? (
+          <p className="py-6 text-center text-sm text-[var(--fg-secondary)]" role="status">
+            {t(
+              'pipelineStages.unreadMessage',
+              'Checking pipeline stages. The list has not arrived.',
+            )}
+          </p>
+        ) : phase === 'failed' ? (
           <EmptyState
             title={t('pipelineStages.errorTitle', 'Could not load pipeline stages')}
             message={t('pipelineStages.errorMessage', 'Refresh and try again.')}
