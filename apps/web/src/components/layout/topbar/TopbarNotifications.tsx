@@ -39,9 +39,32 @@ export function NotificationsBell() {
   useNotificationStream();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
-  const items = notifications.data?.items ?? [];
-  const unreadCount = notifications.data?.unread ?? 0;
+  const payload = notifications.data;
+  // A failed read and a read that has not arrived have no unread count.
+  // The bell and the tray stay on loading or error until a payload arrives.
+  const readFailed = payload === undefined && Boolean(notifications.isError);
+  const readPending = payload === undefined && !notifications.isError;
+  const items = payload?.items ?? [];
+  const unreadCount = payload?.unread ?? 0;
   const reduced = useReducedMotion();
+  const bellLabel = readFailed
+    ? t('topbarNotifications.bellAriaFailed', 'Notifications, could not load')
+    : readPending
+      ? t('topbarNotifications.bellAriaPending', 'Notifications, still loading')
+      : unreadCount > 0
+        ? t('topbarNotifications.bellAriaUnread', 'Notifications, {{count}} unread', {
+            count: unreadCount,
+          })
+        : t('topbarNotifications.bellAria', 'Notifications');
+  const bellTooltip = readFailed
+    ? t('topbarNotifications.tooltipFailed', 'Notifications could not load')
+    : readPending
+      ? t('topbarNotifications.tooltipPending', 'Notifications are still loading')
+      : unreadCount > 0
+        ? t('topbarNotifications.tooltipUnread', '{{count}} unread notification', {
+            count: unreadCount,
+          })
+        : t('topbarNotifications.tooltipTitle', 'Notifications');
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -63,26 +86,13 @@ export function NotificationsBell() {
 
   return (
     <div ref={ref} className="relative">
-      <Tooltip
-        content={
-          unreadCount > 0
-            ? t('topbarNotifications.tooltipUnread', '{{count}} unread notification', {
-                count: unreadCount,
-              })
-            : t('topbarNotifications.tooltipTitle', 'Notifications')
-        }
-      >
+      <Tooltip content={bellTooltip}>
         <button
           type="button"
           className="iconbtn relative"
           data-testid="notification-bell"
-          aria-label={
-            unreadCount > 0
-              ? t('topbarNotifications.bellAriaUnread', 'Notifications, {{count}} unread', {
-                  count: unreadCount,
-                })
-              : t('topbarNotifications.bellAria', 'Notifications')
-          }
+          aria-label={bellLabel}
+          aria-busy={readPending ? true : undefined}
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -131,7 +141,7 @@ export function NotificationsBell() {
                 <div className="px-4 py-6 text-center text-sm text-[var(--danger)]">
                   {t('topbarNotifications.errorMessage', 'Could not load notifications')}
                 </div>
-              ) : notifications.isLoading ? (
+              ) : readPending ? (
                 // Shimmer rows shaped like real notification items (icon dot +
                 // two text lines) — matches the app-wide bs-shimmer skeleton
                 // system instead of a bare "Loading…" string.
