@@ -956,6 +956,8 @@
     "actionItemsAriaLabel": "Action items",
     "markItemComplete": "Mark \"{{item}}\" as complete",
     "loadError": "Failed to load call details.",
+    "detailUnread": "Checking the call detail. The detail has not arrived.",
+    "detailUnreadLabel": "Loading call detail",
     "recordingSectionAriaLabel": "Call recording",
     "recordingLabel": "Recording",
     "recordingAudioAriaLabel": "Call recording audio",
