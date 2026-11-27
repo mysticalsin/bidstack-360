@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { callActionItemText, useCall, useExtractInsights, type CallSummaryEntry } from '@/hooks/useCalls';
 import type { BadgeTone } from '@/components/ui/Badge';
+import { callSummaryPhase } from './call-summary-read';
 
 // ─── MEDDIC dimension display names ───────────────────────────────────────────
 
@@ -192,24 +193,30 @@ export interface CallSummaryPanelProps {
 }
 
 export function CallSummaryPanel({ callSessionId, className }: CallSummaryPanelProps) {
-  const { data: call, isLoading, isError } = useCall(callSessionId);
+  const summary = useCall(callSessionId);
+  // A missing payload is not a missing summary. Empty is only a settled call.
+  const phase = callSummaryPhase(summary);
+  const call = summary.data;
   const extractInsights = useExtractInsights(callSessionId);
   const { t } = useTranslation('crm');
 
-  if (isLoading) {
+  if (phase === 'failed') {
     return (
-      <div className={cn('space-y-3', className)} aria-busy="true" aria-label={t('callSummary.loadingLabel', 'Loading call summary')}>
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-5 w-full animate-pulse rounded bg-[var(--surface-sunken)]" />
-        ))}
+      <div className={cn('rounded-lg border border-[var(--danger)] bg-[var(--surface-card)] p-4', className)} role="alert">
+        <p className="text-sm text-[var(--danger)]">{t('callSummary.loadError', 'Failed to load call summary.')}</p>
       </div>
     );
   }
 
-  if (isError) {
+  if (phase === 'unread') {
     return (
-      <div className={cn('rounded-lg border border-[var(--danger)] bg-[var(--surface-card)] p-4', className)} role="alert">
-        <p className="text-sm text-[var(--danger)]">{t('callSummary.loadError', 'Failed to load call summary.')}</p>
+      <div className={cn('space-y-3', className)} aria-busy="true" aria-label={t('callSummary.loadingLabel', 'Loading call summary')}>
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t('callSummary.unread', 'Checking the call summary. The summary has not arrived.')}
+        </p>
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-5 w-full animate-pulse rounded bg-[var(--surface-sunken)]" />
+        ))}
       </div>
     );
   }
