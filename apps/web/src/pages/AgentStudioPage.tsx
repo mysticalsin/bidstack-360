@@ -23,6 +23,7 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { useIsAdmin } from '@/lib/auth';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { api } from '@/lib/api';
+import { agentStudioListPhase } from './agent-studio-list-read';
 
 interface CrewAgent {
   id: string;
@@ -82,8 +83,6 @@ export function AgentStudioPage() {
       toast.error(t('agentStudio.toastStandardLoadError', 'Could not load the standard agents')),
   });
 
-  const isEmpty = !agents.isLoading && (agents.data?.items.length ?? 0) === 0;
-
   return (
     <div className="space-y-6">
       <header className="page-head">
@@ -119,7 +118,6 @@ export function AgentStudioPage() {
       <AgentsSection
         agents={agents}
         isAdmin={isAdmin}
-        isEmpty={isEmpty}
         onSeed={() => seedStandard.mutate()}
         seedPending={seedStandard.isPending}
       />
@@ -135,19 +133,18 @@ export function AgentStudioPage() {
 function AgentsSection({
   agents,
   isAdmin,
-  isEmpty,
   onSeed,
   seedPending,
 }: {
   agents: ReturnType<typeof useQuery<{ items: CrewAgent[] }>>;
   isAdmin: boolean;
-  isEmpty: boolean;
   onSeed: () => void;
   seedPending: boolean;
 }) {
   const { t } = useTranslation('crm');
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
+  const phase = agentStudioListPhase(agents);
 
   const del = useMutation({
     mutationFn: (id: string) => api(`/api/v1/crew-agents/${id}`, { method: 'DELETE' }),
@@ -173,11 +170,14 @@ function AgentsSection({
 
       {isAdmin && creating && <NewAgentForm onDone={() => setCreating(false)} />}
 
-      {agents.isLoading ? (
+      {phase === 'unread' ? (
         <div className="p-4">
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('agentStudio.agentsUnread', 'Checking agents. The list has not arrived.')}
+          </p>
           <LoadingSkeleton rows={3} />
         </div>
-      ) : agents.isError ? (
+      ) : phase === 'failed' ? (
         <div className="p-4">
           <ErrorState
             title={t('agentStudio.agentsLoadErrorTitle', 'Couldn’t load agents')}
@@ -193,7 +193,7 @@ function AgentsSection({
             }
           />
         </div>
-      ) : isEmpty ? (
+      ) : (agents.data?.items.length ?? 0) === 0 ? (
         <div className="p-6">
           <EmptyState
             title={t('agentStudio.agentsEmptyTitle', 'No agents yet')}
@@ -361,6 +361,7 @@ function CrewsSection({
     'agentStudio.runPermissionHint',
     'You need agent run access to run a crew. Ask an admin to grant it.',
   );
+  const phase = agentStudioListPhase(crews);
 
   return (
     <Card>
@@ -372,11 +373,14 @@ function CrewsSection({
           {t('agentStudio.crewsSubtitle', 'A crew runs its agents over your RFP, step by step.')}
         </p>
       </div>
-      {crews.isLoading ? (
+      {phase === 'unread' ? (
         <div className="p-4">
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('agentStudio.crewsUnread', 'Checking crews. The list has not arrived.')}
+          </p>
           <LoadingSkeleton rows={2} />
         </div>
-      ) : crews.isError ? (
+      ) : phase === 'failed' ? (
         <div className="p-4">
           <ErrorState
             title={t('agentStudio.crewsLoadErrorTitle', 'Couldn’t load crews')}
