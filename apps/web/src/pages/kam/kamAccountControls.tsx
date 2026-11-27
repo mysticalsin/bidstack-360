@@ -13,11 +13,12 @@ import { Dialog, DialogContent } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
 import { CompanyLogo } from '@/components/company/CompanyLogo';
-import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useDesignateAccount, useKamCandidates } from '@/hooks/useKamAccounts';
 import type { KamAccount } from '@bidstack/shared';
+
+import { kamCandidatePhase } from './kam-candidate-read';
 
 const STATUS_TONE: Record<KamAccount['kamStatus'], BadgeTone> = {
   identified: 'gray',
@@ -170,6 +171,14 @@ export function KamDesignateDialog({
   // server-side behind kam:write (kam-accounts.ts:83,114) — disable the
   // submit for a role that lacks it instead of letting it 403.
   const canWrite = useHasPermission('kam:write');
+  const phase = kamCandidatePhase({
+    data: candidates.data,
+    isError: candidates.isError,
+    status: candidates.status,
+  });
+  // The candidate query stays off until two non-space characters.
+  const searching = debounced.trim().length >= 2;
+  const items = phase === 'ready' && candidates.data?.items ? candidates.data.items : [];
   const readOnlyHint = t(
     'kam.designate.readOnlyHint',
     'You need Key Account write access to designate this account.',
@@ -213,11 +222,20 @@ export function KamDesignateDialog({
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            {candidates.isLoading && debounced.length >= 2 ? (
-              <LoadingSkeleton rows={3} />
+            {phase === 'failed' ? (
+              <div role="alert" className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-[var(--fg-secondary)]">Could not load companies.</span>
+                <Button variant="secondary" size="sm" onClick={() => void candidates.refetch()}>
+                  Retry
+                </Button>
+              </div>
+            ) : searching && phase === 'unread' ? (
+              <p className="text-sm text-[var(--fg-secondary)]">
+                Checking companies. The list has not arrived.
+              </p>
             ) : (
               <ul className="max-h-64 space-y-1 overflow-y-auto" role="listbox" aria-label="Companies">
-                {(candidates.data?.items ?? []).map((c) => (
+                {items.map((c) => (
                   <li key={c.id}>
                     <button
                       type="button"
@@ -235,11 +253,11 @@ export function KamDesignateDialog({
                     </button>
                   </li>
                 ))}
-                {debounced.length >= 2 && (candidates.data?.items.length ?? 0) === 0 && !candidates.isLoading && (
+                {searching && items.length === 0 ? (
                   <li className="px-2 py-6 text-center text-sm text-[var(--fg-tertiary)]">
                     No matching companies that aren&apos;t already key accounts.
                   </li>
-                )}
+                ) : null}
               </ul>
             )}
           </div>
