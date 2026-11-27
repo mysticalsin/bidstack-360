@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { springSoft } from '@/lib/motion';
+import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useOnboardingStore } from '@/stores/onboarding';
+
+import { gettingStartedPhase } from './getting-started-read';
 
 // ─── GettingStarted ──────────────────────────────────────────────────────────
 // First-run state for a brand-new org with zero records. Instead of a barren
@@ -24,6 +27,32 @@ export function GettingStarted() {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
   const openTemplatePicker = useOnboardingStore((s) => s.openTemplatePicker);
+  const summary = useOrgSummary();
+  // Missing counts are not an empty org. A pause has no payload yet.
+  const phase = gettingStartedPhase({
+    data: summary.data,
+    isError: summary.isError,
+    status: summary.status,
+  });
+
+  if (phase === 'failed') {
+    return (
+      <p role="alert" className="mx-auto max-w-3xl py-10 text-center text-sm text-[var(--fg-secondary)]">
+        {t('orgDashboard.gettingStarted.loadFailed', 'The workspace summary did not load.')}
+      </p>
+    );
+  }
+
+  if (phase === 'unread') {
+    return (
+      <p role="status" className="mx-auto max-w-3xl py-10 text-center text-sm text-[var(--fg-secondary)]">
+        {t(
+          'orgDashboard.gettingStarted.unread',
+          'Checking the workspace. The summary has not arrived.',
+        )}
+      </p>
+    );
+  }
 
   const cards: StartCard[] = [
     {
