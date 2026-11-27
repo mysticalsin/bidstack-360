@@ -6,6 +6,14 @@ import { LoadingSkeleton } from '@/components/ui/StateMessages';
 import { TeamSection } from '@/components/settings/TeamSection';
 import { useAuth, useIsAdmin } from '@/lib/auth';
 import { usePoloMe, usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
+import {
+  LOGIN_IDENTITY_CAPTION,
+  loginDataModeLabel,
+  loginDoor,
+  loginProviderLabel,
+  loginRoleList,
+  loginText,
+} from './login-identity';
 
 export function IdentitySection() {
   const { t } = useTranslation('settings');
@@ -13,39 +21,64 @@ export function IdentitySection() {
   const isAdmin = useIsAdmin();
   const publicId = usePoloPublicIdentity();
   const me = usePoloMe(isSignedIn);
+  const notOnFile = t('identity.notOnFile', 'Not on file');
+  const couldNotLoad = t('identity.couldNotLoad', 'Could not load');
+  const door = loginDoor({
+    publicId: {
+      status: publicId.isLoading ? 'loading' : publicId.isError ? 'error' : 'ready',
+      dataMode: publicId.data?.dataMode,
+      authProvider: publicId.data?.authProvider,
+    },
+    me: {
+      status: me.isLoading ? 'loading' : me.isError ? 'error' : 'ready',
+      dataMode: me.data?.dataMode,
+      authProvider: me.data?.authProvider,
+    },
+  });
 
   return (
     <div className="space-y-6">
       <Card>
         <SectionHeader
           title={t('identity.title', 'Login identity')}
-          caption={t(
-            'identity.caption',
-            'Who Polo thinks you are. In real mode this is your Cloudflare Access or Clerk email, never a shared Jane Smith stub.',
-          )}
+          caption={t('identity.caption', LOGIN_IDENTITY_CAPTION)}
         />
         <div className="space-y-3 p-5 text-sm">
-          {publicId.isLoading || me.isLoading ? (
+          {door.state === 'loading' ? (
             <LoadingSkeleton rows={3} />
           ) : (
             <>
               <Row label={t('identity.dataMode', 'Data mode')}>
-                <Badge tone={publicId.data?.dataMode === 'real' ? 'jade' : 'amber'}>
-                  {publicId.data?.dataMode === 'real'
-                    ? t('identity.modeReal', 'Real')
-                    : t('identity.modeDemo', 'Demo')}
-                </Badge>
+                {door.state === 'ready' ? (
+                  <Badge tone={door.dataMode === 'real' ? 'jade' : 'amber'}>
+                    {door.dataMode === 'real'
+                      ? t('identity.modeReal', loginDataModeLabel('real'))
+                      : t('identity.modeDemo', loginDataModeLabel('demo'))}
+                  </Badge>
+                ) : (
+                  <span role="status" aria-label={couldNotLoad}>
+                    {couldNotLoad}
+                  </span>
+                )}
               </Row>
               <Row label={t('identity.provider', 'Auth provider')}>
-                {providerLabel(publicId.data?.authProvider ?? me.data?.authProvider, t)}
+                {door.state === 'ready' ? (
+                  t(`identity.provider.${door.provider}`, loginProviderLabel(door.provider))
+                ) : (
+                  <span role="status" aria-label={couldNotLoad}>
+                    {couldNotLoad}
+                  </span>
+                )}
               </Row>
               <Row label={t('identity.signedInAs', 'Signed in as')}>
-                {me.data?.name || me.data?.email || t('identity.unknown', 'Unknown')}
+                {loginText(me.data?.name || me.data?.email, notOnFile)}
               </Row>
-              <Row label={t('identity.email', 'Email')}>{me.data?.email ?? '—'}</Row>
-              <Row label={t('identity.legacyRole', 'Legacy role')}>{me.data?.role ?? '—'}</Row>
+              <Row label={t('identity.email', 'Email')}>{loginText(me.data?.email, notOnFile)}</Row>
+              <Row label={t('identity.legacyRole', 'Legacy role')}>
+                {loginText(me.data?.role, notOnFile)}
+              </Row>
               <Row label={t('identity.rbacRoles', 'RBAC roles')}>
-                {(me.data?.roles ?? []).length > 0 ? me.data?.roles.join(', ') : '—'}
+                {loginRoleList(me.data?.roles, notOnFile)}
               </Row>
             </>
           )}
@@ -107,20 +140,4 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dd className="text-[var(--fg-primary)]">{children}</dd>
     </div>
   );
-}
-
-function providerLabel(
-  provider: string | undefined,
-  t: (key: string, fallback: string) => string,
-): string {
-  switch (provider) {
-    case 'cf-access':
-      return t('identity.providerCfAccess', 'Cloudflare Access');
-    case 'clerk':
-      return t('identity.providerClerk', 'Clerk');
-    case 'demo':
-      return t('identity.providerDemo', 'Public demo door');
-    default:
-      return t('identity.providerStub', 'Dev stub (Jane Smith) — not for real data');
-  }
 }
