@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   useCustomFieldDefinitions,
@@ -98,10 +99,58 @@ export function CustomFieldValuesSection({ entityType, entityId }: CustomFieldVa
     );
   }
 
+  // A missing list is not an empty catalog. Hiding the block would say this
+  // record has no custom fields.
+  if (defs.isError) {
+    return (
+      <Card>
+        <SectionHeader title={t('customFieldValues.heading', 'Custom Fields')} />
+        <div className="p-5">
+          <ErrorState
+            title={t('customFieldValues.loadDefsError', 'Could not load custom fields')}
+            message={t(
+              'customFieldValues.loadDefsErrorMessage',
+              'The field list did not load. This is not an empty field set.',
+            )}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void defs.refetch()}>
+                {t('customFieldValues.retry', 'Retry')}
+              </Button>
+            }
+          />
+        </div>
+      </Card>
+    );
+  }
+
   const activeDefs = defs.data?.items ?? [];
 
   if (activeDefs.length === 0) {
     return null;
+  }
+
+  // A missing value payload is not a blank field. The input stays hidden so
+  // Save cannot write that blank over the stored value.
+  if (values.isError) {
+    return (
+      <Card>
+        <SectionHeader title={t('customFieldValues.heading', 'Custom Fields')} />
+        <div className="p-5">
+          <ErrorState
+            title={t('customFieldValues.loadValuesError', 'Could not load saved field values')}
+            message={t(
+              'customFieldValues.loadValuesErrorMessage',
+              'The saved values did not load. These fields are not blank.',
+            )}
+            action={
+              <Button size="sm" variant="secondary" onClick={() => void values.refetch()}>
+                {t('customFieldValues.retry', 'Retry')}
+              </Button>
+            }
+          />
+        </div>
+      </Card>
+    );
   }
 
   return (
