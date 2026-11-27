@@ -21,6 +21,7 @@ import { roleListCaption } from './role-list-caption';
 import { stageListCaption } from './stage-list-caption';
 import { tagLibraryCaption } from './tag-library-caption';
 import { USER_OVERVIEW_PAGE, userOverviewCaption } from './user-overview-caption';
+import { webhookHealthCounts } from './webhook-health';
 import { webhookListCaption } from './webhook-list-caption';
 
 interface Props {
@@ -50,9 +51,7 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
   const pipelineStages = usePipelineStages({ enabled: isAdmin });
   const apiKeys = useApiKeys({ enabled: isAdmin });
   const webhooks = useWebhookSubscriptions({ enabled: isAdmin });
-  const webhookItems = webhooks.data?.items ?? [];
-  const webhookActive = webhookItems.filter((webhook) => webhook.active).length;
-  const webhookFailing = webhookItems.filter((webhook) => webhook.failureCount > 0).length;
+  const webhookHealth = webhookHealthCounts(webhooks.data ? webhooks.data.items : null);
 
   const tiles: OverviewTileModel[] = [
     {
@@ -210,20 +209,25 @@ export function SettingsOverviewSection({ onNavigate }: Props) {
     {
       title: t('settingsOverview.tileWebhookTitle', 'Webhook delivery'),
       detail:
-        webhooks.data && webhooks.data.pageContinues
+        !webhookHealth || !webhooks.data
           ? t(
-              'settingsOverview.tileWebhookDetailPartial',
-              '{{active}} active / {{failing}} failing. {{drawn}}',
-              {
-                active: formatCount(webhookActive),
-                failing: formatCount(webhookFailing),
-                drawn: webhookListCaption(webhooks.data.items.length, true),
-              },
+              'settingsOverview.tileWebhookDetailUnknown',
+              'Webhook counts are not loaded',
             )
-          : t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
-              active: formatCount(webhookActive),
-              failing: formatCount(webhookFailing),
-            }),
+          : webhooks.data.pageContinues
+            ? t(
+                'settingsOverview.tileWebhookDetailPartial',
+                '{{active}} active / {{failing}} failing. {{drawn}}',
+                {
+                  active: formatCount(webhookHealth.active),
+                  failing: formatCount(webhookHealth.failing),
+                  drawn: webhookListCaption(webhooks.data.items.length, true),
+                },
+              )
+            : t('settingsOverview.tileWebhookDetail', '{{active}} active / {{failing}} failing', {
+                active: formatCount(webhookHealth.active),
+                failing: formatCount(webhookHealth.failing),
+              }),
       tone: webhooks.isError ? 'tomato' : 'purple',
       icon: 'webhook' as const,
       section: 'webhooks' as const,

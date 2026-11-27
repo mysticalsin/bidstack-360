@@ -28,6 +28,7 @@ import {
 import { cn } from '@/lib/cn';
 import { relativeTime } from '@/lib/format';
 import { useIsAdmin } from '@/lib/auth';
+import { webhookHealthCounts } from './webhook-health';
 import { webhookListCaption } from './webhook-list-caption';
 
 interface CreatedSecret {
@@ -52,7 +53,10 @@ export function WebhooksSection() {
     [subs.data],
   );
 
-  const metrics = useMemo(() => buildWebhookMetrics(subs.data?.items ?? []), [subs.data]);
+  const metrics = useMemo(
+    () => webhookHealthCounts(subs.data ? subs.data.items : null),
+    [subs.data],
+  );
   const drawnCaption =
     subs.data && subs.data.pageContinues ? webhookListCaption(subs.data.items.length, true) : null;
 
@@ -105,25 +109,25 @@ export function WebhooksSection() {
           <div className="grid grid-cols-2 gap-3">
             <MetricCard
               label={drawnCaption ?? t('webhooks.metricTotal', 'Total')}
-              value={metrics.total}
+              value={metrics ? metrics.total : null}
               icon="webhook"
               tone="blue"
             />
             <MetricCard
               label={t('webhooks.metricActive', 'Active')}
-              value={metrics.active}
+              value={metrics ? metrics.active : null}
               icon="checkCircle"
               tone="jade"
             />
             <MetricCard
               label={t('webhooks.metricFailing', 'Failing')}
-              value={metrics.failing}
+              value={metrics ? metrics.failing : null}
               icon="warning"
               tone="tomato"
             />
             <MetricCard
               label={t('webhooks.metricEvents', 'Events')}
-              value={metrics.eventCount}
+              value={metrics ? metrics.eventCount : null}
               icon="list"
               tone="purple"
             />
@@ -208,19 +212,23 @@ export function WebhooksSection() {
                   <p className="mt-1 text-xs text-[var(--fg-tertiary)]">{drawnCaption}</p>
                 ) : null}
                 <p className="mt-1 text-xs text-[var(--fg-tertiary)]">
-                  {metrics.lastActivity
+                  {metrics?.lastActivity
                     ? t('webhooks.lastActivity', 'Last activity {{time}}', {
                         time: relativeTime(metrics.lastActivity),
                       })
-                    : t('webhooks.noActivity', 'No delivery activity recorded yet.')}
+                    : metrics
+                      ? t('webhooks.noActivity', 'No delivery activity recorded yet.')
+                      : t('webhooks.activityNotLoaded', 'Delivery activity is not loaded.')}
                 </p>
               </div>
-              <Badge tone={metrics.failing > 0 ? 'tomato' : 'jade'}>
-                {metrics.failing > 0
-                  ? t('webhooks.needAttention', '{{count}} need attention', {
-                      count: metrics.failing,
-                    })
-                  : t('webhooks.allClear', 'All clear')}
+              <Badge tone={!metrics ? 'gray' : metrics.failing > 0 ? 'tomato' : 'jade'}>
+                {!metrics
+                  ? t('webhooks.healthNotLoaded', 'Not loaded')
+                  : metrics.failing > 0
+                    ? t('webhooks.needAttention', '{{count}} need attention', {
+                        count: metrics.failing,
+                      })
+                    : t('webhooks.allClear', 'All clear')}
               </Badge>
             </div>
 
@@ -334,7 +342,7 @@ function MetricCard({
   tone,
 }: {
   label: string;
-  value: number;
+  value: number | null;
   icon: IconName;
   tone: BadgeTone;
 }) {
@@ -351,10 +359,14 @@ function MetricCard({
       </div>
       <div className="mt-2 flex items-end justify-between gap-2">
         <span className="text-2xl font-semibold tabular-nums text-[var(--fg-primary)]">
-          {value}
+          {value === null ? t('webhooks.metricNotLoaded', 'Not loaded') : value}
         </span>
-        <Badge tone={tone}>
-          {value === 0 ? t('webhooks.metricNone', 'None') : t('webhooks.metricLive', 'Live')}
+        <Badge tone={value === null ? 'gray' : tone}>
+          {value === null
+            ? t('webhooks.metricNotLoaded', 'Not loaded')
+            : value === 0
+              ? t('webhooks.metricNone', 'None')
+              : t('webhooks.metricLive', 'Live')}
         </Badge>
       </div>
     </div>
@@ -748,22 +760,4 @@ function HealthDot({ health }: { health: 'healthy' | 'warning' | 'critical' }) {
       aria-label={t('webhooks.healthLabel', 'Health: {{health}}', { health })}
     />
   );
-}
-
-function buildWebhookMetrics(subscriptions: WebhookSub[]) {
-  const active = subscriptions.filter((subscription) => subscription.active).length;
-  const failing = subscriptions.filter((subscription) => subscription.failureCount > 0).length;
-  const eventCount = new Set(subscriptions.flatMap((subscription) => subscription.events)).size;
-  const lastActivity = subscriptions
-    .flatMap((subscription) => [subscription.lastDeliveryAt, subscription.lastFailureAt])
-    .filter((value): value is string => Boolean(value))
-    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
-
-  return {
-    total: subscriptions.length,
-    active,
-    failing,
-    eventCount,
-    lastActivity,
-  };
 }
