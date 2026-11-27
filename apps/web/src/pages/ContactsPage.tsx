@@ -68,6 +68,10 @@ export function ContactsPage() {
   // selectedContacts useMemo below lists `items` in its deps and would
   // recompute on every keystroke otherwise.
   const raw = useMemo(() => data?.items ?? [], [data?.items]);
+  // The pager and the empty headline both treat "no rows" as the book.
+  // A load, a pause before the first payload, and a failed read have no
+  // rows yet. That is not a settled empty buying group.
+  const listSettled = data != null && !isError;
 
   // Sortable columns. Accessors return string|number|null so the comparator
   // can handle "missing" rows (null influence, null sentiment) without a
@@ -443,7 +447,7 @@ export function ContactsPage() {
         search={search}
         setSearch={setSearch}
         deferredSearch={deferredSearch}
-        isLoading={isLoading}
+        isLoading={isLoading || (data == null && !isError)}
         isError={isError}
         error={error}
         refetch={refetch}
@@ -464,16 +468,18 @@ export function ContactsPage() {
         readOnlyHint={readOnlyHint}
       />
 
-      <CursorPager
-        currentPage={pager.page}
-        hasNext={Boolean(data?.nextCursor)}
-        hasPrevious={pager.hasPrevious}
-        isLoading={isLoading}
-        itemCount={items.length}
-        label={t('contacts.pager.label', 'contacts')}
-        onNext={() => pager.goNext(data?.nextCursor)}
-        onPrevious={pager.goPrevious}
-      />
+      {listSettled ? (
+        <CursorPager
+          currentPage={pager.page}
+          hasNext={Boolean(data.nextCursor)}
+          hasPrevious={pager.hasPrevious}
+          isLoading={isLoading}
+          itemCount={items.length}
+          label={t('contacts.pager.label', 'contacts')}
+          onNext={() => pager.goNext(data.nextCursor)}
+          onPrevious={pager.goPrevious}
+        />
+      ) : null}
 
       {/* Controlled edit dialog — single instance, re-seeded by the
           ContactDialog's open effect when editTarget changes. */}
