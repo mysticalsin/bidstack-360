@@ -1907,6 +1907,9 @@
     "allIndustries": "All industries",
     "filterTagAriaLabel": "Filter by tag",
     "allTags": "All tags",
+    "detail": {
+      "contact": "Contact"
+    },
     "resultCount": "{{count}} references",
     "errorTitle": "Could not load references",
     "errorMessage": "Please try again in a moment.",

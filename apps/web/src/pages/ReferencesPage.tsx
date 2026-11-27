@@ -44,7 +44,7 @@ import { tableFetchState, useTableQuery } from '@/lib/table/use-table-query';
 import { NewReferenceDialog, type NewReferenceBody } from './referencesPage/NewReferenceDialog';
 import {
   buildReferenceColumns,
-  REFERENCE_EXPANDABLE,
+  buildReferenceExpandable,
 } from './referencesPage/reference-columns';
 import {
   applyReferencesView,
@@ -137,6 +137,7 @@ export function ReferencesPage() {
       }),
     [t, canWrite, handleUse, handleDelete, isRecording, isDeleting],
   );
+  const expandable = useMemo(() => buildReferenceExpandable(t), [t]);
 
   const facets = useMemo<DataTableFacet[]>(() => {
     const allItems = allReferences.data?.items ?? [];
@@ -201,7 +202,7 @@ export function ReferencesPage() {
           total={total}
           getRowId={(row) => row.id}
           facets={facets}
-          expandable={REFERENCE_EXPANDABLE}
+          expandable={expandable}
           // The table frame, its header and the toolbar render on the first
           // paint and never unmount: a cold load shows the in-body spinner, a
           // filter change keeps the previous rows (ROUND2-ULTRAPLAN risk #7,

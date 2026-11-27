@@ -196,24 +196,47 @@ export function buildReferenceColumns(deps: ReferenceColumnDeps): DataTableColum
   return columns;
 }
 
-// Every row expands, so the hover accent and the chevron are uniform down the
-// column instead of appearing on an arbitrary subset. The detail row carries
-// the three fields a dense grid legitimately cannot: the full case-study
-// description, the customer contact, and the tag list (four tags per row was
-// exactly the noise the retarget exists to remove — you filter by tag from the
-// facet, you read them here).
-export const REFERENCE_EXPANDABLE: DataTableExpandable<Reference, Reference> = {
-  isExpandable: () => true,
-  getSubRows: (row) => [row],
-  getSubRowId: (_sub, row) => `${row.id}-detail`,
-  renderSubCell: (sub, columnId) => {
-    if (columnId === 'title') {
-      return sub.description ? (
-        <span className="block text-fg-secondary">{sub.description}</span>
-      ) : null;
-    }
-    if (columnId === 'company') return contactLine(sub);
-    if (columnId === 'industry') return sub.tags.length > 0 ? sub.tags.join(' · ') : null;
-    return null;
-  },
-};
+// The expanded row is the case-study record: description, customer contact,
+// and tags. Those used to be split across the company and industry columns.
+// Company hides below md, industry hides below xl, and both cells are nowrap
+// inside a fixed width, so "Michael Johnson · mjohnson@ci.com" and a four-tag
+// list were clipped or absent. The title column is the only one that wraps
+// and stays visible, so the whole record is read there. Other columns stay
+// empty on the detail row rather than repeating a clipped copy.
+function caseStudyRecord(reference: Reference, t: TFunction) {
+  const contact = contactLine(reference);
+  const tags = reference.tags.length > 0 ? reference.tags.join(' · ') : null;
+  if (!reference.description && !contact && !tags) return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-1 text-fg-secondary">
+      {reference.description ? <span className="block">{reference.description}</span> : null}
+      {contact ? (
+        <span className="block">
+          <span className="font-medium">{t('references.detail.contact', 'Contact')}</span>
+          {' · '}
+          {contact}
+        </span>
+      ) : null}
+      {tags ? (
+        <span className="block">
+          <span className="font-medium">{t('references.column.tags', 'Tags')}</span>
+          {' · '}
+          {tags}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+export function buildReferenceExpandable(
+  t: TFunction,
+): DataTableExpandable<Reference, Reference> {
+  return {
+    // Every row expands, so the hover accent and the chevron stay uniform
+    // down the column instead of appearing on an arbitrary subset.
+    isExpandable: () => true,
+    getSubRows: (row) => [row],
+    getSubRowId: (_sub, row) => `${row.id}-detail`,
+    renderSubCell: (sub, columnId) => (columnId === 'title' ? caseStudyRecord(sub, t) : null),
+  };
+}
