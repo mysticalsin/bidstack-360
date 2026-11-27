@@ -24,21 +24,25 @@ interface Props {
 
 export function ObjectSettingsForm({ def, updateDef }: Props) {
   const { t } = useTranslation('crm');
-  const [labelSingular, setLabelSingular] = useState('');
-  const [labelPlural, setLabelPlural] = useState('');
-  const [description, setDescription] = useState('');
-  const [color, setColor] = useState('');
-  const [editInit, setEditInit] = useState(false);
+  const [objectKey, setObjectKey] = useState(def.key);
+  const [labelSingular, setLabelSingular] = useState(def.labelSingular);
+  const [labelPlural, setLabelPlural] = useState(def.labelPlural);
+  const [description, setDescription] = useState(def.description ?? '');
+  const [color, setColor] = useState(def.color);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [updateSuccess, setUpdateSuccess] = useState(false);
 
-  // Initialise form once — same pattern as the original page.
-  if (!editInit) {
+  // The editor page stays mounted when :id changes. Replace the draft during
+  // render so Save posts the object now on screen, not the previous one.
+  // A refresh of the same key keeps an in-progress edit.
+  if (def.key !== objectKey) {
+    setObjectKey(def.key);
     setLabelSingular(def.labelSingular);
     setLabelPlural(def.labelPlural);
     setDescription(def.description ?? '');
     setColor(def.color);
-    setEditInit(true);
+    setUpdateError(null);
+    setUpdateSuccess(false);
   }
 
   async function handleUpdate(e: FormEvent) {
