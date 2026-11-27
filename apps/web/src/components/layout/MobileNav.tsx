@@ -5,7 +5,7 @@
 // element that opened it.
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
@@ -20,7 +20,17 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import {
+  ADMIN_SETTINGS,
+  MEMBER_SETTINGS,
+  NAV_SECTIONS,
+  isNavItemVisible,
+  navAliasOwnsPath,
+  navItemOwnsPath,
+  navSectionOwnsPath,
+  type NavItem,
+  type NavSection,
+} from './navConfig';
 import { useIsWideShell } from './shellBreakpoint';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -257,9 +267,7 @@ function MobileNavSection({
   const { t } = useTranslation('common');
   const override = useUiStore((s) => s.collapsedSections[section.key]);
   const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
-  const isActive = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActive = navSectionOwnsPath(section, location.pathname);
   const collapsed = override === undefined ? !isActive : override;
   return (
     <div className="py-1">
@@ -294,7 +302,7 @@ function MobileNavItem({
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const location = useLocation();
 
-  const isActive = (() => {
+  const exact = (() => {
     try {
       const toUrl = new URL(item.to, window.location.origin);
       const toPath = toUrl.pathname;
@@ -313,17 +321,23 @@ function MobileNavItem({
       return false;
     }
   })();
+  // Tint stays on an exact path (or an alias such as the board). aria-current
+  // follows the same path rule as the rail, so a record under the door stays
+  // current for assistive tech. Link keeps that attribute when NavLink would
+  // drop it for an alias.
+  const tint = exact || navAliasOwnsPath(item, location.pathname);
+  const current = navItemOwnsPath(item, location.pathname);
 
   return (
-    <NavLink
+    <Link
       to={item.to}
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-        isActive
+        tint
           ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
           : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
       )}
-      end={item.end ?? item.to === '/'}
+      aria-current={current ? 'page' : undefined}
       onClick={onNavigate}
       onMouseEnter={() => prefetchRoute(item.to)}
     >
@@ -334,7 +348,7 @@ function MobileNavItem({
           {badge}
         </span>
       )}
-    </NavLink>
+    </Link>
   );
 }
 

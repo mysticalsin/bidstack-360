@@ -32,6 +32,9 @@ export interface NavItem {
    *  themselves separate nav items (e.g. `/sales` vs `/sales/orders`), so the
    *  overview doesn't stay highlighted while a sibling route is active. */
   end?: boolean;
+  /** Other pathnames this door owns. A record under an alias counts
+   *  (`/pipeline/later` belongs to `/pipeline`). */
+  aliases?: readonly string[];
 }
 
 export interface NavSection {
@@ -109,9 +112,16 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/leads', label: 'Leads', labelKey: 'nav.leads', icon: 'zap' },
       // Opportunities hosts both the list and the kanban board (List / Board
-      // toggle in-page); the standalone /pipeline route still works and is
-      // reached through that toggle, so it is no longer a separate rail entry.
-      { to: '/opportunities', label: 'Opportunities', labelKey: 'nav.opportunities', icon: 'target', badgeKey: 'openBids' },
+      // toggle). The board lives at /pipeline (also quick start and g p) and
+      // is not its own rail door, so this item stays current there.
+      {
+        to: '/opportunities',
+        label: 'Opportunities',
+        labelKey: 'nav.opportunities',
+        icon: 'target',
+        badgeKey: 'openBids',
+        aliases: ['/pipeline'],
+      },
       { to: '/territories', label: 'Territories', labelKey: 'nav.territories', icon: 'globe' },
     ],
   },
@@ -171,6 +181,45 @@ export interface NavModuleFlags {
   agentStudioEnabled?: boolean;
   appflowyEnabled?: boolean;
   serumEnabled?: boolean;
+}
+
+function pathnameOf(to: string): string {
+  try {
+    return new URL(to, 'http://localhost').pathname;
+  } catch {
+    return to;
+  }
+}
+
+/** True when `pathname` is `base` or a child of it. `/pipeline` does not own `/rfp/x/pipeline`. */
+export function pathOwns(base: string, pathname: string): boolean {
+  const path = pathnameOf(base);
+  if (pathname === path) return true;
+  return path !== '/' && pathname.startsWith(`${path}/`);
+}
+
+export function navAliasOwnsPath(item: Pick<NavItem, 'aliases'>, pathname: string): boolean {
+  return (item.aliases ?? []).some((alias) => pathOwns(alias, pathname));
+}
+
+/** Path rule shared with NavLink, plus aliases. `end` keeps a parent off a child path. */
+export function navItemOwnsPath(
+  item: Pick<NavItem, 'to' | 'end' | 'aliases'>,
+  pathname: string,
+): boolean {
+  if (navAliasOwnsPath(item, pathname)) return true;
+  const path = pathnameOf(item.to);
+  if (item.end || path === '/') return pathname === path;
+  return pathOwns(item.to, pathname);
+}
+
+export function navSectionOwnsPath(
+  section: Pick<NavSection, 'items'>,
+  pathname: string,
+): boolean {
+  return section.items.some(
+    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`) || navAliasOwnsPath(item, pathname),
+  );
 }
 
 /** A nav item is visible if it has no featureKey, or its module is enabled.
