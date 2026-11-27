@@ -121,7 +121,12 @@ export async function fetchLmsCourses(sector?: string): Promise<SalesToolkitCour
     clearTimeout(timer);
   }
 
-  const rows = z.array(LmsCourse).safeParse(Array.isArray(payload) ? payload : []);
+  // A wrapped body or an error object is not an empty course list. Only a
+  // JSON array is a catalog that arrived. Anything else is a failed read.
+  if (!Array.isArray(payload)) {
+    throw new LmsError('LMS returned an unexpected payload shape');
+  }
+  const rows = z.array(LmsCourse).safeParse(payload);
   if (!rows.success) throw new LmsError('LMS returned an unexpected payload shape');
 
   const wanted = sector?.trim().toLowerCase();
