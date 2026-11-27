@@ -7,14 +7,21 @@
 import { useTranslation } from 'react-i18next';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { usePoloPublicIdentity } from '@/hooks/usePoloIdentity';
 import { useAuth, useUser } from '@/lib/auth';
+import { workspaceEnvironment } from './workspace-environment';
 
 export function WorkspaceSection() {
   const { t } = useTranslation('settings');
   const { isSignedIn } = useAuth();
   const { user } = useUser();
+  const identity = usePoloPublicIdentity();
   const workspaceId = import.meta.env.VITE_BIDSTACK_WORKSPACE_ID ?? 'mantu-presales';
-  const env = (import.meta.env.MODE ?? 'development').toLowerCase();
+  const environment = workspaceEnvironment({
+    status: identity.isLoading ? 'loading' : identity.isError ? 'error' : 'ready',
+    dataMode: identity.data?.dataMode,
+    viteMode: import.meta.env.MODE,
+  });
   const usingClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
   return (
@@ -31,9 +38,29 @@ export function WorkspaceSection() {
           <code className="font-mono text-xs text-[var(--fg-primary)]">{workspaceId}</code>
         </Row>
         <Row label={t('workspaceSection.original.environmentLabel', 'Environment')}>
-          <Badge tone={env === 'production' ? 'jade' : env === 'staging' ? 'amber' : 'gray'}>
-            {env}
-          </Badge>
+          {environment.state === 'loading' ? (
+            <span
+              role="status"
+              aria-label={t('workspaceSection.original.environmentLoading', 'Loading')}
+              className="text-[var(--fg-tertiary)]"
+            >
+              {t('workspaceSection.original.environmentLoading', 'Loading')}
+            </span>
+          ) : environment.state === 'error' ? (
+            <span
+              role="status"
+              aria-label={t('workspaceSection.original.environmentError', 'Could not load')}
+              className="text-[var(--fg-tertiary)]"
+            >
+              {t('workspaceSection.original.environmentError', 'Could not load')}
+            </span>
+          ) : (
+            <Badge tone={environment.tone}>
+              {environment.label === 'Demo'
+                ? t('workspaceSection.original.environmentDemo', 'Demo')
+                : environment.label}
+            </Badge>
+          )}
         </Row>
         <Row label={t('workspaceSection.original.authProviderLabel', 'Auth provider')}>
           <Badge tone={usingClerk ? 'jade' : 'gray'}>
