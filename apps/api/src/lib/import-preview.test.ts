@@ -32,4 +32,41 @@ describe('import preview validation', () => {
     expect(result.issues.some((issue) => issue.field === 'financial.companyName')).toBe(true);
     expect(result.issues.some((issue) => issue.field === 'financial.currency')).toBe(true);
   });
+
+  it('checks the later filled column when two columns share a field', () => {
+    // WHY: the import writes the last non-empty cell for a field. The preview
+    // was still reading the first column, so a blank Name hid Northwind Freight
+    // and the row looked required-empty. A blank later column must keep the
+    // earlier name, because that is the cell the import stores.
+    const filledLater = previewImportRows({
+      entityType: 'company',
+      mappings: { Name: 'company.name', Legal: 'company.name' },
+      rows: [{ Name: '', Legal: 'Northwind Freight' }],
+    });
+    expect(filledLater.invalidCount).toBe(0);
+    expect(filledLater.issues).toEqual([]);
+
+    const filledEarlier = previewImportRows({
+      entityType: 'company',
+      mappings: { Name: 'company.name', Legal: 'company.name' },
+      rows: [{ Name: 'Northwind Freight', Legal: '' }],
+    });
+    expect(filledEarlier.invalidCount).toBe(0);
+    expect(filledEarlier.issues).toEqual([]);
+  });
+
+  it('checks the later email when two columns share that field', () => {
+    // WHY: a valid address in the first column was enough for the preview to
+    // say the row was fine, while the import stored the later cell. That later
+    // cell is the one that has to pass.
+    const result = previewImportRows({
+      entityType: 'contact',
+      mappings: { Work: 'contact.email', Other: 'contact.email' },
+      rows: [{ Work: 'good@northwind.example', Other: 'not-an-email' }],
+    });
+    expect(result.validCount).toBe(0);
+    expect(result.issues).toEqual([
+      { row: 1, field: 'contact.email', message: 'invalid email' },
+    ]);
+  });
 });
