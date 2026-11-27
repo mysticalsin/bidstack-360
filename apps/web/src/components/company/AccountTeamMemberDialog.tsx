@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { useAddTeamMember, useUpdateTeamMember, useUserAllocation } from '@/hooks/useAccountTeam';
 import { useUsers } from '@/hooks/useUsers';
 
+import { allocationReadPhase } from './allocation-read';
 import { ROLE_LABELS, projectedAllocation } from './accountTeam';
 
 const ROLE_OPTIONS = (Object.keys(ROLE_LABELS) as AccountTeamRole[]).map((value) => ({
@@ -58,12 +59,16 @@ function MemberForm({ companyId, open, onOpenChange, member, excludeUserIds = []
       ? 'End date must be on or after the start date'
       : undefined;
 
-  const currentTotal = allocation.data?.totalPct ?? 0;
-  const projected = projectedAllocation(
-    currentTotal,
-    member?.allocationPct ?? null,
-    pctError ? null : pctNum,
-  );
+  // A missing total is not 0% booked. Quote a percent only after the number arrives.
+  const allocationPhase = userId ? allocationReadPhase(allocation) : 'idle';
+  const knownTotal =
+    allocationPhase === 'ready' && typeof allocation.data?.totalPct === 'number'
+      ? allocation.data.totalPct
+      : null;
+  const projected =
+    knownTotal === null
+      ? null
+      : projectedAllocation(knownTotal, member?.allocationPct ?? null, pctError ? null : pctNum);
   const personName =
     member?.userName ?? users.data?.find((u) => u.id === userId)?.name ?? 'This person';
 
@@ -123,12 +128,20 @@ function MemberForm({ companyId, open, onOpenChange, member, excludeUserIds = []
         onChange={(e) => setPct(e.target.value)}
         error={pctError}
         helper={
-          userId && allocation.data
-            ? `${projected}% across all accounts with this change`
-            : undefined
+          projected !== null ? `${projected}% across all accounts with this change` : undefined
         }
       />
-      {userId && allocation.data && isOverAllocated(projected) ? (
+      {allocationPhase === 'unread' ? (
+        <p role="status" className="text-xs text-[var(--fg-secondary)]">
+          Checking allocation. The total has not arrived.
+        </p>
+      ) : null}
+      {allocationPhase === 'failed' ? (
+        <p role="alert" className="text-xs text-[var(--danger)]">
+          Could not load allocation. The total has not arrived.
+        </p>
+      ) : null}
+      {projected !== null && isOverAllocated(projected) ? (
         <p role="status" className="text-xs font-medium text-[var(--warning-fg)]">
           {personName} would be at {projected}% across accounts
         </p>
