@@ -21,6 +21,10 @@ import { useEffect, type ReactNode } from 'react';
 
 import {
   AuthProvider,
+  DEMO_EMAIL_KEY,
+  DEMO_RESUME_EMAIL_KEY,
+  DEMO_RESUME_KEY,
+  DEMO_SESSION_ENDED_KEY,
   DEMO_SIGNED_OUT_KEY,
   DEMO_TOKEN_KEY,
   isTransientMeFailure,
@@ -218,6 +222,13 @@ function FetchingChild() {
   return null;
 }
 
+function RejectedSessionChild() {
+  useEffect(() => {
+    void api('/api/whoami').catch(() => undefined);
+  }, []);
+  return null;
+}
+
 describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
   it('registers the api token provider synchronously, before a child effect can fire the first request', async () => {
     vi.stubEnv('VITE_AUTH_MODE', 'demo');
@@ -258,11 +269,65 @@ describe('AuthProvider — demo mode (VITE_AUTH_MODE=demo)', () => {
         <Probe />
       </AuthProvider>,
     );
+    localStorage.setItem(DEMO_RESUME_KEY, 'demo_left.proof');
+    localStorage.setItem(DEMO_RESUME_EMAIL_KEY, 'ada.visitor@example.test');
+    localStorage.setItem(DEMO_SESSION_ENDED_KEY, '1');
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
     expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBe('1');
+    expect(localStorage.getItem(DEMO_RESUME_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_RESUME_EMAIL_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_SESSION_ENDED_KEY)).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith('/__auth/logout', expect.objectContaining({ method: 'POST' }));
     expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('parks a rejected demo token for resume and does not call that a sign-out', async () => {
+    // WHY: a dead demo token is the resume proof the session route already
+    // accepts. Clearing it makes the next email open a new sandbox, and the
+    // login page has no reason to say the previous session ended.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'demo_expired.proof');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'Ada.Visitor@example.test');
+    const fetchMock = vi.fn(async () => jsonResponse({ message: 'Invalid or expired demo session' }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <RejectedSessionChild />
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(localStorage.getItem(DEMO_SESSION_ENDED_KEY)).toBe('1'));
+    expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_EMAIL_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_RESUME_KEY)).toBe('demo_expired.proof');
+    expect(localStorage.getItem(DEMO_RESUME_EMAIL_KEY)).toBe('ada.visitor@example.test');
+    expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBeNull();
+    expect(screen.getByTestId('signed-in').textContent).toBe('false');
+  });
+
+  it('does not park a rejected token that cannot resume a demo sandbox', async () => {
+    // WHY: only a demo-signed token is a resume proof. Parking anything else
+    // would send it on the next sign-in.
+    vi.stubEnv('VITE_AUTH_MODE', 'demo');
+    localStorage.setItem(DEMO_TOKEN_KEY, 'not-a-demo-token');
+    localStorage.setItem(DEMO_EMAIL_KEY, 'ada.visitor@example.test');
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ message: 'Invalid or expired demo session' }, 401)));
+
+    render(
+      <AuthProvider publishableKey={undefined}>
+        <RejectedSessionChild />
+        <Probe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(localStorage.getItem(DEMO_SESSION_ENDED_KEY)).toBe('1'));
+    expect(localStorage.getItem(DEMO_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_RESUME_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_RESUME_EMAIL_KEY)).toBeNull();
+    expect(localStorage.getItem(DEMO_SIGNED_OUT_KEY)).toBeNull();
   });
 });
 
