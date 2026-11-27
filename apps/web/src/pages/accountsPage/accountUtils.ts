@@ -166,27 +166,57 @@ export function techStackPillsFor(company: CrmCompany): string[] {
   return items.slice(0, 3);
 }
 
-/** Every technology once, most confident first; the card shows the first three. */
-export function rankedTechFor(company: CrmCompany): Array<{ name: string; category: string }> {
-  const best = new Map<string, { name: string; category: string; confidence: number; order: number }>();
+/** Every technology once, most confident first; the card shows the first three.
+ *  `sample` stays true only when every sighting of that name is demo fixture
+ *  data. One real detection clears it, even if a louder sample sighting exists. */
+export function rankedTechFor(
+  company: CrmCompany,
+): Array<{ name: string; category: string; sample: boolean }> {
+  const best = new Map<
+    string,
+    { name: string; category: string; confidence: number; order: number; sample: boolean }
+  >();
   let order = 0;
   for (const category of company.technicalStack ?? []) {
     for (const item of category.items) {
       const key = item.name.trim().toLowerCase();
       if (!key) continue;
+      const sightingIsSample = item.sample === true;
       const prev = best.get(key);
-      if (!prev || item.confidence > prev.confidence) {
-        best.set(key, { name: item.name, category: category.label, confidence: item.confidence, order: prev?.order ?? order });
+      if (!prev) {
+        best.set(key, {
+          name: item.name,
+          category: category.label,
+          confidence: item.confidence,
+          order,
+          sample: sightingIsSample,
+        });
+      } else {
+        const sample = prev.sample && sightingIsSample;
+        if (item.confidence > prev.confidence) {
+          best.set(key, {
+            name: item.name,
+            category: category.label,
+            confidence: item.confidence,
+            order: prev.order,
+            sample,
+          });
+        } else if (prev.sample && !sightingIsSample) {
+          prev.sample = false;
+        }
       }
       order++;
     }
   }
   return [...best.values()]
     .sort((a, b) => b.confidence - a.confidence || a.order - b.order)
-    .map(({ name, category }) => ({ name, category }));
+    .map(({ name, category, sample }) => ({ name, category, sample }));
 }
 
-export function topTechFor(company: CrmCompany, max = 3): Array<{ name: string; category: string }> {
+export function topTechFor(
+  company: CrmCompany,
+  max = 3,
+): Array<{ name: string; category: string; sample: boolean }> {
   return rankedTechFor(company).slice(0, max);
 }
 

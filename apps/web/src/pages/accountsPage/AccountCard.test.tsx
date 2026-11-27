@@ -164,4 +164,71 @@ describe('AccountCard tech logos', () => {
     renderCard();
     expect(screen.getByText('Tech stack pending')).toBeTruthy();
   });
+
+  // Demo seeds mark the whole open-data snapshot sample:true. The list must
+  // say so. A detected stack (no sample flag) must not wear that caption, and
+  // the card still shows three names when more sample technologies exist.
+  it('calls a demo sample stack sample and still shows only three names', () => {
+    const row = deriveAccount(
+      company({
+        name: 'Northwind Pharma',
+        technicalStack: [
+          {
+            label: 'Collaboration',
+            items: [{ name: 'Google Workspace', source: 'open_data:dns', confidence: 0.95, sample: true }],
+          },
+          {
+            label: 'Cloud',
+            items: [{ name: 'Microsoft Azure', source: 'open_data:jobs', confidence: 0.79, sample: true }],
+          },
+          {
+            label: 'Data',
+            items: [{ name: 'Databricks', source: 'open_data:jobs', confidence: 0.63, sample: true }],
+          },
+          {
+            label: 'DevOps',
+            items: [{ name: 'Terraform', source: 'open_data:jobs', confidence: 0.5, sample: true }],
+          },
+        ],
+      }),
+      [],
+    );
+
+    renderCard(row);
+
+    const tech = screen.getByTestId('account-card-tech');
+    expect([...tech.querySelectorAll('[data-tech-name]')].map((el) => el.getAttribute('data-tech-name'))).toEqual([
+      'Google Workspace',
+      'Microsoft Azure',
+      'Databricks',
+    ]);
+    expect(screen.getByText('Sample')).toBeTruthy();
+    // The card is one link. Its accessible name is what a screen reader hears,
+    // so the sample caption has to live there, not on an inner label the link hides.
+    expect(
+      screen.getByRole('link', {
+        name: 'Open Northwind Pharma customer cockpit. Sample technologies: Google Workspace, Microsoft Azure, Databricks',
+      }),
+    ).toBeTruthy();
+    expect(tech.getAttribute('title')).toBe(
+      'Google Workspace (sample), Microsoft Azure (sample), Databricks (sample), Terraform (sample)',
+    );
+  });
+
+  it('does not call a detected stack sample', () => {
+    const row = deriveAccount(
+      company({
+        technicalStack: [
+          { label: 'Cloud', items: [{ name: 'Azure', source: 'open_data:dns', confidence: 0.95 }] },
+        ],
+      }),
+      [],
+    );
+
+    renderCard(row);
+
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Open Acme customer cockpit' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /Sample technologies/ })).toBeNull();
+  });
 });

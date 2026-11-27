@@ -39,6 +39,11 @@ export const AccountCard = memo(function AccountCard({
   const techPills = techStackPillsFor(company);
   const rankedTech = rankedTechFor(company);
   const topTech = rankedTech.slice(0, 3);
+  const sampleTech = topTech.length > 0 && topTech.every((tech) => tech.sample);
+  const techTitle =
+    rankedTech.length > 0
+      ? rankedTech.map((tech) => (tech.sample ? `${tech.name} (sample)` : tech.name)).join(', ')
+      : undefined;
   const imageUrl = displayableLogoUrl(company.imageUrl);
   const meta = `${titleCase(company.industry ?? t('account.unknownIndustry', 'Unknown industry'))}${company.domain ? ` · ${company.domain}` : ''}`;
   return (
@@ -58,9 +63,20 @@ export const AccountCard = memo(function AccountCard({
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
-          aria-label={t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
-            name: company.name,
-          })}
+          aria-label={
+            sampleTech
+              ? t(
+                  'account.openCockpitSampleTechAria',
+                  'Open {{name}} customer cockpit. Sample technologies: {{tech}}',
+                  {
+                    name: company.name,
+                    tech: topTech.map((tech) => tech.name).join(', '),
+                  },
+                )
+              : t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
+                  name: company.name,
+                })
+          }
         >
           {imageUrl ? (
             <img
@@ -109,9 +125,14 @@ export const AccountCard = memo(function AccountCard({
           <div
             data-testid="account-card-tech"
             className={`account-card-tech${techPills.length === 0 ? ' is-empty' : ''}`}
-            title={rankedTech.length > 0 ? rankedTech.map((tech) => tech.name).join(', ') : undefined}
+            title={techTitle}
           >
             <Icon name="zap" size={13} ariaHidden />
+            {sampleTech ? (
+              <strong className="shrink-0 text-xs font-semibold text-[var(--fg-secondary)]">
+                {t('account.techSample', 'Sample')}
+              </strong>
+            ) : null}
             {topTech.length > 0 ? (
               topTech.map((tech) => (
                 <span key={tech.name} className="account-card-tech-item" data-tech-name={tech.name}>
