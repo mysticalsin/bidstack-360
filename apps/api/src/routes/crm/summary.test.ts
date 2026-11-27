@@ -58,4 +58,18 @@ describe('crm summary routes', () => {
     const res = await server.inject({ method: 'GET', url: '/api/crm/summary?limit=0' });
     expect(res.statusCode).toBe(400);
   });
+
+  failIfNoDb('GET /api/crm/summary counts open follow-ups apart from a finished handover', async () => {
+    // The isolated org is the demo sign-in book: four open follow-ups due in
+    // a few days, and the Stellantis handover already done and due two days
+    // ago. `tasks` still counts every row. `openTasks` is what the home cell
+    // prints, so that finished row is not a fifth live follow-up. A done
+    // follow-up is not overdue.
+    const res = await server.inject({ method: 'GET', url: '/api/crm/summary' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { tasks: number; openTasks: number; overdueTasks: number };
+    expect(body.tasks).toBe(5);
+    expect(body.openTasks).toBe(4);
+    expect(body.overdueTasks).toBe(0);
+  });
 });

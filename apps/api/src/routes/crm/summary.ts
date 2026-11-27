@@ -15,6 +15,7 @@ type SummaryCounts = {
   openOpportunities: number;
   pipelineValueMicros: bigint | number | string | null;
   tasks: number;
+  openTasks: number;
   overdueTasks: number;
   serviceCases: number;
   openServiceCases: number;
@@ -28,6 +29,7 @@ type CrmSummaryPayload = {
   openOpportunities: number;
   pipelineValue: number;
   tasks: number;
+  openTasks: number;
   overdueTasks: number;
   serviceCases: number;
   openServiceCases: number;
@@ -87,6 +89,13 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
             AND deleted_at IS NULL
         ) AS "pipelineValueMicros",
         (SELECT COUNT(*)::int FROM tasks WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS tasks,
+        (
+          SELECT COUNT(*)::int
+          FROM tasks
+          WHERE org_id = ${orgId}::uuid
+            AND status <> 'done'
+            AND deleted_at IS NULL
+        ) AS "openTasks",
         (
           SELECT COUNT(*)::int
           FROM tasks
@@ -163,6 +172,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     openOpportunities: 0,
     pipelineValueMicros: 0,
     tasks: 0,
+    openTasks: 0,
     overdueTasks: 0,
     serviceCases: 0,
     openServiceCases: 0,
@@ -210,6 +220,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     openOpportunities: counts.openOpportunities,
     pipelineValue: pipelineValueMicros / 1_000_000,
     tasks: counts.tasks,
+    openTasks: counts.openTasks,
     overdueTasks: counts.overdueTasks,
     serviceCases: counts.serviceCases,
     openServiceCases: counts.openServiceCases,
@@ -251,6 +262,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
             openOpportunities: z.number(),
             pipelineValue: z.number(),
             tasks: z.number(),
+            openTasks: z.number(),
             overdueTasks: z.number(),
             serviceCases: z.number(),
             openServiceCases: z.number(),

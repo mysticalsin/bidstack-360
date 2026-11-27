@@ -9,6 +9,8 @@ export interface OrgSummary {
   openOpportunities: number;
   pipelineValue: number;
   tasks: number;
+  /** Follow-ups that are not done. The home Tasks cell uses this so a finished row is not a live follow-up. */
+  openTasks?: number;
   overdueTasks: number;
   serviceCases: number;
   openServiceCases: number;
