@@ -127,7 +127,7 @@ body {
 .result-name { font-weight: 500; font-size: 14px; }
 .result-type { font-size: 12px; color: var(--color-text-muted); }
 
-.empty-state, .loading-state, .error-state {
+.empty-state, .loading-state, .unread-state, .error-state {
   padding: 12px 16px;
   font-size: 13px;
   color: var(--color-text-muted);
