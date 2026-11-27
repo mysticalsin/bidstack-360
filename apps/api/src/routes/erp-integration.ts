@@ -28,6 +28,7 @@ import {
   searchLocalCompanies,
   mergeSuggestions,
   safeErrorMessage,
+  hasCompanyLookupKey,
   ErpPresalesKit,
   ErpCompanySuggestion,
   CompanyAutocompleteQuery,
@@ -237,8 +238,21 @@ export const erpRoutes: FastifyPluginAsyncZod = async (server) => {
       schema: { querystring: CompanyAutocompleteQuery, response: { 200: ErpCompanyAutocompleteResponse } },
     },
     async (req) => {
-      const warnings: string[] = [];
       const client = getClient();
+      // A blank query is not a partner search. Do not probe ERP and do not
+      // fall through to the local book, which would list every demo company.
+      if (!hasCompanyLookupKey(req.query)) {
+        return {
+          generatedAt: new Date().toISOString(),
+          configured: Boolean(client),
+          reachable: false,
+          source: 'none' as const,
+          items: [],
+          warnings: [],
+        };
+      }
+
+      const warnings: string[] = [];
       let erpItems: z.infer<typeof ErpCompanySuggestion>[] = [];
       let reachable = false;
 

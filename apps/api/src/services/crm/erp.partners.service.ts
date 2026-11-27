@@ -9,6 +9,7 @@ import type { OdooMcpClient as ErpMcpClient } from '@bidstack/odoo-mcp-client';
 
 import {
   asUrl,
+  hasCompanyLookupKey,
   mergeSuggestions,
   normalizeDomain,
   normalizeName,
@@ -27,6 +28,7 @@ export async function searchErpPartners(
   client: ErpMcpClient,
   query: CompanyAutocompleteInput,
 ): Promise<CompanySuggestion[]> {
+  if (!hasCompanyLookupKey(query)) return [];
   const domain = buildPartnerDomain(query);
   const rows = await client.searchRecords<unknown>({
     model: 'res.partner',
@@ -94,6 +96,7 @@ export async function searchLocalCompanies(
   orgId: string,
   query: CompanyAutocompleteInput,
 ): Promise<CompanySuggestion[]> {
+  if (!hasCompanyLookupKey(query)) return [];
   const q = query.q?.trim();
   const domain = normalizeDomain(query.domain);
   const where: Prisma.CompanyEnrichmentWhereInput = { orgId };

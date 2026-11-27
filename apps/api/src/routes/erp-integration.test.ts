@@ -50,6 +50,38 @@ vi.mock('@bidstack/db', () => ({
 
 const checkConnector = vi.mocked(checkSerumConnectorRuntimePolicy);
 const userRoleCount = vi.mocked(prisma.userRole.count);
+const companyFindMany = vi.mocked(prisma.companyEnrichment.findMany);
+const opportunityFindMany = vi.mocked(prisma.opportunity.findMany);
+
+// A blank partner lookup must not read the demo book. These rows exist so a
+// test can prove an empty query would have listed them.
+function seedDemoPartnerBook() {
+  companyFindMany.mockResolvedValue([
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      legalName: 'Northwind Demo',
+      tradeName: 'Northwind',
+      domain: 'northwind.example',
+      website: 'https://northwind.example',
+      registryIds: {},
+      confidenceBps: 8000,
+    },
+  ] as never);
+  opportunityFindMany.mockResolvedValue([
+    {
+      customer: 'Contoso Demo',
+      name: 'Contoso staffing bid',
+      logoUrl: null,
+    },
+  ] as never);
+}
+
+function clearDemoPartnerBook() {
+  companyFindMany.mockReset();
+  companyFindMany.mockResolvedValue([]);
+  opportunityFindMany.mockReset();
+  opportunityFindMany.mockResolvedValue([]);
+}
 const TEST_ORG_ID = '00000000-0000-4000-8000-000000000001';
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000002';
 
@@ -268,6 +300,91 @@ describe('erp-integration route', () => {
       items: [],
       warnings: ['ERP MCP is not configured; using local Polo PreSales records.'],
     });
+  });
+
+  it('does not list the demo book when the partner lookup has no name, domain, VAT, or DUNS', async () => {
+    // WHY: demo leaves ERP unset. A blank or whitespace query is not a search,
+    // so the seeded companies and opportunity customers must not come back as matches.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedDemoPartnerBook();
+    companyFindMany.mockClear();
+    opportunityFindMany.mockClear();
+    try {
+      const app = await buildApp();
+      for (const url of [
+        '/api/integrations/erp/company-autocomplete',
+        '/api/integrations/erp/company-autocomplete?q=%20%20',
+      ]) {
+        const res = await app.inject({ method: 'GET', url });
+        expect(res.statusCode).toBe(200);
+        expect(res.json()).toMatchObject({
+          configured: false,
+          reachable: false,
+          source: 'none',
+          items: [],
+          warnings: [],
+        });
+      }
+      expect(companyFindMany).not.toHaveBeenCalled();
+      expect(opportunityFindMany).not.toHaveBeenCalled();
+    } finally {
+      clearDemoPartnerBook();
+    }
+  });
+
+  it('does not ask ERP for every company when the partner lookup is blank', async () => {
+    // WHY: a configured sidecar with no lookup key would otherwise search
+    // res.partner for is_company only and return the first page of partners.
+    seedDemoPartnerBook();
+    companyFindMany.mockClear();
+    opportunityFindMany.mockClear();
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete',
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({
+        configured: true,
+        reachable: false,
+        source: 'none',
+        items: [],
+        warnings: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(companyFindMany).not.toHaveBeenCalled();
+      expect(opportunityFindMany).not.toHaveBeenCalled();
+    } finally {
+      clearDemoPartnerBook();
+    }
+  });
+
+  it('still returns the matching local company when the partner lookup names one', async () => {
+    // Guard: the empty-query refusal must not blank a real name search while ERP is unset.
+    delete process.env.ERP_MCP_URL;
+    delete process.env.ODOO_MCP_URL;
+    __resetErpClient();
+    seedDemoPartnerBook();
+    companyFindMany.mockClear();
+    try {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/integrations/erp/company-autocomplete?q=Northwind',
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { source: string; items: Array<{ name: string }> };
+      expect(body.source).toBe('local');
+      expect(body.items.map((item) => item.name)).toContain('Northwind');
+      expect(companyFindMany).toHaveBeenCalled();
+    } finally {
+      clearDemoPartnerBook();
+    }
   });
 
   it('proxies search_records and returns rows', async () => {
