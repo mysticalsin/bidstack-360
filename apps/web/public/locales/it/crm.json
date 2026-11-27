@@ -3308,7 +3308,8 @@
     "weekdayWed": "Mer",
     "weekdayThu": "Gio",
     "weekdayFri": "Ven",
-    "weekdaySat": "Sab"
+    "weekdaySat": "Sab",
+    "finishedOnly": "I follow-up completati restano fuori da questo calendario."
   },
   "recentActivity": {
     "heading": "Attività recente",

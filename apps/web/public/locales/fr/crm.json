@@ -3363,7 +3363,8 @@
     "weekdayWed": "Mer",
     "weekdayThu": "Jeu",
     "weekdayFri": "Ven",
-    "weekdaySat": "Sam"
+    "weekdaySat": "Sam",
+    "finishedOnly": "Les suivis terminés restent hors de ce calendrier."
   },
   "recentActivity": {
     "heading": "Activité récente",

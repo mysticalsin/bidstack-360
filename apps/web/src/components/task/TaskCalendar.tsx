@@ -27,19 +27,25 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
   const prevMonth = () => setMonth(new Date(year, monthIndex - 1, 1));
   const nextMonth = () => setMonth(new Date(year, monthIndex + 1, 1));
 
-  const tasksByDay = useMemo(() => {
+  // A finished follow-up is not a deadline. Demo seed files the handover as
+  // done on Monday of the current week; painting it made that week look busy.
+  const { tasksByDay, finishedOnly } = useMemo(() => {
     const map = new Map<number, Task[]>();
+    let finishedInMonth = 0;
     for (const task of tasks) {
       if (!task.dueDate) continue;
       const d = new Date(task.dueDate);
-      if (d.getFullYear() === year && d.getMonth() === monthIndex) {
-        const day = d.getDate();
-        const list = map.get(day) ?? [];
-        list.push(task);
-        map.set(day, list);
+      if (d.getFullYear() !== year || d.getMonth() !== monthIndex) continue;
+      if (task.status === 'done') {
+        finishedInMonth += 1;
+        continue;
       }
+      const day = d.getDate();
+      const list = map.get(day) ?? [];
+      list.push(task);
+      map.set(day, list);
     }
-    return map;
+    return { tasksByDay: map, finishedOnly: finishedInMonth > 0 && map.size === 0 };
   }, [tasks, year, monthIndex]);
 
   const monthLabel = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -62,7 +68,17 @@ export function TaskCalendar({ tasks }: TaskCalendarProps) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--fg-primary)]">{monthLabel}</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--fg-primary)]">{monthLabel}</h2>
+          {finishedOnly ? (
+            <p className="text-xs text-[var(--fg-secondary)]">
+              {t(
+                'taskCalendar.finishedOnly',
+                'Finished follow-ups stay off this calendar.',
+              )}
+            </p>
+          ) : null}
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"

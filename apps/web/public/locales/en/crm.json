@@ -3324,7 +3324,8 @@
     "weekdayWed": "Wed",
     "weekdayThu": "Thu",
     "weekdayFri": "Fri",
-    "weekdaySat": "Sat"
+    "weekdaySat": "Sat",
+    "finishedOnly": "Finished follow-ups stay off this calendar."
   },
   "recentActivity": {
     "heading": "Recent activity",
