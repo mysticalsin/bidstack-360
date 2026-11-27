@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
 import {
   useDataProviders,
@@ -20,11 +20,17 @@ import {
   type DataProviderTestResult,
 } from '@/hooks/useDataProviders';
 import { useIsAdmin } from '@/lib/auth';
+import { dataSourceCatalogPhase } from './data-source-catalog-read';
 
 export function DataSourceCredentialsCard() {
   const { t } = useTranslation('settings');
   const isAdmin = useIsAdmin();
   const providers = useDataProviders();
+  const phase = dataSourceCatalogPhase({
+    data: providers.data,
+    isError: providers.isError,
+    status: providers.status,
+  });
   const items = providers.data?.items ?? [];
 
   return (
@@ -37,9 +43,14 @@ export function DataSourceCredentialsCard() {
         )}
       />
       <div className="p-5">
-        {providers.isLoading ? (
-          <LoadingSkeleton rows={2} />
-        ) : providers.isError ? (
+        {phase === 'unread' ? (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'dataSourceCredentials.checking',
+              'Checking data sources. The catalog has not arrived.',
+            )}
+          </p>
+        ) : phase === 'failed' ? (
           <ErrorState
             title={t('dataSourceCredentials.errorTitle', 'Could not load data sources')}
             message={t(
@@ -52,7 +63,7 @@ export function DataSourceCredentialsCard() {
               </Button>
             }
           />
-        ) : items.length === 0 ? (
+        ) : phase === 'empty' ? (
           <EmptyState
             title={t('dataSourceCredentials.emptyTitle', 'No data sources')}
             message={t('dataSourceCredentials.emptyMessage', 'The API returns the supported sources.')}
