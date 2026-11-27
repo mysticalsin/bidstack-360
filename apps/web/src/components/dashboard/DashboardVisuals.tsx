@@ -28,10 +28,19 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
+export function DashboardHero({
+  rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, rowsFailed = false, weightedPending = false, weightedFailed = false, onRetry, feedPending = false,
+}: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
-  /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
+  /** Bid rows still loading: do not draw won-this-year as zero or an empty book. */
   rowsPending?: boolean;
+  /** Bid rows failed, or the payload arrived with no list. */
+  rowsFailed?: boolean;
+  /** Weighted pipeline still loading: do not draw it as zero. */
+  weightedPending?: boolean;
+  /** Weighted pipeline failed, or the payload arrived with no figure. */
+  weightedFailed?: boolean;
+  onRetry?: () => void;
   /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
   feedPending?: boolean;
 }) {
@@ -42,31 +51,63 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
   const [now] = useState(() => Date.now());
-  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  const bidsFailed = rowsFailed;
+  const bidsUnread = rowsPending && !rowsFailed;
+  const weightFailed = weightedFailed;
+  const weightUnread = weightedPending && !weightedFailed;
+  const bidsKnown = !bidsFailed && !bidsUnread;
+  const weightKnown = !weightFailed && !weightUnread;
+  const wonTotal = bidsKnown ? (cumulativeWon(rows).at(-1)?.y ?? 0) : 0;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
+  const weightedText = weightFailed
+    ? 'Could not load the weighted pipeline. It has not arrived.'
+    : weightUnread
+      ? 'Checking the weighted pipeline. It has not arrived.'
+      : `Weighted ${fmtCompact(weighted)}`;
+  const wonText = bidsFailed
+    ? 'Could not load won bids. The bids have not arrived.'
+    : bidsUnread
+      ? 'Checking won bids. They have not arrived.'
+      : null;
+  const summary = bidsKnown && weightKnown
+    ? `Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`
+    : `Open pipeline ${fmtCompact(openValue)}. ${weightedText} ${wonText ?? `Won so far this year ${fmtCompact(wonTotal)}.`}`;
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{
+      summary={summary}
+      table={bidsKnown ? {
         columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
         rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
-      }}
+      } : undefined}
       className="dash-hero"
       interactive
     >
       <div className="dash-hero-figs">
         <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
-          <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
+          <div className="viz-meta">{weightedText}</div>
         </HeroFig>
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
-          <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
-          <div className="viz-meta">Won this year</div>
-        </HeroFig>
+        {wonText ? (
+          <p className="viz-meta">{wonText}</p>
+        ) : (
+          <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
+            <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
+            <div className="viz-meta">Won this year</div>
+          </HeroFig>
+        )}
+        {bidsFailed || weightFailed ? (
+          <button
+            type="button"
+            className="min-h-[44px] rounded-md px-3 text-xs font-semibold text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:bg-[var(--surface-hover)]"
+            onClick={() => onRetry?.()}
+          >
+            Retry
+          </button>
+        ) : null}
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
             <PulseOrb tone={pulse} size={96} bold />
@@ -79,7 +120,9 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
           </div>
         ) : null}
       </div>
-      {rowsPending && !months.keys.length ? (
+      {bidsFailed && !months.keys.length ? (
+        <p className="viz-empty">Could not load bids. The bids have not arrived.</p>
+      ) : bidsUnread && !months.keys.length ? (
         <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
       ) : months.keys.length ? (
         <DivergingBars
@@ -97,7 +140,7 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      {bidsKnown ? <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div> : null}
     </ChartCard>
   );
 }

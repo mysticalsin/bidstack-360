@@ -54,6 +54,64 @@ describe('DashboardHero', () => {
     render(<DashboardHero rows={[]} openValue={0} weighted={0} openCount={0} />);
     expect(screen.getByText('No dated bids yet.')).toBeTruthy();
   });
+
+  it('keeps a zero weighted figure when that report has arrived', () => {
+    // An arrived zero is a real weighted pipeline. Only a missing read must refuse it.
+    render(<DashboardHero rows={[]} openValue={0} weighted={0} openCount={0} />);
+    expect(screen.getByText(/^Weighted 0$/i)).toBeTruthy();
+  });
+
+  it('does not call an unread bid list or an unread weighted figure empty or zero', () => {
+    // The open-pipeline number can already be known from the workspace summary.
+    // Won-this-year and the weighted figure come from other reads. Until those
+    // payloads arrive, zero and "no dated bids" would invent an empty book.
+    render(
+      <DashboardHero
+        rows={[]}
+        openValue={11_900_000}
+        weighted={0}
+        openCount={6}
+        rowsPending
+        weightedPending
+        onDrill={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('No dated bids yet.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /won this year 0/i })).toBeNull();
+    expect(screen.queryByText(/^Weighted 0$/i)).toBeNull();
+    expect(screen.getByText('Checking won bids. They have not arrived.')).toBeTruthy();
+    expect(screen.getByText('Checking the weighted pipeline. It has not arrived.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /open pipeline 11\.9M/i })).toBeTruthy();
+    expect(screen.getByRole('figure').getAttribute('aria-label') ?? '').not.toMatch(/won so far this year 0|weighted 0/i);
+  });
+
+  it('does not call a failed bid list or a failed weighted figure empty or zero', () => {
+    // A failed read, including a payload that never included the list or the
+    // weighted figure, is not an empty book and not a zero-weighted pipeline.
+    const onRetry = vi.fn();
+    render(
+      <DashboardHero
+        rows={[]}
+        openValue={11_900_000}
+        weighted={0}
+        openCount={6}
+        rowsFailed
+        weightedFailed
+        onRetry={onRetry}
+        onDrill={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText('No dated bids yet.')).toBeNull();
+    expect(screen.queryByRole('button', { name: /won this year 0/i })).toBeNull();
+    expect(screen.queryByText(/^Weighted 0$/i)).toBeNull();
+    expect(screen.getByText('Could not load won bids. The bids have not arrived.')).toBeTruthy();
+    expect(screen.getByText('Could not load bids. The bids have not arrived.')).toBeTruthy();
+    expect(screen.getByText('Could not load the weighted pipeline. It has not arrived.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('filterOpps closeMonth', () => {
