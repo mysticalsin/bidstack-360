@@ -63,7 +63,33 @@ describe('CreateEventModal time zone', () => {
     expect(body.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
-  it('refuses an end time before the start time', async () => {
+  // WHY: calendar writes are off, so a Google or Microsoft choice never leaves
+// Polo. Offering the choice, then saving a provider, tells a demo user the
+// event is on a calendar it is not on.
+it('does not ask which external calendar to use', async () => {
+  const { fireEvent } = await import('@testing-library/react');
+  const onSave = vi.fn();
+  render(
+    <CreateEventModal
+      onClose={vi.fn()}
+      onSave={onSave}
+      loading={false}
+      timeZone="UTC"
+    />,
+  );
+
+  expect(screen.queryByLabelText('Calendar')).toBeNull();
+  expect(screen.queryByRole('combobox')).toBeNull();
+  expect(screen.getByText('This event stays in Polo.')).toBeTruthy();
+
+  fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Pricing review' } });
+  fireEvent.submit(screen.getByLabelText('Title').closest('form') as HTMLFormElement);
+
+  const body = onSave.mock.calls[0]?.[0] as { provider?: string };
+  expect(body.provider).toBeUndefined();
+});
+
+it('refuses an end time before the start time', async () => {
     const { fireEvent } = await import('@testing-library/react');
     const onSave = vi.fn();
     render(<CreateEventModal onClose={vi.fn()} onSave={onSave} loading={false} timeZone="America/Toronto" />);

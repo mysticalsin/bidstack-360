@@ -7,5 +7,7 @@ const PROVIDER_FILL: Record<string, string> = {
 };
 
 export function eventFill(ev: CalendarEvent): string {
+  // A Polo-only row keeps a provider name in storage. That name is not a calendar.
+  if (ev.localOnly) return 'bg-gray-600';
   return PROVIDER_FILL[ev.provider] ?? 'bg-gray-600';
 }

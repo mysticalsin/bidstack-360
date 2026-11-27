@@ -94,7 +94,11 @@ export function CalendarPage() {
 
   const events = useMemo(() => {
     const all = data?.items ?? [];
-    return providerFilter === 'all' ? all : all.filter((e) => e.provider === providerFilter);
+    // Google and Microsoft mean the event is on that calendar. A Polo-only
+    // row still carries a provider name, and calendar writes are off, so
+    // that name must not put it on either chip.
+    if (providerFilter === 'all') return all;
+    return all.filter((e) => !e.localOnly && e.provider === providerFilter);
   }, [data, providerFilter]);
 
   const step = view === 'day' ? 1 : view === 'week' ? 7 : AGENDA_DAYS;
