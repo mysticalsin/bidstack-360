@@ -26,6 +26,8 @@ export interface NavItem {
   labelKey: string;
   icon: IconName;
   badgeKey?: NavBadgeKey;
+  /** Other URLs this door owns. The href stays `to`. */
+  activeAliases?: readonly string[];
   /** When set, the item is hidden unless its module is enabled (OrgSettings). */
   featureKey?: NavFeatureKey;
   /** Exact-match active state. Use for section overviews whose sub-routes are
@@ -152,7 +154,15 @@ export const NAV_SECTIONS: NavSection[] = [
       // Reports + dashboards live under one Insights surface (Analytics): the
       // page hosts the dashboard switcher, "Manage dashboards", and links to
       // saved Reports + the report builder. No separate Reports rail door.
-      { to: '/analytics', label: 'Analytics & Reports', labelKey: 'nav.analyticsReports', icon: 'dashboard' },
+      // activeAliases keeps this item current on those pages. The href stays
+      // the analytics page.
+      {
+        to: '/analytics',
+        label: 'Analytics & Reports',
+        labelKey: 'nav.analyticsReports',
+        icon: 'dashboard',
+        activeAliases: ['/reports', '/dashboards'],
+      },
       {
         to: '/workspace/insights',
         label: 'CRM Insights',
@@ -171,6 +181,31 @@ export interface NavModuleFlags {
   agentStudioEnabled?: boolean;
   appflowyEnabled?: boolean;
   serumEnabled?: boolean;
+}
+
+/** True when pathname is one of this item's aliases, not its href. */
+export function navAliasIsCurrent(
+  item: Pick<NavItem, 'activeAliases'>,
+  pathname: string,
+): boolean {
+  for (const alias of item.activeAliases ?? []) {
+    const path = alias.split('?')[0] ?? alias;
+    if (path.length === 0) continue;
+    if (pathname === path || pathname.startsWith(`${path}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Section ownership: the item's own path, a record under it, or an alias.
+ * Home is included. Callers that skip Home still can.
+ */
+export function navItemContainsPath(
+  item: Pick<NavItem, 'to' | 'activeAliases'>,
+  pathname: string,
+): boolean {
+  const path = item.to.split('?')[0] ?? item.to;
+  return pathname === path || pathname.startsWith(`${path}/`) || navAliasIsCurrent(item, pathname);
 }
 
 /** A nav item is visible if it has no featureKey, or its module is enabled.

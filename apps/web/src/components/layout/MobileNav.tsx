@@ -5,7 +5,7 @@
 // element that opened it.
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { PoloPreSalesLogo } from '@/components/brand/PoloPreSalesLogo';
@@ -20,7 +20,16 @@ import { cn } from '@/lib/cn';
 import { prefetchRoute } from '@/lib/prefetch';
 
 import { useAppModules } from '@/hooks/useAppModules';
-import { ADMIN_SETTINGS, MEMBER_SETTINGS, NAV_SECTIONS, isNavItemVisible, type NavItem, type NavSection } from './navConfig';
+import {
+  ADMIN_SETTINGS,
+  MEMBER_SETTINGS,
+  NAV_SECTIONS,
+  isNavItemVisible,
+  navAliasIsCurrent,
+  navItemContainsPath,
+  type NavItem,
+  type NavSection,
+} from './navConfig';
 import { useIsWideShell } from './shellBreakpoint';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -257,9 +266,7 @@ function MobileNavSection({
   const { t } = useTranslation('common');
   const override = useUiStore((s) => s.collapsedSections[section.key]);
   const setSectionCollapsed = useUiStore((s) => s.setSectionCollapsed);
-  const isActive = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActive = section.items.some((it) => navItemContainsPath(it, location.pathname));
   const collapsed = override === undefined ? !isActive : override;
   return (
     <div className="py-1">
@@ -293,40 +300,38 @@ function MobileNavItem({
   const label = t(item.labelKey, item.label);
   const badge = item.badgeKey ? badges[item.badgeKey] : 0;
   const location = useLocation();
+  const aliasCurrent = navAliasIsCurrent(item, location.pathname);
 
-  const isActive = (() => {
-    try {
-      const toUrl = new URL(item.to, window.location.origin);
-      const toPath = toUrl.pathname;
-      const toTab = toUrl.searchParams.get('tab');
+  const isActive =
+    aliasCurrent ||
+    (() => {
+      try {
+        const toUrl = new URL(item.to, window.location.origin);
+        const toPath = toUrl.pathname;
+        const toTab = toUrl.searchParams.get('tab');
 
-      const currentTab = new URLSearchParams(location.search).get('tab');
+        const currentTab = new URLSearchParams(location.search).get('tab');
 
-      if (location.pathname !== toPath) return false;
+        if (location.pathname !== toPath) return false;
 
-      if (toTab) {
-        return currentTab === toTab;
-      } else {
-        return !currentTab || currentTab === 'overview';
+        if (toTab) {
+          return currentTab === toTab;
+        } else {
+          return !currentTab || currentTab === 'overview';
+        }
+      } catch {
+        return false;
       }
-    } catch {
-      return false;
-    }
-  })();
+    })();
 
-  return (
-    <NavLink
-      to={item.to}
-      className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-        isActive
-          ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
-          : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
-      )}
-      end={item.end ?? item.to === '/'}
-      onClick={onNavigate}
-      onMouseEnter={() => prefetchRoute(item.to)}
-    >
+  const className = cn(
+    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+    isActive
+      ? 'bg-[var(--brand-primary-tint)] text-[var(--brand-deep)]'
+      : 'text-[var(--fg-secondary)] hover:bg-[var(--surface-sunken)] hover:text-[var(--fg-primary)]',
+  );
+  const body = (
+    <>
       <Icon name={item.icon} size={16} />
       <span className="flex-1">{label}</span>
       {badge > 0 && (
@@ -334,6 +339,31 @@ function MobileNavItem({
           {badge}
         </span>
       )}
+    </>
+  );
+  // NavLink drops aria-current unless `to` is this URL. An alias uses Link.
+  if (aliasCurrent) {
+    return (
+      <Link
+        to={item.to}
+        className={className}
+        aria-current="page"
+        onClick={onNavigate}
+        onMouseEnter={() => prefetchRoute(item.to)}
+      >
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <NavLink
+      to={item.to}
+      className={className}
+      end={item.end ?? item.to === '/'}
+      onClick={onNavigate}
+      onMouseEnter={() => prefetchRoute(item.to)}
+    >
+      {body}
     </NavLink>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { TooltipBare, TooltipProvider } from '@/components/ui/Tooltip';
@@ -22,6 +22,8 @@ import {
   MEMBER_SETTINGS,
   NAV_SECTIONS,
   isNavItemVisible,
+  navAliasIsCurrent,
+  navItemContainsPath,
   type NavItem,
   type NavSection,
 } from './navConfig';
@@ -39,7 +41,7 @@ function findSectionKeyForPath(pathname: string): string | undefined {
   return NAV_SECTIONS.find(
     (section) =>
       section.key !== 'home' &&
-      section.items.some((it) => pathname === it.to || pathname.startsWith(`${it.to}/`)),
+      section.items.some((it) => navItemContainsPath(it, pathname)),
   )?.key;
 }
 
@@ -230,9 +232,7 @@ function SidebarSection({
   // Accordion: a section is collapsed by default unless it holds the active
   // route — so only one section's items show at once and the rail never needs
   // an internal scroll. An explicit user toggle (override) wins and persists.
-  const isActiveSection = section.items.some(
-    (it) => location.pathname === it.to || location.pathname.startsWith(`${it.to}/`),
-  );
+  const isActiveSection = section.items.some((it) => navItemContainsPath(it, location.pathname));
   const sectionCollapsed = override === undefined ? !isActiveSection : override;
 
   if (collapsed) {
@@ -269,9 +269,21 @@ function SidebarSection({
           <div className="sb-flyout-content">
             {section.items.map((item) => {
               const badge = item.badgeKey ? badges[item.badgeKey] : 0;
+              const aliasCurrent = navAliasIsCurrent(item, location.pathname);
+              const label = t(item.labelKey, item.label);
+              // NavLink drops aria-current unless `to` is this URL. An alias
+              // is a different URL, so the current mark sits on Link.
+              if (aliasCurrent) {
+                return (
+                  <Link key={item.to} to={item.to} className="sb-flyout-item" aria-current="page">
+                    <span>{label}</span>
+                    {badge > 0 && <span className="sb-badge">{badge}</span>}
+                  </Link>
+                );
+              }
               return (
                 <NavLink key={item.to} to={item.to} end={item.end} className="sb-flyout-item">
-                  <span>{t(item.labelKey, item.label)}</span>
+                  <span>{label}</span>
                   {badge > 0 && <span className="sb-badge">{badge}</span>}
                 </NavLink>
               );
@@ -348,6 +360,7 @@ function SidebarItem({
   const prefetch = () => prefetchRoute(item.to);
 
   const isActive = useMemo(() => {
+    if (navAliasIsCurrent(item, location.pathname)) return true;
     try {
       const toUrl = new URL(item.to, window.location.origin);
       const toPath = toUrl.pathname;
@@ -365,9 +378,32 @@ function SidebarItem({
     } catch {
       return false;
     }
-  }, [location, item.to]);
+  }, [location, item]);
 
-  const link = (
+  const linkBody = (
+    <>
+      <Icon name={item.icon} size={16} />
+      <span>{label}</span>
+      {badge > 0 && <span className="sb-badge">{badge}</span>}
+    </>
+  );
+  // NavLink drops aria-current unless `to` is this URL. An alias still has
+  // to paint as the current door, so that case uses Link.
+  const aliasCurrent = navAliasIsCurrent(item, location.pathname);
+  const link = aliasCurrent ? (
+    <Link
+      to={item.to}
+      aria-current="page"
+      className={cn('sb-item', 'is-active')}
+      aria-label={label}
+      title={collapsed ? undefined : label}
+      onMouseEnter={prefetch}
+      onFocus={prefetch}
+      onTouchStart={prefetch}
+    >
+      {linkBody}
+    </Link>
+  ) : (
     <NavLink
       to={item.to}
       end={item.end}
@@ -379,9 +415,7 @@ function SidebarItem({
       onFocus={prefetch}
       onTouchStart={prefetch}
     >
-      <Icon name={item.icon} size={16} />
-      <span>{label}</span>
-      {badge > 0 && <span className="sb-badge">{badge}</span>}
+      {linkBody}
     </NavLink>
   );
   // Tooltips only when the label is hidden (collapsed mode) — otherwise
