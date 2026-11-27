@@ -75,68 +75,81 @@ export function TimeGrid({ keys, tz, events, todayKey, showDeadlines, onSlot, on
 
   return (
     <div ref={scroller} className="flex-1 overflow-auto" data-testid="calendar-grid">
-      <div
-        className="sticky top-0 z-20 grid border-b border-[var(--border-default)] bg-[var(--surface-page)]"
-        style={columns(keys.length)}
-      >
-        <div className="h-12" aria-hidden="true" />
-        {keys.map((key) => {
-          const isToday = key === todayKey;
-          return (
-            <div
-              key={key}
-              className={cn(
-                'flex h-12 min-w-0 flex-col items-center justify-center text-xs font-medium',
-                isToday ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-secondary)]',
-              )}
-            >
-              <span className="truncate">{formatDayLabel(key, { weekday: 'short' })}</span>
-              <span
+      {/* Day names, all-day bars, and the deadlines lane stay pinned. The hour
+          grid opens at 07:00, and that scroll used to carry the lane off
+          screen. On a demo week with no timed meeting the lane is the only
+          signal, so a blank 07:00 grid read as an empty week. */}
+      <div className="sticky top-0 z-20 bg-[var(--surface-page)]">
+        <div
+          className="grid border-b border-[var(--border-default)] bg-[var(--surface-page)]"
+          style={columns(keys.length)}
+        >
+          <div className="h-12" aria-hidden="true" />
+          {keys.map((key) => {
+            const isToday = key === todayKey;
+            return (
+              <div
+                key={key}
                 className={cn(
-                  'mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold',
-                  isToday && 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]',
+                  'flex h-12 min-w-0 flex-col items-center justify-center text-xs font-medium',
+                  isToday ? 'text-[var(--fg-primary)]' : 'text-[var(--fg-secondary)]',
                 )}
               >
-                {formatDayLabel(key, { day: 'numeric' })}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {laneRows > 0 && (
-        <div
-          className="grid gap-y-1 border-b border-[var(--border-subtle)] py-1"
-          style={{ ...columns(keys.length), gridAutoRows: `${LANE_ROW_PX}px` }}
-          data-testid="calendar-all-day"
-        >
-          <div
-            className="flex items-center justify-end pr-2 text-xs text-[var(--fg-tertiary)]"
-            style={{ gridColumn: 1, gridRow: `1 / span ${laneRows}` }}
-          >
-            {t('calendar.allDay', 'All day')}
-          </div>
-          {lane.map((seg) => (
-            <button
-              key={seg.event.id}
-              type="button"
-              title={`${seg.event.subject}, ${timeRange(seg.event)}`}
-              onClick={() => onSelect(seg.event)}
-              className={cn(
-                'mx-0.5 min-w-0 truncate rounded px-2 text-left text-xs font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
-                eventFill(seg.event),
-                seg.continuesBefore && 'rounded-l-none',
-                seg.continuesAfter && 'rounded-r-none',
-              )}
-              style={{ gridColumn: `${seg.startCol + 2} / span ${seg.span}`, gridRow: seg.row + 1 }}
-            >
-              {seg.event.subject}
-            </button>
-          ))}
+                <span className="truncate">{formatDayLabel(key, { weekday: 'short' })}</span>
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold',
+                    isToday && 'bg-[var(--brand-primary)] text-[var(--fg-on-brand)]',
+                  )}
+                >
+                  {formatDayLabel(key, { day: 'numeric' })}
+                </span>
+              </div>
+            );
+          })}
         </div>
-      )}
 
-      {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} />}
+        {laneRows > 0 || showDeadlines ? (
+          <div className="max-h-48 overflow-auto">
+            {laneRows > 0 && (
+              <div
+                className="grid gap-y-1 border-b border-[var(--border-subtle)] py-1"
+                style={{ ...columns(keys.length), gridAutoRows: `${LANE_ROW_PX}px` }}
+                data-testid="calendar-all-day"
+              >
+                <div
+                  className="flex items-center justify-end pr-2 text-xs text-[var(--fg-tertiary)]"
+                  style={{ gridColumn: 1, gridRow: `1 / span ${laneRows}` }}
+                >
+                  {t('calendar.allDay', 'All day')}
+                </div>
+                {lane.map((seg) => (
+                  <button
+                    key={seg.event.id}
+                    type="button"
+                    title={`${seg.event.subject}, ${timeRange(seg.event)}`}
+                    onClick={() => onSelect(seg.event)}
+                    className={cn(
+                      'mx-0.5 min-w-0 truncate rounded px-2 text-left text-xs font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--border-focus)]',
+                      eventFill(seg.event),
+                      seg.continuesBefore && 'rounded-l-none',
+                      seg.continuesAfter && 'rounded-r-none',
+                    )}
+                    style={{
+                      gridColumn: `${seg.startCol + 2} / span ${seg.span}`,
+                      gridRow: seg.row + 1,
+                    }}
+                  >
+                    {seg.event.subject}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showDeadlines && <DeadlinesRow days={keys.map(keyToLocalDate)} />}
+          </div>
+        ) : null}
+      </div>
 
       <div className="grid" style={columns(keys.length)}>
         <div aria-hidden="true">
