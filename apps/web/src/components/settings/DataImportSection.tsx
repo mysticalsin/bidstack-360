@@ -5,6 +5,8 @@ import { Card, SectionHeader } from '@/components/ui/Card';
 import { CsvImportWizard } from '@/components/import/CsvImportWizard';
 import { SyncNowControl } from '@/components/sync/SyncNowControl';
 
+import { ImportHistoryPanel } from './ImportHistoryPanel';
+
 export function DataImportSection() {
   const { t } = useTranslation('settings');
   return (
@@ -23,7 +25,8 @@ export function DataImportSection() {
             'Bring companies, contacts, leads, and opportunities in from a CSV export of your previous CRM. Map your columns, choose how duplicates are handled, then import.',
           )}
         />
-        <div className="p-5">
+        <div className="flex flex-col gap-4 p-5">
+          <ImportHistoryPanel />
           <CsvImportWizard />
         </div>
       </Card>
