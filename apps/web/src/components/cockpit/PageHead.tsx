@@ -10,7 +10,6 @@ import { BriefingDialog } from '@/components/opportunity/BriefingDialog';
 import { Icon } from '@/components/ui/Icon';
 import { SavedFlash } from '@/components/ui/SavedFlash';
 import { useEnrichCompany } from '@/hooks/useEnrichCompany';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { Spark } from '@/components/viz/charts';
 import { cumulativeOpen, runningWinRate } from '@/components/viz/viz-data';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
@@ -23,6 +22,7 @@ import { useAccountHistory } from '@/stores/accountHistory';
 import type { AccountCockpitMaybeScored, CompanyHealth } from '@bidstack/shared';
 
 import { deriveNextMove } from './CommandCenter';
+import { pageHeadOpenAmount } from './page-head-open-amount';
 import { labelForBand } from './_tokens';
 
 interface Props {
@@ -73,7 +73,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const favorites = useAccountHistory((s) => s.favorites);
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
-  const { formatMoney } = useFormatMoney();
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
@@ -226,7 +225,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
         <div className="acct-keys" role="group" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
           <div>
             <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
-            <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
+            <span className="acct-key-value"><AnimatedNumber value={openValue} format={pageHeadOpenAmount} /></span>
             <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
             <span>
               {openOpps.length === 1
