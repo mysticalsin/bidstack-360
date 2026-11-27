@@ -264,14 +264,25 @@ export function HierarchyTab({
           </div>
         </div>
       )}
-      {hierarchy.isLoading && <DetailPageSkeleton tabs={false} columns={1} cards={1} />}
-      {hierarchy.isError && (
+      {hierarchy.isError ? (
         <ErrorState
           title={t('companyTabs.hierarchy.errorTitle', "Couldn't load hierarchy")}
           message={t('companyTabs.hierarchy.errorMessage', 'Unable to fetch account hierarchy.')}
         />
+      ) : hierarchy.data ? (
+        <AccountHierarchyTree tree={hierarchy.data.tree} />
+      ) : hierarchy.isLoading ? (
+        <DetailPageSkeleton tabs={false} columns={1} cards={1} />
+      ) : (
+        // Pending, paused, or in flight while isLoading is still false.
+        // A blank panel would read as a company with no org chart.
+        <p role="status" className="text-sm text-[var(--fg-secondary)]">
+          {t(
+            'companyTabs.hierarchy.checking',
+            'Checking the account hierarchy. The tree has not arrived.',
+          )}
+        </p>
       )}
-      {hierarchy.data && <AccountHierarchyTree tree={hierarchy.data.tree} />}
     </div>
   );
 }
