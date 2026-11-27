@@ -34,6 +34,9 @@ import { Icon } from '@/components/ui/Icon';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useGateDecisions, useSaveClassification, useRecordGate } from '@/hooks/useBidGovernance';
+import { useOpportunity } from '@/hooks/useOpportunities';
+
+import { governanceClassPhase } from './governance-class-read';
 
 /** The saved assessment on the opportunity, if it has one. */
 export interface SavedClassification {
@@ -128,11 +131,71 @@ function LabelledList({ title, items }: { title: string; items: readonly string[
  * every settings section in this app).
  */
 export function BidGovernancePanel({ opportunityId, saved }: Props) {
+  const { t } = useTranslation('crm');
+  // A caller that already has the record (the opportunity page) must not
+  // start a second read. A selected deal with no saved payload has to wait.
+  const recordId = saved == null && opportunityId ? opportunityId : undefined;
+  const record = useOpportunity(recordId);
+  const phase = governanceClassPhase({
+    opportunityId,
+    saved,
+    data: record.data,
+    isError: record.isError,
+    status: record.status,
+  });
+
+  if (phase === 'unread') {
+    return (
+      <Card>
+        <SectionHeader title={t('bidClass.title', 'Bid Classification & Governance')} />
+        <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+          {t(
+            'bidClass.classUnread',
+            'Checking the saved classification. The record has not arrived.',
+          )}
+        </p>
+      </Card>
+    );
+  }
+
+  if (phase === 'failed') {
+    const detail = record.error instanceof Error ? record.error.message : null;
+    return (
+      <Card>
+        <SectionHeader title={t('bidClass.title', 'Bid Classification & Governance')} />
+        <p role="alert" className="px-5 py-4 text-sm text-[var(--danger)]">
+          {t('bidClass.classFailed', 'Could not load the saved classification.')}
+          {detail ? <span className="mt-1 block text-xs">{detail}</span> : null}
+        </p>
+      </Card>
+    );
+  }
+
+  if (phase === 'ready' && record.data == null) {
+    return (
+      <Card>
+        <SectionHeader title={t('bidClass.title', 'Bid Classification & Governance')} />
+        <p role="status" className="px-5 py-4 text-sm text-[var(--fg-secondary)]">
+          {t('bidClass.classNone', 'No saved classification is on this opportunity.')}
+        </p>
+      </Card>
+    );
+  }
+
+  const resolved: SavedClassification | null =
+    phase === 'ready' && record.data
+      ? {
+          bidClass: record.data.bidClass ?? null,
+          fteEstimate: record.data.fteEstimate ?? null,
+          commitmentLevel: record.data.commitmentLevel ?? null,
+        }
+      : (saved ?? null);
+
   return (
     <BidGovernanceForm
-      key={`${opportunityId ?? 'none'}:${saved?.bidClass ?? ''}:${saved?.fteEstimate ?? ''}:${saved?.commitmentLevel ?? ''}`}
+      key={`${opportunityId ?? 'none'}:${resolved?.bidClass ?? ''}:${resolved?.fteEstimate ?? ''}:${resolved?.commitmentLevel ?? ''}`}
       opportunityId={opportunityId}
-      saved={saved}
+      saved={resolved}
     />
   );
 }
