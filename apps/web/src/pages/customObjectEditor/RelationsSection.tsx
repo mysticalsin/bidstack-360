@@ -10,6 +10,7 @@ import {
   type useCustomObjectRelations,
 } from '@/hooks/useCustomObjects';
 import { CARDINALITIES } from './customObjectEditorConfig';
+import { relationsListPhase } from './relations-list-read';
 
 interface Props {
   addRelation: ReturnType<typeof useAddCustomObjectRelation>;
@@ -18,6 +19,8 @@ interface Props {
 
 export function RelationsSection({ addRelation, relationsQuery }: Props) {
   const { t } = useTranslation('crm');
+  // A missing payload is not a missing list. Empty is only a settled read.
+  const phase = relationsListPhase(relationsQuery);
   const [showRelationForm, setShowRelationForm] = useState(false);
   const [newRelation, setNewRelation] = useState({
     relationKey: '',
@@ -185,13 +188,25 @@ export function RelationsSection({ addRelation, relationsQuery }: Props) {
           </form>
         )}
 
-        {relationsQuery.data?.items.length === 0 && (
+        {phase === 'unread' && (
+          <p className="p-4 text-sm text-[var(--text-secondary)]" role="status">
+            {t('relations.unread', 'Checking relations. The list has not arrived.')}
+          </p>
+        )}
+
+        {phase === 'failed' && (
+          <p className="p-4 text-sm text-red-600 dark:text-red-400" role="alert">
+            {t('relations.loadError', 'Could not load relations.')}
+          </p>
+        )}
+
+        {phase === 'ready' && relationsQuery.data?.items.length === 0 && (
           <p className="p-4 text-sm text-[var(--text-secondary)]">
             {t('relations.emptyState', 'No relations defined yet.')}
           </p>
         )}
 
-        {relationsQuery.data?.items.map((rel) => (
+        {phase === 'ready' && relationsQuery.data?.items.map((rel) => (
           <div
             key={rel.id}
             className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)] last:border-0"
