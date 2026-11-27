@@ -61,6 +61,10 @@ import type pino from 'pino';
 import { prisma, TaskStatus, InitiativeStage } from '@bidstack/db';
 
 import {
+  fixtureTasksOutsideAlertWindow,
+  projectFixtureTaskAlertDue,
+} from './task-kam-alerts.fixture-due.js';
+import {
   daysUntilDue,
   daysSince,
   isTaskDueOrOverdue,
@@ -134,7 +138,13 @@ async function alertTaskIfNew(task: DueTask, daysUntil: number, url: string): Pr
   return true;
 }
 
-export async function scanTaskDueAlerts(now: Date, log: pino.Logger): Promise<number> {
+export async function scanTaskDueAlerts(
+  now: Date,
+  log: pino.Logger,
+  // Omitted mode matches getPoloDataMode: only exact `real` stays on the stored
+  // date. An explicit other spelling is passed through and does not slide.
+  mode: string | undefined = process.env.POLO_DATA_MODE === 'real' ? 'real' : 'demo',
+): Promise<number> {
   const dayKey = utcDayKey(now);
   // Bound the query itself (not just the in-memory isTaskDueOrOverdue filter)
   // to "due tomorrow or earlier" — mirrors bid-deadline-alerts.ts's windowEnd.
@@ -144,22 +154,34 @@ export async function scanTaskDueAlerts(now: Date, log: pino.Logger): Promise<nu
   const windowEnd = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
   );
+  // Aged fixture rows would sort first on the stored May date and fill this
+  // batch while their demo due date is still in the future. Leave those out.
+  // A live task, and a fixture row whose date was edited, stays on dueDate.
+  const outsideFixture = fixtureTasksOutsideAlertWindow(now, mode);
   const tasks = await prisma.task.findMany({
     where: {
       deletedAt: null,
       status: { in: OPEN_TASK_STATUSES },
       assigneeId: { not: null },
       dueDate: { not: null, lte: windowEnd },
+      ...(outsideFixture.length > 0
+        ? { NOT: { OR: outsideFixture.map((row) => ({ id: row.id, dueDate: row.dueDate })) } }
+        : {}),
     },
     orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
     take: SCAN_BATCH_SIZE,
-    select: { id: true, orgId: true, title: true, dueDate: true, assigneeId: true },
+    select: { id: true, orgId: true, title: true, dueDate: true, assigneeId: true, status: true },
   });
 
   let created = 0;
   for (const task of tasks) {
     if (!task.dueDate || !task.assigneeId) continue;
-    const daysUntil = daysUntilDue(task.dueDate, now);
+    const dueDate = projectFixtureTaskAlertDue(
+      { id: task.id, status: task.status, dueDate: task.dueDate },
+      now,
+      mode,
+    );
+    const daysUntil = daysUntilDue(dueDate, now);
     if (!isTaskDueOrOverdue(daysUntil)) continue;
     try {
       const scanned: DueTask = {

@@ -112,6 +112,137 @@ describe('scanTaskDueAlerts', () => {
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
+  it('reads an aged fixture task as due tomorrow in demo, and leaves it out of the overdue batch', async () => {
+    // WHY: the seven open fixture tasks are dated 2026-05-12 through 2026-05-23.
+    // On 2026-11-27 every stored date is past, so this scan raises an overdue
+    // nudge for each of them and they sort first in the 1000-row batch.
+    const now = new Date('2026-11-27T12:00:00.000Z');
+    const earlyDue = new Date('2026-05-12T00:00:00.000Z');
+    const farDue = new Date('2026-05-23T00:00:00.000Z');
+    const early = {
+      id: '00000000-0000-4000-8000-000000010003',
+      orgId: ORG_ID,
+      title: 'Final commercial review — Rush University',
+      dueDate: earlyDue,
+      assigneeId: 'user-1',
+    };
+    mocks.notificationFindFirst.mockResolvedValue(null);
+    mocks.taskFindMany.mockResolvedValue([
+      early,
+      {
+        id: '00000000-0000-4000-8000-000000010005',
+        orgId: ORG_ID,
+        title: 'Confirm MAPFRE budget owner',
+        dueDate: farDue,
+        assigneeId: 'user-1',
+      },
+    ]);
+
+    const created = await scanTaskDueAlerts(now, log, 'demo');
+
+    expect(created).toBe(1);
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.notificationCreate.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Task due tomorrow: Final commercial review — Rush University',
+          entityId: early.id,
+        }),
+      }),
+    );
+    expect(early.dueDate).toBe(earlyDue);
+    const excluded = (mocks.taskFindMany.mock.calls[0]?.[0].where.NOT?.OR ?? []).map(
+      (row: { id: string }) => row.id,
+    );
+    expect(excluded).toContain('00000000-0000-4000-8000-000000010005');
+    expect(excluded).not.toContain(early.id);
+  });
+
+  it('slides an aged fixture task when POLO_DATA_MODE is unset, and keeps it when real', async () => {
+    // WHY: the hosted demo leaves POLO_DATA_MODE unset. That is demo, same as
+    // getPoloDataMode. Exact real must keep the stored May date.
+    const now = new Date('2026-11-27T12:00:00.000Z');
+    const row = {
+      id: '00000000-0000-4000-8000-000000010003',
+      orgId: ORG_ID,
+      title: 'Final commercial review — Rush University',
+      dueDate: new Date('2026-05-12T00:00:00.000Z'),
+      assigneeId: 'user-1',
+    };
+    const previous = process.env.POLO_DATA_MODE;
+    try {
+      delete process.env.POLO_DATA_MODE;
+      mocks.notificationFindFirst.mockResolvedValue(null);
+      mocks.taskFindMany.mockResolvedValue([row]);
+      expect(await scanTaskDueAlerts(now, log)).toBe(1);
+      expect(mocks.notificationCreate.mock.calls[0]?.[0].data.title).toBe(
+        'Task due tomorrow: Final commercial review — Rush University',
+      );
+
+      process.env.POLO_DATA_MODE = 'real';
+      mocks.notificationCreate.mockClear();
+      expect(await scanTaskDueAlerts(now, log)).toBe(1);
+      expect(mocks.notificationCreate.mock.calls[0]?.[0].data.title).toBe(
+        'Task overdue: Final commercial review — Rush University',
+      );
+    } finally {
+      if (previous === undefined) delete process.env.POLO_DATA_MODE;
+      else process.env.POLO_DATA_MODE = previous;
+    }
+  });
+
+  it('keeps the stored May date when the mode is real or not exactly demo', async () => {
+    const now = new Date('2026-11-27T12:00:00.000Z');
+    const row = {
+      id: '00000000-0000-4000-8000-000000010003',
+      orgId: ORG_ID,
+      title: 'Final commercial review — Rush University',
+      dueDate: new Date('2026-05-12T00:00:00.000Z'),
+      assigneeId: 'user-1',
+    };
+    mocks.notificationFindFirst.mockResolvedValue(null);
+    for (const mode of ['real', 'Demo', 'DEMO', 'demo-x', ' demo', 'notdemo'] as const) {
+      mocks.taskFindMany.mockResolvedValue([row]);
+      mocks.notificationCreate.mockClear();
+      const created = await scanTaskDueAlerts(now, log, mode);
+      expect(created).toBe(1);
+      expect(mocks.notificationCreate.mock.calls[0]?.[0].data.title).toBe(
+        'Task overdue: Final commercial review — Rush University',
+      );
+      expect(mocks.taskFindMany.mock.calls.at(-1)?.[0].where.NOT).toBeUndefined();
+    }
+  });
+
+  it('does not slide a live task or a fixture task whose date was edited', async () => {
+    const now = new Date('2026-11-27T12:00:00.000Z');
+    mocks.notificationFindFirst.mockResolvedValue(null);
+    mocks.taskFindMany.mockResolvedValue([
+      {
+        id: 'task-live',
+        orgId: ORG_ID,
+        title: 'Live follow-up',
+        dueDate: new Date('2026-05-12T00:00:00.000Z'),
+        assigneeId: 'user-1',
+      },
+      {
+        id: '00000000-0000-4000-8000-000000010003',
+        orgId: ORG_ID,
+        title: 'Edited fixture',
+        dueDate: new Date('2026-05-13T00:00:00.000Z'),
+        assigneeId: 'user-2',
+      },
+    ]);
+
+    const created = await scanTaskDueAlerts(now, log, 'demo');
+
+    expect(created).toBe(2);
+    const titles = mocks.notificationCreate.mock.calls.map((call) => call[0].data.title);
+    expect(titles).toEqual([
+      'Task overdue: Live follow-up',
+      'Task overdue: Edited fixture',
+    ]);
+  });
+
   it('respects an explicit taskDueSoon opt-out — the assignee is not notified', async () => {
     // WHY this case must exist: "respecting the relevant pref" is an explicit
     // task requirement, and the pref-gating branch (task-kam-alerts.ts's
