@@ -49,6 +49,13 @@ function layout(items: TimelineItem[], x: (d: Date) => number) {
   return out;
 }
 
+// noDash drops a "Sample:" title prefix. The mark button replaces its text
+// with this name, so a demo row has to say sample here.
+function markName(item: TimelineItem): string {
+  const name = `${CATEGORY_LABEL[item.category]}, ${dateFmt.format(new Date(item.at))}: ${noDash(item.title)}`;
+  return item.sample ? `${name}, sample` : name;
+}
+
 function Detail({ item }: { item: TimelineItem }) {
   const tone = CATEGORY_TONE[item.category];
   return (
@@ -211,7 +218,7 @@ export function TimelineView({
                     data-upcoming={item.upcoming}
                     aria-pressed={selected === item.id}
                     aria-controls={`${id}-detail`}
-                    aria-label={`${CATEGORY_LABEL[item.category]}, ${dateFmt.format(new Date(item.at))}: ${noDash(item.title)}`}
+                    aria-label={markName(item)}
                     style={{ left: `${left}%`, '--row': row, '--i': Math.min(n, 30) } as React.CSSProperties}
                     onClick={() => setSelected((s) => (s === item.id ? null : item.id))}
                     onMouseEnter={() => setHover({ id: item.id, left, lane })}
@@ -226,7 +233,7 @@ export function TimelineView({
                   <span className="sg-tip" role="presentation" aria-hidden style={{ left: `${Math.min(88, Math.max(12, hover.left))}%`, top: '50%' }}>
                     {noDash(hovered.title)}
                     <br />
-                    <span style={{ opacity: 0.75 }}>{CATEGORY_LABEL[hovered.category]} · {dateFmt.format(new Date(hovered.at))}</span>
+                    <span style={{ opacity: 0.75 }}>{CATEGORY_LABEL[hovered.category]} · {dateFmt.format(new Date(hovered.at))}{hovered.sample ? ' · Sample' : ''}</span>
                   </span>
                 ) : null}
               </div>

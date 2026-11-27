@@ -88,6 +88,18 @@ describe('TimelineView', () => {
     expect(screen.queryByRole('button', { name: /^Launch,/ })).toBeNull();
   });
 
+  it('names a sample mark as sample before it is opened, and leaves a live mark live', () => {
+    // WHY: demo funding rows carry sample:true, and noDash strips the "Sample:"
+    // title prefix. The mark button replaces its text with aria-label, so a
+    // screen reader hears a live funding event unless that name says sample.
+    // A real launch must stay a launch.
+    wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" />);
+    const funding = screen.getByRole('button', { name: /^Funding,/ });
+    expect(funding.getAttribute('aria-label')).toMatch(/, sample$/);
+    const launch = screen.getByRole('button', { name: /^Launch,/ });
+    expect(launch.getAttribute('aria-label')).not.toMatch(/sample/i);
+  });
+
   it('shows the detail with the source on click, without the sample prefix or dashes', () => {
     wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" />);
     fireEvent.click(screen.getByRole('button', { name: /^Funding,/ }));
