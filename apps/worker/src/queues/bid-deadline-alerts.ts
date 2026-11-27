@@ -35,13 +35,14 @@ import { Queue, Worker, type Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import type pino from 'pino';
 
-import { prisma, OpportunityStage, Prisma } from '@bidstack/db';
+import { prisma, Prisma } from '@bidstack/db';
 
 import {
   DEADLINE_THRESHOLD_DAYS,
   OVERDUE_DEDUPE_THRESHOLD,
   daysUntilDue,
   deadlineDedupeUrl,
+  deadlineScanWhere,
   dueInLabel,
   isOverdue,
   nearestCrossedThreshold,
@@ -81,9 +82,6 @@ const JOB_OPTIONS = {
   removeOnComplete: { age: 86_400, count: 50 },
   removeOnFail: { age: 86_400 * 7, count: 500 },
 };
-
-/** Closed stages (won/lost) — their opportunities no longer need deadline alerts. */
-const CLOSED_STAGES = [OpportunityStage.closed_won, OpportunityStage.closed_lost];
 
 interface ScannedOpp {
   id: string;
@@ -197,12 +195,7 @@ async function scanDeadlines(log: pino.Logger): Promise<void> {
   const windowEnd = new Date(todayUTC.getTime() + maxThreshold * 86_400_000);
 
   const opps = await prisma.opportunity.findMany({
-    where: {
-      deletedAt: null,
-      stage: { notIn: CLOSED_STAGES },
-      ownerId: { not: null },
-      dueDate: { gte: windowStart, lte: windowEnd },
-    },
+    where: deadlineScanWhere(windowStart, windowEnd),
     // Deterministic order: soonest deadlines first so a >batch backlog never
     // starves the most-urgent alerts.
     orderBy: [{ dueDate: 'asc' }, { id: 'asc' }],
