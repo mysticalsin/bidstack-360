@@ -15,8 +15,20 @@ describe('formatExtractedMicros', () => {
     expect(formatExtractedMicros(850_500_000, 'EUR')).toBe('850.50 EUR');
   });
 
-  it('refuses a micros number that is not a safe integer', () => {
-    expect(formatExtractedMicros(Number.MAX_SAFE_INTEGER + 2)).toBe('amount not readable');
+  it('refuses a micros value that is not an integer', () => {
+    // WHY: a fractional float is not a micros count. NaN and Infinity are not either.
+    expect(formatExtractedMicros(1.5)).toBe('amount not readable');
+    expect(formatExtractedMicros(Number.NaN)).toBe('amount not readable');
+    expect(formatExtractedMicros(Number.POSITIVE_INFINITY)).toBe('amount not readable');
+  });
+
+  it('prints a liability cap above about 9.007 billion units', () => {
+    // WHY: 9,007,199,255 units is 9_007_199_255_000_000 micros. That float is an exact
+    // integer, but it sits past Number.MAX_SAFE_INTEGER, so the review said
+    // "amount not readable" for a cap a reader can still name.
+    expect(formatExtractedMicros(9_007_199_255_000_000, 'EUR')).toBe('9,007,199,255 EUR');
+    expect(formatExtractedMicros(10_000_000_000_000_000, 'EUR')).toBe('10,000,000,000 EUR');
+    expect(formatExtractedMicros(10_000_000_000_500_000, 'USD')).toBe('10,000,000,000.50 USD');
   });
 
   it('rounds an exact half cent away from zero on both signs', () => {
@@ -54,10 +66,18 @@ describe('formatExtractedRowList', () => {
     ])).toBe('Analyst: 1.00 USD / hour · Reviewer: -1.01 USD / hour');
   });
 
-  it('shares precision without inventing a currency or a number for an unsafe integer', () => {
-    // WHY: lining up cents must not turn a missing code into EUR or an unsafe micros value into digits.
+  it('lines up cents when one rate is an exact integer past the safe range', () => {
+    // WHY: a readable rate with cents is still a cent. The whole sibling in that list shows .00.
     expect(formatExtractedRowList([
-      { role: 'Ghost', rateMicros: Number.MAX_SAFE_INTEGER + 2, currency: 'EUR', unit: 'day' },
+      { role: 'Anchor', rateMicros: 1_200_000_000, currency: 'EUR', unit: 'day' },
+      { role: 'Cap', rateMicros: 10_000_000_000_500_000, currency: 'EUR', unit: 'day' },
+    ])).toBe('Anchor: 1,200.00 EUR / day · Cap: 10,000,000,000.50 EUR / day');
+  });
+
+  it('shares precision without inventing a currency or a number for a non-integer', () => {
+    // WHY: lining up cents must not turn a missing code into EUR or a fractional micros value into digits.
+    expect(formatExtractedRowList([
+      { role: 'Ghost', rateMicros: 1.5, currency: 'EUR', unit: 'day' },
       { role: 'Senior Consultant', rateMicros: 1_200_000_000, currency: null, unit: 'day' },
       { role: 'Designer', rateMicros: 850_500_000, currency: 'EUR', unit: 'day' },
     ])).toBe('Ghost: amount not readable / day · Senior Consultant: 1,200.00 unspecified / day · Designer: 850.50 EUR / day');
