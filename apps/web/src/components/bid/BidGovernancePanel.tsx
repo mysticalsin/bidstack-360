@@ -137,13 +137,26 @@ export function BidGovernancePanel({ opportunityId, saved }: Props) {
   );
 }
 
+function recordedInputs(
+  saved: SavedClassification | null | undefined,
+): { fte: number; commitment: CommitmentLevel } | null {
+  if (!saved || !isBidClass(saved.bidClass)) return null;
+  if (typeof saved.fteEstimate !== 'number' || !Number.isFinite(saved.fteEstimate)) return null;
+  if (!isCommitment(saved.commitmentLevel)) return null;
+  return { fte: saved.fteEstimate, commitment: saved.commitmentLevel };
+}
+
 function BidGovernanceForm({ opportunityId, saved }: Props) {
   const { t } = useTranslation('crm');
 
-  // Seed from the record; fall back to a neutral mid-size bid when unclassified.
-  const [fte, setFte] = useState(saved?.fteEstimate ?? 5);
-  const [commitment, setCommitment] = useState<CommitmentLevel>(
-    isCommitment(saved?.commitmentLevel) ? saved.commitmentLevel : 'medium',
+  // A saved class opens on the saved inputs. A deal with no class (demo
+  // Siemens stores none) must not wear the scratch defaults: 5 FTE × medium
+  // paints C1, and a larger placeholder painted C3. C3 stays off that path.
+  // The scratch calculator, with no deal selected, still opens on 5 × medium.
+  const recorded = recordedInputs(saved);
+  const [fte, setFte] = useState<number | null>(recorded ? recorded.fte : opportunityId ? null : 5);
+  const [commitment, setCommitment] = useState<CommitmentLevel | null>(
+    recorded ? recorded.commitment : opportunityId ? null : 'medium',
   );
   const [triggers, setTriggers] = useState<EscalationTriggers>({});
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -154,14 +167,15 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
   const canWrite = useHasPermission('opportunities:write');
   const readOnlyHint = t('bidClass.readOnly', 'You do not have permission to change this');
 
-  const assessment = useMemo(
-    () => assessBid(Number.isFinite(fte) ? fte : 0, commitment, triggers),
-    [fte, commitment, triggers],
-  );
-  const { governance, escalations, sizeBand, bidClass } = assessment;
+  const assessment = useMemo(() => {
+    if (fte === null || commitment === null || !Number.isFinite(fte)) return null;
+    return assessBid(fte, commitment, triggers);
+  }, [fte, commitment, triggers]);
+  const escalations = assessment?.escalations ?? [];
+  const bidClass = assessment?.bidClass;
 
   const savedClass = isBidClass(saved?.bidClass) ? saved.bidClass : null;
-  const isDirty = savedClass !== null && savedClass !== bidClass;
+  const isDirty = savedClass !== null && bidClass !== undefined && savedClass !== bidClass;
 
   // Gates are class-driven: the API rejects a gate that does not belong to the
   // opportunity's SAVED class, so offer exactly those. Before a class is saved
@@ -176,6 +190,7 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
   const gateDecisions = useGateDecisions(opportunityId);
 
   const onSave = () => {
+    if (fte === null || commitment === null) return;
     saveClassification.mutate(
       { fteEstimate: fte, commitmentLevel: commitment },
       {
@@ -242,10 +257,13 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
               type="number"
               min={0}
               step={0.5}
-              value={fte}
+              value={fte ?? ''}
               disabled={!canWrite}
               title={canWrite ? undefined : readOnlyHint}
-              onChange={(e) => setFte(e.target.valueAsNumber)}
+              onChange={(e) => {
+                const next = e.target.valueAsNumber;
+                setFte(Number.isFinite(next) ? next : null);
+              }}
               className="dialog-input h-9 w-28 text-sm disabled:opacity-60"
               aria-label={t('bidClass.fte', 'Team size (FTE)')}
             />
@@ -304,14 +322,15 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
           </div>
         </div>
 
-        {/* Result */}
+        {/* Result. An unclassified deal does not wear a placeholder class. */}
+        {assessment ? (
         <div className="grid gap-4 md:grid-cols-[auto_1fr]">
           <div
-            className={`flex flex-col items-center justify-center rounded-lg border p-4 ${CLASS_TONE[bidClass]}`}
+            className={`flex flex-col items-center justify-center rounded-lg border p-4 ${CLASS_TONE[assessment.bidClass]}`}
           >
-            <span className="text-3xl font-bold leading-none">{bidClass}</span>
+            <span className="text-3xl font-bold leading-none">{assessment.bidClass}</span>
             <span className="mt-1 text-xs font-medium uppercase tracking-wider">
-              {sizeBand} · {governance.estDurationDays[0]}–{governance.estDurationDays[1]}d
+              {assessment.sizeBand} · {assessment.governance.estDurationDays[0]}–{assessment.governance.estDurationDays[1]}d
             </span>
           </div>
 
@@ -323,14 +342,14 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
                 })}
               </p>
             )}
-            <p className="text-sm text-[var(--fg-secondary)]">{governance.description}</p>
+            <p className="text-sm text-[var(--fg-secondary)]">{assessment.governance.description}</p>
 
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
                 {t('bidClass.gates', 'Governance gates')}
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {governance.gates.map((g, i) => (
+                {assessment.governance.gates.map((g, i) => (
                   <span
                     key={g}
                     className="inline-flex items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-0.5 text-xs font-medium text-[var(--fg-primary)]"
@@ -347,18 +366,18 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
             <div className="grid gap-3 sm:grid-cols-2">
               <LabelledList
                 title={t('bidClass.committee', 'Committee')}
-                items={governance.committee}
+                items={assessment.governance.committee}
               />
               <LabelledList
                 title={t('bidClass.validators', 'Final validators')}
-                items={governance.finalValidators}
+                items={assessment.governance.finalValidators}
               />
             </div>
 
-            {governance.specialRules.length > 0 && (
+            {assessment.governance.specialRules.length > 0 && (
               <LabelledList
                 title={t('bidClass.specialRules', 'Special rules')}
-                items={governance.specialRules}
+                items={assessment.governance.specialRules}
               />
             )}
 
@@ -380,12 +399,21 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
             )}
           </div>
         </div>
+        ) : (
+          <p className="text-sm text-[var(--fg-secondary)]">
+            {t(
+              'bidClass.unclassified',
+              'This bid has no class yet. Set team size and commitment to preview one. Nothing is saved until you save it.',
+            )}
+          </p>
+        )}
 
         {/* Persist to the opportunity + record formal gate decisions */}
         {opportunityId ? (
           <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
             {canWrite ? (
               <>
+                {assessment ? (
                 <Button
                   size="sm"
                   onClick={onSave}
@@ -395,11 +423,13 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
                   {saveClassification.isPending
                     ? t('bidClass.saving', 'Saving…')
                     : t('bidClass.saveClass', 'Save {{bidClass}} to this opportunity', {
-                        bidClass,
+                        bidClass: assessment.bidClass,
                       })}
                 </Button>
+                ) : null}
 
-                {/* Gate recorder */}
+                {/* Gate recorder. An unclassified deal does not offer every gate. */}
+                {savedClass ? (
                 <div className="mt-3 flex flex-wrap items-end gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--fg-tertiary)]">
@@ -458,6 +488,7 @@ function BidGovernanceForm({ opportunityId, saved }: Props) {
                       : t('bidClass.recordGate', 'Record gate decision')}
                   </Button>
                 </div>
+                ) : null}
               </>
             ) : (
               <p className="text-xs text-[var(--fg-tertiary)]">{readOnlyHint}</p>
