@@ -12,6 +12,15 @@ type TaskSummaryPayload = { total: number; open: number; overdue: number; dueSoo
 // limit 50; calling useTasks() with no filter loads the first page only — the
 // page-level consumer (TasksPage) threads cursor/limit via CursorPager so the
 // admin Tasks screen is no longer capped at the first 50 at a large tenant.
+/** One task by id. The list is one page, so a stored alert cannot use it. */
+export function useTask(id: string | undefined) {
+  return useQuery({
+    queryKey: ['tasks', 'one', id],
+    enabled: Boolean(id),
+    queryFn: ({ signal }) => api<Task>(`/api/tasks/${id}`, { signal }),
+  });
+}
+
 export function useTasks(filter: Partial<TaskFilter> = {}) {
   return useQuery<TaskPage>({
     queryKey: ['tasks', filter],

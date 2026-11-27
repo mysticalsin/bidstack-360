@@ -7,15 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { ApiError } from '@/lib/api';
 import { useHasPermission } from '@/hooks/useCapabilities';
-import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { useTask, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
-  const tasks = useTasks();
+  // The list is the first page only. A stored alert opens this route by id,
+  // including a follow-up that page never held.
+  const record = useTask(id);
   const update = useUpdateTask();
   // PATCH /api/tasks/:id is gated server-side behind tasks:write — disable the
   // Edit entry point instead of letting the user fill out a form that 403s on
@@ -26,16 +29,17 @@ export function TaskDetailPage() {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('');
 
-  const task = tasks.data?.items.find((t) => t.id === id);
+  const task = record.data;
+  const missing = record.error instanceof ApiError && record.error.status === 404;
 
-  if (tasks.isLoading) return <LoadingSkeleton rows={6} />;
-  if (tasks.isError)
+  if (record.isLoading) return <LoadingSkeleton rows={6} />;
+  if (record.isError && !missing)
     return (
       <ErrorState
         title={t('taskDetail.errorTitle', 'Failed to load task')}
         message={
-          tasks.error instanceof Error
-            ? tasks.error.message
+          record.error instanceof Error
+            ? record.error.message
             : t('taskDetail.errorMessage', 'Something went wrong')
         }
       />
