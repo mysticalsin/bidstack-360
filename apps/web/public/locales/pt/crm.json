@@ -1084,6 +1084,8 @@
     "srHeading": "Painel",
     "cockpitErrorTitle": "Não foi possível carregar o cockpit da conta",
     "cockpitErrorMessage": "O endpoint do painel não respondeu.",
+    "accountNotFoundTitle": "Conta não encontrada",
+    "accountNotFoundMessage": "Esta conta não está no espaço de trabalho. Ela pode ter sido removida, ou você pode não ter acesso.",
     "retry": "Tentar novamente",
     "backToAccounts": "Voltar para contas",
     "liveRefreshFailed": "Aviso: a atualização ao vivo falhou, mostrando o último instantâneo verificado.",

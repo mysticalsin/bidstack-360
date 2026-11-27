@@ -60,7 +60,7 @@ import { CockpitCustomizeMenu } from '@/components/cockpit/CockpitCustomizeMenu'
 import { Reveal } from '@/components/motion/Reveal';
 import { NotesPanel } from '@/components/notes/NotesPanel';
 import { DashboardSkeleton } from '@/components/skeletons/PageSkeletons';
-import { ErrorState } from '@/components/ui/StateMessages';
+import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import { useCrmDashboard } from '@/hooks/useCrmDashboard';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
@@ -177,12 +177,34 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     }
   }, [dashboard.data, accountId]);
 
-  const isTransientError =
-    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
-  const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
+  const missingAccount =
+    dashboard.isError && dashboard.error instanceof ApiError && dashboard.error.status === 404;
+  // A 404 is a missing record. Do not paint the last cockpit over it, and do
+  // not call it a failed load. A 500 can still use the tab-local snapshot.
+  const isTransientError = dashboard.isError && !missingAccount;
+  const snapshot = missingAccount
+    ? null
+    : (dashboard.data ?? (isTransientError ? cachedSnapshot : null));
 
   if (dashboard.isLoading && !snapshot) {
     return <DashboardSkeleton />;
+  }
+
+  if (missingAccount) {
+    return (
+      <EmptyState
+        title={t('dashboard.accountNotFoundTitle', 'Account not found')}
+        message={t(
+          'dashboard.accountNotFoundMessage',
+          'This account is not in the workspace. It may have been removed, or you may not have access to it.',
+        )}
+        action={
+          <EmptyStateLink to="/accounts">
+            {t('dashboard.backToAccounts', 'Back to accounts')}
+          </EmptyStateLink>
+        }
+      />
+    );
   }
 
   if (!snapshot) {

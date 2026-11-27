@@ -1084,6 +1084,8 @@
     "srHeading": "Dashboard",
     "cockpitErrorTitle": "Impossibile caricare il cockpit dell'account",
     "cockpitErrorMessage": "L'endpoint della dashboard non ha risposto.",
+    "accountNotFoundTitle": "Account non trovato",
+    "accountNotFoundMessage": "Questo account non è nello spazio di lavoro. Potrebbe essere stato rimosso, oppure potresti non avere accesso.",
     "retry": "Riprova",
     "backToAccounts": "Torna agli account",
     "liveRefreshFailed": "Avviso: l'aggiornamento in tempo reale non è riuscito, viene mostrata l'ultima istantanea verificata.",

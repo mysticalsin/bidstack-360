@@ -1169,6 +1169,8 @@
     "srHeading": "Tableau de bord",
     "cockpitErrorTitle": "Impossible de charger le cockpit du compte",
     "cockpitErrorMessage": "Le point de terminaison du tableau de bord n'a pas répondu.",
+    "accountNotFoundTitle": "Compte introuvable",
+    "accountNotFoundMessage": "Ce compte n'est pas dans l'espace de travail. Il a peut-être été retiré, ou vous n'y avez pas accès.",
     "retry": "Réessayer",
     "backToAccounts": "Retour aux comptes",
     "liveRefreshFailed": "Avertissement : l'actualisation en direct a échoué, affichage du dernier instantané vérifié.",
