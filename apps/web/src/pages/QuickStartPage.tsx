@@ -8,10 +8,12 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
+import { ErrorState } from '@/components/ui/StateMessages';
 import { cn } from '@/lib/cn';
 import { useOnboardingStore, type ChecklistItem } from '@/stores/onboarding';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { useUsers } from '@/hooks/useUsers';
+import { quickStartCountPhase } from './quick-start-count-read';
 
 interface ChecklistItemDef {
   key: ChecklistItem;
@@ -31,12 +33,39 @@ export function QuickStartPage() {
   // they kick off an action with no cheap "is it done" signal.
   const summary = useOrgSummary();
   const users = useUsers();
+  const summaryPhase = quickStartCountPhase({
+    data: summary.data,
+    isError: summary.isError,
+    status: summary.status,
+  });
+  const teamPhase = quickStartCountPhase({
+    data: users.data,
+    isError: users.isError,
+    status: users.status,
+  });
+  const countsReady = summaryPhase === 'ready' && teamPhase === 'ready';
+  const summaryData = summary.data;
+  const teamData = users.data;
+  // Missing totals are not zero. A read that has not arrived stays out of
+  // `derived`, so a stored click cannot finish the row and a stale payload
+  // cannot survive an error.
   const derived: Partial<Record<ChecklistItem, boolean>> = {
-    first_lead: (summary.data?.leads ?? 0) > 0,
-    first_deal: (summary.data?.opportunities ?? 0) > 0,
-    invite_team: (users.data?.length ?? 0) > 1,
+    ...(summaryPhase === 'ready'
+      ? {
+          first_lead: (summaryData == null ? 0 : summaryData.leads) > 0,
+          first_deal: (summaryData == null ? 0 : summaryData.opportunities) > 0,
+        }
+      : {}),
+    ...(teamPhase === 'ready'
+      ? { invite_team: (teamData == null ? 0 : teamData.length) > 1 }
+      : {}),
   };
   const isDone = (key: ChecklistItem) => derived[key] ?? completedChecklist.includes(key);
+  const countHidden = (key: ChecklistItem) => {
+    if (key === 'first_lead' || key === 'first_deal') return summaryPhase !== 'ready';
+    if (key === 'invite_team') return teamPhase !== 'ready';
+    return false;
+  };
 
   const ITEMS: ChecklistItemDef[] = [
     {
@@ -127,28 +156,46 @@ export function QuickStartPage() {
         </p>
       </div>
 
-      {/* Progress bar */}
+      {/* Progress bar. Counts that have not arrived are not a zero book. */}
       <div className="mb-8">
-        <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--fg-secondary)]">
-          <span>
-            {t('quickStart.progress.count', '{{completed}} of {{total}} complete', {
-              completed: completedCount,
-              total: ITEMS.length,
-            })}
-          </span>
-          <span>{t('quickStart.progress.percent', '{{percent}}%', { percent: progressPct })}</span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
-          <div
-            className="h-full rounded-full bg-[var(--brand)] transition-all duration-500"
-            style={{ width: `${progressPct}%` }}
-            role="progressbar"
-            aria-valuenow={progressPct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label={t('quickStart.progress.ariaLabel', 'Onboarding progress')}
-          />
-        </div>
+        {summaryPhase === 'failed' ? (
+          <ErrorState title={t('quickStart.summaryFailed', 'Failed to check the workspace')} />
+        ) : summaryPhase === 'unread' ? (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('quickStart.summaryChecking', 'Checking the workspace. The summary has not arrived.')}
+          </p>
+        ) : null}
+        {teamPhase === 'failed' ? (
+          <ErrorState title={t('quickStart.teamFailed', 'Failed to check teammates')} />
+        ) : teamPhase === 'unread' ? (
+          <p role="status" className="text-sm text-[var(--fg-secondary)]">
+            {t('quickStart.teamChecking', 'Checking teammates. The list has not arrived.')}
+          </p>
+        ) : null}
+        {countsReady ? (
+          <>
+            <div className="mb-1.5 flex items-center justify-between text-xs text-[var(--fg-secondary)]">
+              <span>
+                {t('quickStart.progress.count', '{{completed}} of {{total}} complete', {
+                  completed: completedCount,
+                  total: ITEMS.length,
+                })}
+              </span>
+              <span>{t('quickStart.progress.percent', '{{percent}}%', { percent: progressPct })}</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[var(--surface-sunken)]">
+              <div
+                className="h-full rounded-full bg-[var(--brand)] transition-all duration-500"
+                style={{ width: `${progressPct}%` }}
+                role="progressbar"
+                aria-valuenow={progressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={t('quickStart.progress.ariaLabel', 'Onboarding progress')}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* Tour launcher */}
@@ -165,7 +212,7 @@ export function QuickStartPage() {
 
       {/* Checklist */}
       <ul className="space-y-3" role="list">
-        {ITEMS.map((item) => {
+        {ITEMS.filter((item) => !countHidden(item.key)).map((item) => {
           const done = isDone(item.key);
           return (
             <li key={item.key}>
@@ -231,7 +278,7 @@ export function QuickStartPage() {
       </ul>
 
       {/* Completion state */}
-      {completedCount === ITEMS.length && (
+      {countsReady && completedCount === ITEMS.length && (
         <div className="mt-8 rounded-xl bg-[var(--brand)]/10 p-6 text-center">
           <Icon
             name="sparkle"
