@@ -2970,7 +2970,8 @@
     "markAllRead": "Mark all read",
     "errorMessage": "Could not load notifications",
     "loading": "Loading…",
-    "empty": "You’re all caught up"
+    "emptyTitle": "No new notifications",
+    "emptyBody": "Updates appear here as they happen."
   },
   "createEvent": {
     "modalLabel": "Create calendar event",

@@ -28,7 +28,7 @@ export class NotificationsPage {
     this.tray = page.locator('[data-testid="notification-tray"], [role="dialog"][aria-label*="notification"]');
     this.notificationItems = this.tray.locator('[data-testid="notification-item"], li');
     this.markAllReadButton = this.tray.getByRole('button', { name: /mark all read|clear all/i });
-    this.emptyState = this.tray.getByText(/no notifications|all caught up/i);
+    this.emptyState = this.tray.getByText(/no new notifications|no notifications|all caught up/i);
   }
 
   async openTray(): Promise<void> {

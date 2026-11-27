@@ -2956,7 +2956,8 @@
     "markAllRead": "Segna tutto come letto",
     "errorMessage": "Impossibile caricare le notifiche",
     "loading": "Caricamento…",
-    "empty": "Sei aggiornato"
+    "emptyTitle": "Nessuna nuova notifica",
+    "emptyBody": "Gli aggiornamenti compaiono qui quando arrivano."
   },
   "createEvent": {
     "modalLabel": "Crea evento calendario",
