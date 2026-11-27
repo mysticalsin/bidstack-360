@@ -147,6 +147,13 @@ export function computeSignalCoverage(input: {
     (openDeals.length > 0 ? 40 : 0) +
       (openDeals.length > 0 ? Math.round((complete / openDeals.length) * 60) : 0),
   );
+  // A closed book (won or lost only) has no open deal to finish. Scoring it
+  // at 0 keeps an empty account critical, without telling the reader that
+  // missing deals still need a stage, owner, or close date.
+  if (openDeals.length === 0) {
+    pipeline.whatItMeasures = 'Whether this account has an open deal.';
+    pipeline.recommendedAction = 'No open deals on this account.';
+  }
 
   const factors = [firmographics, contactFactor, engagement, pipeline];
   // Weights: external intel is the cockpit's backbone; the rest split evenly.
