@@ -278,7 +278,14 @@ export const OrgDashboard = memo(function OrgDashboard() {
           <PipelineCard rows={oppRows} onDrill={setDrill} />
           <ActivityByHourCard />
         </div>
-        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
+          <PerformanceCard
+            rows={oppRows}
+            projection={projection.data}
+            pending={projection.isLoading}
+            failed={projection.isError}
+            onRetry={() => void projection.refetch()}
+            onDrill={setDrill}
+          />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
         <details className="dash-more">
