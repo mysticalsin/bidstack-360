@@ -24,17 +24,52 @@ import {
   titleCase,
   type AccountRow,
 } from './accountUtils';
+import {
+  LEVERAGE_SCOPE_COPY,
+  leverageCardModel,
+  type LeverageCardFlag,
+} from './leverageCardCopy';
 
 export const AccountCard = memo(function AccountCard({
   row,
   index,
+  leverageFlags = [],
 }: {
   row: AccountRow;
   index: number;
+  leverageFlags?: LeverageCardFlag[];
 }) {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
   const { company, openDeals, pipelineMicros, totalDeals, health } = row;
+  const leverage = leverageCardModel(leverageFlags);
+  const leverageScope = leverage
+    ? t(`account.leverageScope.${leverage.scope}`, LEVERAGE_SCOPE_COPY[leverage.scope])
+    : '';
+  const leverageExtra =
+    leverage && leverage.extraCount > 0
+      ? leverage.extraCount === 1
+        ? t('account.leverageMore_one', '{{count}} more agreement on this account.', {
+            count: leverage.extraCount,
+          })
+        : t('account.leverageMore_other', '{{count}} more agreements on this account.', {
+            count: leverage.extraCount,
+          })
+      : '';
+  const cockpitLabel = leverage
+    ? t(
+        'account.openCockpitLeverageAria',
+        'Open {{name}} customer cockpit. {{headline}} {{scope}}{{extra}}',
+        {
+          name: company.name,
+          headline: leverage.headline,
+          scope: leverageScope,
+          extra: leverageExtra ? ` ${leverageExtra}` : '',
+        },
+      )
+    : t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
+        name: company.name,
+      });
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
   const rankedTech = rankedTechFor(company);
@@ -58,9 +93,7 @@ export const AccountCard = memo(function AccountCard({
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
-          aria-label={t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
-            name: company.name,
-          })}
+          aria-label={cockpitLabel}
         >
           {imageUrl ? (
             <img
@@ -87,6 +120,21 @@ export const AccountCard = memo(function AccountCard({
             </div>
             <Badge tone={healthTone(health)}>{healthLabel(health)}</Badge>
           </div>
+
+          {leverage ? (
+            <div
+              className={`account-card-insight${leverage.scope === 'allowed' ? ' is-complete' : ''}`}
+              data-testid="account-card-leverage"
+            >
+              <Icon
+                name={leverage.scope === 'allowed' ? 'checkCircle' : 'info'}
+                size={14}
+                ariaHidden
+              />
+              <span>{`${leverage.headline} `}</span>
+              <strong>{leverageExtra ? `${leverageScope} ${leverageExtra}` : leverageScope}</strong>
+            </div>
+          ) : null}
 
           <div
             className="account-card-sources"
