@@ -26,10 +26,13 @@ describe('useOnboarding mutations', () => {
     });
   });
 
-  it('removes sample data via DELETE', async () => {
+  it('removes fixture rows through the sample-data purge, never a live route', async () => {
     const { result } = renderHook(() => useDeleteSampleData(), { wrapper });
     result.current.mutate();
     await waitFor(() => expect(api).toHaveBeenCalled());
+    // Seller-facing labels say Reference. This route stays so the purge can
+    // still delete rows tagged isSample without pretending they are live.
     expect(api).toHaveBeenCalledWith('/api/onboarding/sample-data', { method: 'DELETE' });
+    expect(String(vi.mocked(api).mock.calls.at(-1)?.[0])).not.toMatch(/live/i);
   });
 });
