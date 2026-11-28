@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, openBook, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -52,6 +52,20 @@ describe('viz-data', () => {
 
   it('flags open bids past their due date', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+  });
+
+  it('builds the open headline from these rows, not a second report', () => {
+    // WHY: the workspace chart is this bid read (capped at 100). The pipeline
+    // report is the whole book. The headline has to be these rows: open value,
+    // value × probability / 100, closed rows left out. A missing probability
+    // is not a certain win, and the weight rounds to cents like the report.
+    expect(openBook([
+      row({ stage: 's1_ongoing', value: 2_500_000, probability: 40 }),
+      row({ stage: 'Closed Won', value: 9_000_000, probability: 100 }),
+      row({ stage: 'closed_lost', value: 1_000_000, probability: 0 }),
+      row({ stage: 's2_sent', value: 100, probability: null }),
+    ])).toEqual({ value: 2_500_100, weighted: 1_000_000, count: 2 });
+    expect(openBook([row({ value: 10, probability: 33.33 })])).toEqual({ value: 10, weighted: 3.33, count: 1 });
   });
 
   it('keeps two compact digits when they name the same amount', () => {

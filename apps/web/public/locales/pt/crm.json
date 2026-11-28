@@ -1429,6 +1429,7 @@
     "greetingEvening": "Boa noite",
     "pageTitle": "Central de comando do espaço de trabalho",
     "pageSubtitle": "{{companies}} empresas · {{openDeals}} negócios abertos · {{pipeline}} pipeline",
+    "pageSubtitleHeld": "{{companies}} empresas · {{openDeals}} negócios abertos",
     "allAccounts": "Todas as contas",
     "opportunities": "Oportunidades",
     "errorTitle": "Não foi possível carregar o painel",

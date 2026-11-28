@@ -1,15 +1,25 @@
 // The workspace dashboard charts are the bid read. A failure is not an empty
 // book, and a later failure keeps the last rows.
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
+import { fmtCompact } from '@/components/viz/viz-data';
 import { OrgDashboard } from './OrgDashboard';
+import { formatUnspecifiedAmount } from './unspecified-currency';
 import { useOrgSummary } from '@/hooks/useOrgSummary';
 import { usePipelineReport } from '@/hooks/usePipelineReport';
 
 const seen = vi.hoisted(() => ({
-  hero: null as null | { rows: unknown[]; rowsPending?: boolean; rowsFailed?: boolean; onRetry?: () => void },
+  hero: null as null | {
+    rows: unknown[];
+    openValue?: number;
+    weighted?: number;
+    openCount?: number;
+    rowsPending?: boolean;
+    rowsFailed?: boolean;
+    onRetry?: () => void;
+  },
   needs: null as null | { rows: unknown[]; pending?: boolean; rowsFailed?: boolean; onRetry?: () => void },
   pipeline: null as null | { rows: unknown[]; rowsPending?: boolean; rowsFailed?: boolean; onRetry?: () => void },
   performance: null as null | { rows: unknown[]; rowsPending?: boolean; rowsFailed?: boolean; onRetry?: () => void },
@@ -17,7 +27,15 @@ const seen = vi.hoisted(() => ({
 
 const bids = vi.hoisted(() => ({
   state: {
-    data: undefined as { items: Array<{ id: string; customer: string }> } | undefined,
+    data: undefined as {
+      items: Array<{
+        id: string;
+        customer: string;
+        stage?: string | null;
+        value?: number | null;
+        probability?: number | null;
+      }>;
+    } | undefined,
     isLoading: false,
     isError: true,
     refetch: vi.fn(),
@@ -25,7 +43,12 @@ const bids = vi.hoisted(() => ({
 }));
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (_key: string, fallback: string) => fallback }),
+  useTranslation: () => ({
+    t: (_key: string, fallback: string, vars?: Record<string, string | number>) => {
+      if (!vars) return fallback;
+      return fallback.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(vars[name] ?? ''));
+    },
+  }),
 }));
 
 vi.mock('framer-motion', () => ({
@@ -156,5 +179,86 @@ describe('workspace dashboard bid read', () => {
     expect(seen.needs?.pending).toBe(true);
     expect(seen.pipeline?.rowsPending).toBe(true);
     expect(seen.performance?.rowsPending).toBe(true);
+  });
+
+  it('does not announce the workspace pipeline amount while the bid read failed', () => {
+    // WHY: the hero says the bid read failed. The page subtitle was still
+    // reading the workspace summary, so the same screen announced a healthy
+    // pipeline beside that error.
+    bids.state = { data: undefined, isLoading: false, isError: true, refetch: vi.fn() };
+
+    renderDashboard();
+
+    const sub = screen.getByText(/companies/).closest('.page-sub');
+    expect(sub).toBeTruthy();
+    expect(sub?.textContent).toContain('2 companies');
+    expect(sub?.textContent).toContain('2 open deals');
+    expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
+    expect(sub?.textContent).not.toContain(formatUnspecifiedAmount(summary.pipelineValue));
+    expect(within(sub as HTMLElement).queryByRole('button', { name: /Pipeline/i })).toBeNull();
+    expect(seen.hero?.openValue).toBe(0);
+    expect(seen.hero?.weighted).toBe(0);
+    expect(seen.hero?.openCount).toBe(0);
+  });
+
+  it('does not announce the workspace pipeline amount while the bid read is loading', () => {
+    // WHY: the summary can arrive before the rows. That gap is not a pipeline total.
+    bids.state = { data: undefined, isLoading: true, isError: false, refetch: vi.fn() };
+
+    renderDashboard();
+
+    const sub = screen.getByText(/companies/).closest('.page-sub');
+    expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
+    expect(within(sub as HTMLElement).queryByRole('button', { name: /Pipeline/i })).toBeNull();
+    expect(seen.hero?.openValue).toBe(0);
+    expect(seen.hero?.weighted).toBe(0);
+  });
+
+  it('shows zero pipeline on the page only after the bid read succeeds with no rows', () => {
+    // WHY: empty is zero. The workspace summary beside an empty read is a different book.
+    bids.state = { data: { items: [] }, isLoading: false, isError: false, refetch: vi.fn() };
+
+    renderDashboard();
+
+    const sub = screen.getByText(/companies/).closest('.page-sub');
+    expect(sub?.textContent).toContain('0 pipeline');
+    expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
+    const info = within(sub as HTMLElement).getByRole('button', { name: /Pipeline/i });
+    expect(info.getAttribute('aria-label')).toContain(formatUnspecifiedAmount(0));
+    expect(info.getAttribute('aria-label')).not.toContain(formatUnspecifiedAmount(summary.pipelineValue));
+    expect(seen.hero?.openValue).toBe(0);
+    expect(seen.hero?.weighted).toBe(0);
+    expect(seen.hero?.openCount).toBe(0);
+  });
+
+  it('reads the headline from the bid rows once they are on screen', () => {
+    // WHY: the chart is this read, capped at 100 bids. The pipeline report and
+    // the workspace summary can name a different total. A won row is not open.
+    bids.state = {
+      data: {
+        items: [
+          { id: 'labs', customer: 'Globex Labs', stage: 's1_ongoing', value: 2_500_000, probability: 40 },
+          { id: 'won', customer: 'Won Co', stage: 'closed_won', value: 9_000_000, probability: 100 },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+
+    renderDashboard();
+
+    expect(seen.hero?.openValue).toBe(2_500_000);
+    expect(seen.hero?.weighted).toBe(1_000_000);
+    expect(seen.hero?.openCount).toBe(1);
+    expect(seen.hero?.openValue).not.toBe(1_000_000);
+    expect(seen.hero?.weighted).not.toBe(500_000);
+    expect(seen.hero?.openCount).not.toBe(summary.openOpportunities);
+    const sub = screen.getByText(/companies/).closest('.page-sub');
+    expect(sub?.textContent).toContain(fmtCompact(2_500_000));
+    expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
+    const info = within(sub as HTMLElement).getByRole('button', { name: /Pipeline/i });
+    expect(info.getAttribute('aria-label')).toContain(formatUnspecifiedAmount(2_500_000));
+    expect(info.getAttribute('aria-label')).not.toContain(formatUnspecifiedAmount(summary.pipelineValue));
   });
 });

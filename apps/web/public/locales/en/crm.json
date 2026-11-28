@@ -1430,6 +1430,7 @@
     "greetingEvening": "Good evening",
     "pageTitle": "Dashboard",
     "pageSubtitle": "{{companies}} companies · {{openDeals}} open deals · {{pipeline}} pipeline",
+    "pageSubtitleHeld": "{{companies}} companies · {{openDeals}} open deals",
     "allAccounts": "All accounts",
     "opportunities": "Opportunities",
     "errorTitle": "Could not load dashboard",

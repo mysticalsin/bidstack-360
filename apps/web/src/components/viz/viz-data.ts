@@ -58,6 +58,25 @@ export function statusMix(rows: OppRow[]) {
   return { open, won: rows.filter(isWon).length, lost: rows.filter(isLost).length };
 }
 
+/**
+ * Open pipeline of this bid read. Closed rows stay out. Weight is
+ * value × probability / 100, rounded to cents the way the pipeline report
+ * rounds. A missing probability adds no weight.
+ */
+export function openBook(rows: readonly OppRow[]): { value: number; weighted: number; count: number } {
+  let value = 0;
+  let weighted = 0;
+  let count = 0;
+  for (const o of rows) {
+    if (isClosed(o)) continue;
+    count += 1;
+    const amount = o.value ?? 0;
+    value += amount;
+    weighted += amount * ((o.probability ?? 0) / 100);
+  }
+  return { value, weighted: Math.round(weighted * 100) / 100, count };
+}
+
 /** Win rate per close quarter (count-based), oldest first. */
 export function winRateByQuarter(rows: OppRow[]) {
   const by = new Map<string, { won: number; lost: number; t: number }>();

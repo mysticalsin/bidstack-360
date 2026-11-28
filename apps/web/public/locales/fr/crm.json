@@ -1484,6 +1484,7 @@
     "greetingEvening": "Bonsoir",
     "pageTitle": "Centre de commande de l'espace de travail",
     "pageSubtitle": "{{companies}} entreprises · {{openDeals}} affaires ouvertes · {{pipeline}} pipeline",
+    "pageSubtitleHeld": "{{companies}} entreprises · {{openDeals}} affaires ouvertes",
     "allAccounts": "Tous les comptes",
     "opportunities": "Opportunités",
     "errorTitle": "Impossible de charger le tableau de bord",
