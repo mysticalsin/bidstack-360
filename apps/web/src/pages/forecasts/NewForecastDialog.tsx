@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import type { Forecast } from '@bidstack/shared';
 
-import { CATEGORIES, CATEGORY_LABELS } from './forecastsConfig';
+import { canonicalForecastPeriod, CATEGORIES, CATEGORY_LABELS } from './forecastsConfig';
 
 interface NewForecastDialogProps {
   users: Array<{ id: string; name: string | null; email: string }>;
@@ -41,8 +41,17 @@ export function NewForecastDialogContent({
     closed: '',
   });
 
+  const canonicalPeriod = canonicalForecastPeriod(period);
+  const periodError =
+    period.trim().length > 0 && canonicalPeriod === null
+      ? t(
+          'newForecast.periodError',
+          'Use a month like 2026-05, a quarter like Q1 2027 or 2026-Q1, or a year like 2026.',
+        )
+      : undefined;
+
   const canSubmit =
-    period.trim().length > 0 &&
+    canonicalPeriod !== null &&
     // Require an owner — the server rejects an empty ownerId (must be a UUID), so
     // gating Save here turns a silent 400 into a clear "pick an owner first".
     ownerId.trim().length > 0 &&
@@ -57,9 +66,10 @@ export function NewForecastDialogContent({
       <div className="space-y-4">
         <Input
           label={t('newForecast.periodLabel', 'Period')}
-          placeholder={t('newForecast.periodPlaceholder', 'e.g. 2026-05, 2026-Q2, or 2026')}
+          placeholder={t('newForecast.periodPlaceholder', 'e.g. 2026-05, Q1 2027, or 2026')}
           value={period}
           onChange={(e) => setPeriod(e.target.value)}
+          error={periodError}
           required
         />
         <Select
@@ -92,7 +102,7 @@ export function NewForecastDialogContent({
             disabled={!canSubmit}
             onClick={() =>
               onSubmit({
-                period: period.trim(),
+                period: canonicalPeriod ?? period.trim(),
                 ownerId,
                 amounts: {
                   pipeline: Math.round(Number(amounts.pipeline || 0) * 1_000_000),
