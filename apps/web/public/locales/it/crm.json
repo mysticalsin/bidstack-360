@@ -2311,6 +2311,7 @@
     "breadcrumbLabel": "Percorso di navigazione",
     "contacts": "Contatti",
     "noRole": "Nessun ruolo",
+    "openAccount": "Apri l'account {{customer}}",
     "influence": "Influenza: {{value}}/5",
     "added": "Aggiunto",
     "opportunitiesTitle": "Opportunità",

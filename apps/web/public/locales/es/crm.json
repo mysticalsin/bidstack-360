@@ -2344,6 +2344,7 @@
     "breadcrumbLabel": "Ruta de navegación",
     "contacts": "Contactos",
     "noRole": "Sin cargo",
+    "openAccount": "Abrir la cuenta {{customer}}",
     "influence": "Influencia: {{value}}/5",
     "added": "Añadido",
     "opportunitiesTitle": "Oportunidades",

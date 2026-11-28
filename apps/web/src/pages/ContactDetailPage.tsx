@@ -16,6 +16,31 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
+import { contactRecordAccountHref } from './contact-record-account-href';
+
+function ContactAccountName({
+  customer,
+  companyId,
+}: {
+  customer: string;
+  companyId: string | null;
+}) {
+  const { t } = useTranslation('crm');
+  // A name search can match a different company. Only a stored company uuid
+  // opens the account. needs_review stays the name as text.
+  const href = contactRecordAccountHref(companyId);
+  if (!href) return customer;
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]"
+      aria-label={t('contactDetail.openAccount', 'Open account {{customer}}', { customer })}
+    >
+      {customer}
+    </Link>
+  );
+}
+
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
@@ -91,12 +116,7 @@ export function ContactDetailPage() {
               {c.customer ? (
                 <>
                   {' · '}
-                  <Link
-                    to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
-                  >
-                    {c.customer}
-                  </Link>
+                  <ContactAccountName customer={c.customer} companyId={c.companyId} />
                 </>
               ) : null}
             </p>
