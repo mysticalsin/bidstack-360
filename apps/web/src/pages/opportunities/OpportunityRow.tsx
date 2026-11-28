@@ -78,6 +78,8 @@ export const Row = memo(function Row({
   canWrite: boolean;
 }) {
   const fireConfetti = useConfetti((s) => s.fire);
+  const stage = resolvePipelineStage(opp);
+  const decided = stage.isWon || stage.isLost;
 
   // Per-field flash timestamp. Bumping a field's value re-triggers the
   // SavedFlash chip next to that cell, independent of the others.
@@ -180,7 +182,7 @@ export const Row = memo(function Row({
 
       <td className="px-5 py-3">
         <StageCell
-          stage={resolvePipelineStage(opp)}
+          stage={stage}
           options={stageOptions}
           isSaving={saving.stage}
           canEdit={canWrite}
@@ -283,9 +285,8 @@ export const Row = memo(function Row({
       </td>
 
       <td className="px-5 py-3">
-        {/* Editable date stays on DateCell; DueDateChip adds the urgency
-            signal a bare date never carried — deadline slippage is the #1
-            preventable bid loss. */}
+        {/* Editable date stays on DateCell. The chip is the open-bid clock.
+            A won or lost bid keeps the date, but that clock has stopped. */}
         <div className="flex items-center gap-2 whitespace-nowrap">
           <DateCell
             value={opp.dueDate}
@@ -310,7 +311,7 @@ export const Row = memo(function Row({
               );
             }}
           />
-          <DueDateChip dueDate={opp.dueDate} size="sm" />
+          <DueDateChip dueDate={opp.dueDate} size="sm" settled={decided} />
         </div>
         <SavedFlash trigger={saved.dueDate} />
       </td>

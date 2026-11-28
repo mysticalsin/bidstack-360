@@ -510,7 +510,7 @@ export function OpportunityDetailPage() {
                     ) : (
                       <span title={readOnlyHint}>{formatDate(data.dueDate)}</span>
                     )}
-                    <DueDateChip dueDate={data.dueDate} size="lg" />
+                    <DueDateChip dueDate={data.dueDate} size="lg" settled={isOutcomeLocked} />
                   </span>
                 </div>
               </div>

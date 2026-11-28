@@ -292,3 +292,43 @@ describe('OpportunityDetailPage deal value', () => {
     expect(screen.queryByText(/not a euro forecast/)).toBeNull();
   });
 });
+
+describe('OpportunityDetailPage decided due clock', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('does not call a closed-won deal overdue from a past due date', () => {
+    // The header keeps the date editor. The chip beside it must not say the
+    // bid is late once the outcome is locked. Demo OP-2046 is this case.
+    capabilitiesMocks.useHasPermission.mockReturnValue(false);
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, stage: 'closed_won', dueDate: '2020-01-01', code: 'OP-2046' },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByText('Closed')).toBeDefined();
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    expect(screen.getByLabelText(/Closed bid/i)).toBeTruthy();
+  });
+
+  it('still counts an open deal with a past due date as overdue', () => {
+    capabilitiesMocks.useHasPermission.mockReturnValue(false);
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, stage: 's4_negotiation', dueDate: '2020-01-01' },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByText(/d overdue/)).toBeTruthy();
+    expect(screen.queryByText('Closed')).toBeNull();
+  });
+});
