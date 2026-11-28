@@ -2365,7 +2365,8 @@
       "colName": "Nome",
       "colStage": "Estágio",
       "colValue": "Valor",
-      "colProbability": "Probabilidade"
+      "colProbability": "Probabilidade",
+      "colDue": "Vencimento"
     },
     "cases": {
       "emptyTitle": "Nenhum caso aberto",
