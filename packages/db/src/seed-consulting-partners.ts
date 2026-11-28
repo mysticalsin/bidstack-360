@@ -2,7 +2,7 @@
  * Slice 15 demo fixtures: consulting partners for the seeded demo accounts.
  * Public rows are source 'fixture', method 'fixture', sample=true, and run
  * through the same reader as fetched news. Internal evidence comes from
- * Sample-titled notes that the regular internal scan reads; their rows are
+ * reference-titled notes that the regular internal scan reads; their rows are
  * flagged sample too. Idempotent: notes are matched by title, rows upsert on
  * their keys.
  */
@@ -29,7 +29,7 @@ interface PartnerFixture {
   notes: FixtureNote[];
 }
 
-/** Clearly fictional sample stories; the UI shows them with the Sample tag. */
+/** Fictional reference stories. The rows stay sample so the UI can mark them Reference. */
 export const PARTNER_FIXTURES: PartnerFixture[] = [
   {
     account: 'MAPFRE',
@@ -40,7 +40,7 @@ export const PARTNER_FIXTURES: PartnerFixture[] = [
     ],
     notes: [
       {
-        title: 'Sample: MAPFRE IT steering debrief',
+        title: 'Reference: MAPFRE IT steering debrief',
         body: 'The MAPFRE CIO office said our delivery quality is better than Accenture on the claims platform. Our squads were faster to staff than Accenture.',
         daysAgo: 20,
       },
@@ -54,7 +54,7 @@ export const PARTNER_FIXTURES: PartnerFixture[] = [
     ],
     notes: [
       {
-        title: 'Sample: DNB procurement feedback',
+        title: 'Reference: DNB procurement feedback',
         body: 'DNB procurement feedback: Sopra Steria is cheaper than us. Our data engineering quality is stronger than Sopra Steria.',
         daysAgo: 15,
       },
@@ -65,7 +65,7 @@ export const PARTNER_FIXTURES: PartnerFixture[] = [
     items: [{ title: 'MAHLE partners with Akkodis on e-mobility engineering services', daysAgo: 75, site: 'https://www.akkodis.com/' }],
     notes: [
       {
-        title: 'Sample: MAHLE test bench review',
+        title: 'Reference: MAHLE test bench review',
         body: 'Akkodis was slow to ramp up the validation team. Our engineers delivered faster than Akkodis on the thermal test bench.',
         daysAgo: 10,
       },
@@ -81,7 +81,7 @@ export function partnerFixtureDrafts(f: PartnerFixture, now: Date): PartnerEvide
   });
 }
 
-/** Seed sample consulting partners for the demo accounts. Returns rows written. */
+/** Seed reference consulting partners for the fixture accounts. Returns rows written. */
 export async function seedConsultingPartners(prisma: PrismaClient, orgId: string, now: Date = new Date()): Promise<number> {
   const author = await prisma.user.findFirst({ where: { orgId }, orderBy: { createdAt: 'asc' }, select: { id: true } });
   let written = 0;

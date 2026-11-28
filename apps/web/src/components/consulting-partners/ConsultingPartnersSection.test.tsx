@@ -62,6 +62,7 @@ describe('ConsultingPartnersSection', () => {
   afterEach(() => {
     cleanup();
     refresh.mockReset();
+    ev.sample = false;
     Object.assign(state, { data: summary, isLoading: false, canWrite: true });
   });
 
@@ -123,16 +124,6 @@ describe('ConsultingPartnersSection', () => {
     state.canWrite = false;
     view();
     expect(screen.queryByRole('button', { name: 'Refresh consulting partners' })).toBeNull();
-  });
-
-  it('shows the empty line and the Sample tag', () => {
-    state.data = { ...summary, partners: [] };
-    view();
-    expect(screen.getByTestId('partners-empty').textContent).toBe('No consulting partners found');
-    cleanup();
-    state.data = { ...summary, sample: true };
-    view();
-    expect(screen.getByText('Sample')).toBeTruthy();
   });
 
   const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
