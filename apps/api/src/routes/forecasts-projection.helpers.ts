@@ -119,6 +119,11 @@ export interface ProjectionRow {
   ownerName: string | null;
   stage: OpportunityStage;
   valueMicros: string; // numeric SUM serialized as string by the driver
+  /**
+   * True only for open value whose close date is before the current quarter.
+   * A blank close date rolls into the quarter but is not past due.
+   */
+  overdue?: boolean;
 }
 
 interface OwnerAccumulator {
@@ -127,21 +132,24 @@ interface OwnerAccumulator {
   openMicros: number;
   weightedMicros: number;
   wonMicros: number;
+  overdueOpenMicros: number;
 }
 
 function emptyOwner(ownerId: string | null, ownerName: string): OwnerAccumulator {
-  return { ownerId, ownerName, openMicros: 0, weightedMicros: 0, wonMicros: 0 };
+  return { ownerId, ownerName, openMicros: 0, weightedMicros: 0, wonMicros: 0, overdueOpenMicros: 0 };
 }
 
 function applyRow(owner: OwnerAccumulator, row: ProjectionRow, probability: number): void {
   const value = Number(row.valueMicros);
   if (row.stage === 'closed_won') {
-    // Won is a date-anchored actual — never part of open/weighted pipeline.
+    // Won is a date-anchored actual — never part of open/weighted pipeline,
+    // even if the close date is already past.
     owner.wonMicros += value;
     return;
   }
   owner.openMicros += value;
   owner.weightedMicros += (value * probability) / 100;
+  if (row.overdue === true) owner.overdueOpenMicros += value;
 }
 
 /**
@@ -179,7 +187,8 @@ function buildPeriod(
   periodOwners: Map<string, OwnerAccumulator>,
   manualCommitByPeriod: Map<string, number>,
 ): ForecastProjectionPeriod {
-  const byOwner: ForecastProjectionOwner[] = [...periodOwners.values()]
+  const owners = [...periodOwners.values()];
+  const byOwner: ForecastProjectionOwner[] = owners
     .map((o) => ({
       ownerId: o.ownerId,
       ownerName: o.ownerName,
@@ -196,6 +205,7 @@ function buildPeriod(
     openMicros: byOwner.reduce((s, o) => s + o.openMicros, 0),
     weightedMicros: byOwner.reduce((s, o) => s + o.weightedMicros, 0),
     wonMicros: byOwner.reduce((s, o) => s + o.wonMicros, 0),
+    overdueOpenMicros: Math.round(owners.reduce((s, o) => s + o.overdueOpenMicros, 0)),
     manualCommitMicros: manual ?? null,
     byOwner,
   };

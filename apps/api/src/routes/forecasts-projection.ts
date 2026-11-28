@@ -36,8 +36,10 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
       const winEnd = isoDate(window.windowEndExclusive);
 
       // Aggregate in Postgres so the payload is bounded to periods × owners ×
-      // stages. Open pipeline with a null/overdue close date rolls into the
-      // current quarter (it is live now); won is date-anchored actuals only.
+      // stages. Open pipeline with a null close date, or a close date before
+      // this quarter, rolls into the current quarter (it is still live). Won
+      // stays date-anchored. `overdue` is only a close date before the quarter,
+      // so a blank date is not called past due.
       const rows = await prisma.$queryRaw<ProjectionRow[]>(Prisma.sql`
         SELECT
           CASE
@@ -56,6 +58,10 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
                 ELSE NULL
               END
           END AS period,
+          (
+            o.stage <> 'closed_won'
+            AND o.due_date IS NOT NULL AND o.due_date < ${curStart}::date
+          ) AS overdue,
           o.owner_id AS "ownerId",
           COALESCE(u.name, 'Unassigned') AS "ownerName",
           o.stage::text AS stage,
@@ -65,7 +71,7 @@ export const forecastsProjectionRoutes: FastifyPluginAsyncZod = async (server) =
         WHERE o.org_id = ${orgId}::uuid
           AND o.deleted_at IS NULL
           AND o.stage <> 'closed_lost'
-        GROUP BY 1, o.owner_id, u.name, o.stage
+        GROUP BY 1, 2, o.owner_id, u.name, o.stage
       `);
 
       const [stageProbabilities, manualCommitByPeriod] = await Promise.all([
