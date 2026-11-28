@@ -26,6 +26,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
+import { openPagePipelineValue, weightedOpenPageValue } from './open-page-weight';
+
 // ── OppKpiBar ─────────────────────────────────────────────────────────────────
 
 /**
@@ -38,8 +40,10 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
  */
 export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: OrgSummary }) {
   const { t } = useTranslation('crm');
-  const openOpps = opps.filter((o) => !o.pipelineStage?.isWon && !o.pipelineStage?.isLost);
-  const weighted = openOpps.reduce((acc, o) => acc + o.value * (o.probability / 100), 0);
+  // Legacy closed_won / closed_lost rows have no pipelineStage flags. Counting
+  // them as open puts a won bid's full value into WR (page).
+  const weighted = weightedOpenPageValue(opps);
+  const openValue = openPagePipelineValue(opps);
   const kpis = summary
     ? [
         {
@@ -80,7 +84,7 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
         },
         {
           label: t('oppToolbar.kpiOpenPage', 'Open (page)'),
-          value: `${formatUnspecifiedAmount(openOpps.reduce((acc, o) => acc + o.value, 0))}`,
+          value: `${formatUnspecifiedAmount(openValue)}`,
           basis: true,
         },
       ];
