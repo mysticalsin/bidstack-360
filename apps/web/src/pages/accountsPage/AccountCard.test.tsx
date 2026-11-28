@@ -138,6 +138,28 @@ describe('AccountCard coverage explainability', () => {
   });
 });
 
+describe('AccountCard overdue close dates', () => {
+  beforeEach(cleanup);
+  const asOf = new Date('2026-11-25T12:00:00.000Z');
+
+  it('names a past close date on the card and in the cockpit link', () => {
+    const row = deriveAccount(company(), [deal({ closeDate: '2026-07-22' })], asOf);
+    renderCard(row);
+
+    const badge = screen.getByText('1 overdue');
+    expect(badge.className).toContain('--tag-tomato-fg');
+    expect(screen.getByRole('link', { name: 'Open Acme customer cockpit, 1 overdue' })).toBeTruthy();
+  });
+
+  it('stays quiet when the open deal is still due', () => {
+    const row = deriveAccount(company(), [deal({ closeDate: '2026-12-01' })], asOf);
+    renderCard(row);
+
+    expect(screen.queryByText(/overdue/i)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Open Acme customer cockpit' })).toBeTruthy();
+  });
+});
+
 describe('AccountCard tech logos', () => {
   beforeEach(cleanup);
 

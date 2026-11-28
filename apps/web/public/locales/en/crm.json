@@ -388,6 +388,7 @@
       "companyCount_one": "{{count}} company",
       "companyCount_other": "{{count}} companies",
       "openDeals": "{{count}} open deals",
+      "openDealsOverdue": "{{count}} open deals · {{overdue}} overdue",
       "weightedPipeline": "{{amount}} weighted pipeline"
     },
     "sync": {
@@ -412,7 +413,8 @@
       },
       "openDeals": {
         "label": "Open deals",
-        "detail": "External CRM pipeline"
+        "detail": "External CRM pipeline",
+        "overdue": "{{count}} overdue"
       },
       "weightedPipeline": {
         "label": "Weighted pipeline",
@@ -3389,6 +3391,8 @@
   },
   "account": {
     "openCockpitAria": "Open {{name}} customer cockpit",
+    "openCockpitOverdueAria": "Open {{name}} customer cockpit, {{count}} overdue",
+    "overdueCount": "{{count}} overdue",
     "unknownIndustry": "Unknown industry",
     "dataSourcesAria": "{{name}} data sources",
     "openDeals": "Open deals",

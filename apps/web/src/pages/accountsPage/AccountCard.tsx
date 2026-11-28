@@ -34,7 +34,7 @@ export const AccountCard = memo(function AccountCard({
 }) {
   const { t } = useTranslation('crm');
   const { formatMoneyMicros } = useFormatMoney();
-  const { company, openDeals, pipelineMicros, totalDeals, health } = row;
+  const { company, openDeals, pipelineMicros, totalDeals, health, overdueDeals } = row;
   const sources = sourcePillsFor(company);
   const techPills = techStackPillsFor(company);
   const rankedTech = rankedTechFor(company);
@@ -58,9 +58,17 @@ export const AccountCard = memo(function AccountCard({
         <Link
           to={`/accounts/${encodeURIComponent(company.id)}`}
           className="account-card"
-          aria-label={t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
-            name: company.name,
-          })}
+          aria-label={
+            overdueDeals > 0
+              ? t(
+                  'account.openCockpitOverdueAria',
+                  'Open {{name}} customer cockpit, {{count}} overdue',
+                  { name: company.name, count: overdueDeals },
+                )
+              : t('account.openCockpitAria', 'Open {{name}} customer cockpit', {
+                  name: company.name,
+                })
+          }
         >
           {imageUrl ? (
             <img
@@ -130,7 +138,14 @@ export const AccountCard = memo(function AccountCard({
             <div>
               <dt>{t('account.openDeals', 'Open deals')}</dt>
               <dd>
-                <AnimatedMetric value={openDeals.toLocaleString()} />
+                <span className="inline-flex flex-wrap items-baseline gap-2">
+                  <AnimatedMetric value={openDeals.toLocaleString()} />
+                  {overdueDeals > 0 ? (
+                    <Badge tone="tomato">
+                      {t('account.overdueCount', '{{count}} overdue', { count: overdueDeals })}
+                    </Badge>
+                  ) : null}
+                </span>
               </dd>
             </div>
             <div>
