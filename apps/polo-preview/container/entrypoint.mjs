@@ -15,7 +15,7 @@ import { pipeline } from 'node:stream/promises';
 
 import { makeApiProxy, rejectUpgrade } from '../src/container-proxy.js';
 import { ACTIVE_IMPORT_MIGRATION, decideBootMigration, DUPLICATE_PRECHECK_SQL, planBootMigration } from '../src/active-import-precheck.js';
-import { appDatabaseUrl, ownerDatabaseUrl } from '../src/database-roles.js';
+import { appDatabaseUrl, appRoleGrantsSql, ensureAppRoleSql, ownerDatabaseUrl } from '../src/database-roles.js';
 import { isApiPath } from '../src/protocol.js';
 
 const APP = '/app';
@@ -150,20 +150,30 @@ function quoteLiteral(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
-function setAppRolePassword() {
-  const password = process.env.POLO_APP_DB_PASSWORD || '';
-  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
-  // psql must not echo the statement. A failure reports the role, not the secret.
+function psql(sql) {
   const res = spawnSync(
     'psql',
     ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '-v', 'ON_ERROR_STOP=1', '-q'],
-    {
-      encoding: 'utf8',
-      input: `ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    },
+    { encoding: 'utf8', input: sql, stdio: ['pipe', 'pipe', 'pipe'] },
   );
-  if (res.status !== 0) throw new Error('could not set the app role password');
+  if (res.status !== 0) {
+    const detail = `${res.stderr || ''}`.replace(/PASSWORD\s+'[^']*'/gi, "PASSWORD '[redacted]'").trim().slice(0, 240);
+    throw new Error(detail || 'psql failed');
+  }
+}
+
+function ensureAppRole() {
+  psql(ensureAppRoleSql());
+}
+
+function setAppRolePassword() {
+  const password = process.env.POLO_APP_DB_PASSWORD || '';
+  if (!password) throw new Error('POLO_APP_DB_PASSWORD is required');
+  // The role is cluster-global and is not in the R2 dump. Create it before
+  // setting the password, then put the runtime grants back.
+  ensureAppRole();
+  psql(`ALTER ROLE app_role PASSWORD ${quoteLiteral(password)};\n`);
+  psql(appRoleGrantsSql());
 }
 
 function startDatabase() {
@@ -386,6 +396,8 @@ async function restoreFrom(req) {
   const file = join(dir, 'snapshot.tgz');
   await pipeline(req, createWriteStream(file));
   runSync('tar', ['-xzf', file, '-C', dir]);
+  // Roles are not in the dump. Create the login first so GRANT statements restore.
+  ensureAppRole();
   // The database is fresh on every boot, so restore without --clean. pg_restore
   // exits 1 on harmless warnings; the row check below is the real verdict.
   spawnSync('pg_restore', ['-h', '127.0.0.1', '-U', PG_USER, '-d', DB, '--no-owner', join(dir, 'db.dump')], { stdio: 'inherit' });
