@@ -2357,6 +2357,10 @@
     "errorMessage": "The key accounts endpoint did not respond.",
     "emptyTitle": "No key accounts yet",
     "emptyMessage": "Flag strategically important companies as Key Accounts from the Companies page.",
+    "emptyFilteredTitle": "No key accounts match these filters",
+    "emptyFilteredMessage": "Nothing in the strategic book matches this search or industry. Clear the filters to see the accounts you already flagged.",
+    "clearFilters": "Clear filters",
+    "resultSearch": "matching \"{{search}}\"",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "open deals",
     "metricContacts": "contacts"
