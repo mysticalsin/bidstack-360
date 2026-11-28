@@ -26,3 +26,12 @@ export function forecastTotalsNote(pageContinues: boolean): string | null {
   if (!pageContinues) return null;
   return 'These amounts are the loaded forecasts for this period filter, not every forecast.';
 }
+
+/**
+ * The period filter only changes the list once a forecast is loaded.
+ * While the read is unsettled, or the book has none, every shape is the
+ * same screen — Monthly, Quarterly, and Yearly included.
+ */
+export function showForecastPeriodFilter(loadedCount: number, settled: boolean): boolean {
+  return settled && loadedCount > 0;
+}

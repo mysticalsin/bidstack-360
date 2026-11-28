@@ -24,7 +24,7 @@ import { ForecastChart } from './forecasts/ForecastChart';
 import { ForecastProjection } from './forecasts/ForecastProjection';
 import { ForecastList } from './forecasts/ForecastList';
 import { NewForecastDialogContent } from './forecasts/NewForecastDialog';
-import { forecastTotalsNote } from './forecasts/forecast-list-caption';
+import { forecastTotalsNote, showForecastPeriodFilter } from './forecasts/forecast-list-caption';
 import {
   buildChartData,
   groupForecasts,
@@ -56,10 +56,15 @@ export function ForecastsPage() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('monthly');
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const loadedItems = forecasts.data?.items;
+  const loadedCount = loadedItems?.length ?? 0;
+  const listSettled = !forecasts.isLoading && !forecasts.isError && forecasts.data != null;
+  const showPeriodFilter = showForecastPeriodFilter(loadedCount, listSettled);
+  const manualBookEmpty = listSettled && loadedCount === 0;
+
   const filteredItems = useMemo(() => {
-    const items = forecasts.data?.items ?? [];
-    return items.filter((i) => matchesPeriodFilter(i.period, periodFilter));
-  }, [forecasts.data, periodFilter]);
+    return (loadedItems ?? []).filter((i) => matchesPeriodFilter(i.period, periodFilter));
+  }, [loadedItems, periodFilter]);
 
   // pageContinues is the forecast the list read past this page and dropped.
   const pageContinues = Boolean(forecasts.data?.pageContinues);
@@ -211,22 +216,32 @@ export function ForecastsPage() {
           {t('forecasts.manualSectionTitle', 'Manual overrides')}
         </h2>
         <p className="mt-0.5 text-xs text-[var(--fg-tertiary)]">
-          {t('forecasts.manualSectionCaption', 'Rep-entered figures override the projection for their period.')}
+          {manualBookEmpty
+            ? t(
+                'forecasts.manualSectionCaptionEmpty',
+                'None are set. The projection above stands.',
+              )
+            : t(
+                'forecasts.manualSectionCaption',
+                'Rep-entered figures override the projection for their period.',
+              )}
         </p>
       </motion.div>
 
-      {/* ── Period filter ── */}
-      <motion.div variants={reducedMotion ? undefined : staggerChild}>
-        <Tabs value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
-          <TabsList aria-label={t('forecasts.periodFilterLabel', 'Period filter')}>
-            <TabsTrigger value="monthly">{t('forecasts.periodMonthly', 'Monthly')}</TabsTrigger>
-            <TabsTrigger value="quarterly">
-              {t('forecasts.periodQuarterly', 'Quarterly')}
-            </TabsTrigger>
-            <TabsTrigger value="yearly">{t('forecasts.periodYearly', 'Yearly')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </motion.div>
+      {/* The filter is a dead control until a forecast exists to hide or show. */}
+      {showPeriodFilter ? (
+        <motion.div variants={reducedMotion ? undefined : staggerChild}>
+          <Tabs value={periodFilter} onValueChange={(v) => setPeriodFilter(v as PeriodFilter)}>
+            <TabsList aria-label={t('forecasts.periodFilterLabel', 'Period filter')}>
+              <TabsTrigger value="monthly">{t('forecasts.periodMonthly', 'Monthly')}</TabsTrigger>
+              <TabsTrigger value="quarterly">
+                {t('forecasts.periodQuarterly', 'Quarterly')}
+              </TabsTrigger>
+              <TabsTrigger value="yearly">{t('forecasts.periodYearly', 'Yearly')}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </motion.div>
+      ) : null}
 
       {totalsNote ? (
         <p className="text-xs text-[var(--fg-tertiary)]">{totalsNote}</p>
@@ -288,6 +303,7 @@ export function ForecastsPage() {
           canWrite={canWrite}
           readOnlyHint={readOnlyHint}
           pageContinues={pageContinues}
+          periodFilterExcluded={showPeriodFilter && rows.length === 0}
         />
       </motion.div>
     </motion.div>

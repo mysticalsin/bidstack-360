@@ -91,6 +91,72 @@ describe('ForecastsPage — territories:write gating', () => {
     deleteButtons.forEach((btn) => expect((btn as HTMLButtonElement).disabled).toBe(false));
   });
 
+  it('does not offer a period filter when the book has no manual forecasts', () => {
+    // WHY: the demo book has no hand-entered forecasts. Monthly, Quarterly,
+    // and Yearly are then the same empty list. Telling the reader to change
+    // the filter sends them through three identical screens, and the caption
+    // still says those missing figures override the projection.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByRole('tablist', { name: /period filter/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'No manual overrides' })).toBeTruthy();
+    expect(screen.getByText('The projection above stands until a rep enters one.')).toBeTruthy();
+    expect(screen.getByText('None are set. The projection above stands.')).toBeTruthy();
+    expect(screen.queryByText(/try changing the period filter/i)).toBeNull();
+    expect(screen.queryByText(/override the projection/i)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /New Forecast/i }).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the period filter when a saved forecast is a different period shape', () => {
+    // WHY: a quarterly commit is invisible on the monthly filter. The filter
+    // is the way back to that row, so it has to stay, and the empty state has
+    // to name the filter rather than a missing book.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: { items: [{ ...forecast, period: '2026-Q4' }] },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.getByRole('tablist', { name: /period filter/i })).toBeTruthy();
+    expect(screen.queryByText('Alice Dev')).toBeNull();
+    expect(screen.getByRole('heading', { name: 'No forecasts in this period' })).toBeTruthy();
+    expect(screen.getByText('Try another period filter.')).toBeTruthy();
+    expect(screen.getByText('Rep-entered figures override the projection for their period.')).toBeTruthy();
+  });
+
+  it('does not call a still-loading list an empty manual book', () => {
+    // WHY: a slow read is not "none are set". That sentence is only true
+    // after the list has settled empty.
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    forecastsMocks.useForecasts.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderPage();
+
+    expect(screen.queryByRole('heading', { name: 'No manual overrides' })).toBeNull();
+    expect(screen.queryByText('None are set. The projection above stands.')).toBeNull();
+    expect(screen.queryByRole('tablist', { name: /period filter/i })).toBeNull();
+  });
+
   it('hides New Forecast and disables cell edit / row delete for a user without territories:write', () => {
     capabilitiesMocks.useHasPermission.mockReturnValue(false);
 

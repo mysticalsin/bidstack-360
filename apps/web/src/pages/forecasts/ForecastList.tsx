@@ -54,6 +54,11 @@ interface ForecastListProps {
   readOnlyHint: string;
   /** True when the list read one forecast past this page and dropped it. */
   pageContinues?: boolean;
+  /**
+   * True when forecasts were loaded, but none match the selected period
+   * shape. False when the book itself has no manual forecasts.
+   */
+  periodFilterExcluded?: boolean;
 }
 
 export function ForecastList({
@@ -69,6 +74,7 @@ export function ForecastList({
   canWrite,
   readOnlyHint,
   pageContinues = false,
+  periodFilterExcluded = false,
 }: ForecastListProps) {
   const { t } = useTranslation('crm');
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
@@ -128,11 +134,19 @@ export function ForecastList({
         <LoadingSkeleton rows={4} />
       ) : rows.length === 0 ? (
         <EmptyState
-          title={t('forecastList.emptyTitle', 'No forecasts found')}
-          message={t(
-            'forecastList.emptyMessage',
-            'Try changing the period filter or create your first forecast.',
-          )}
+          title={
+            periodFilterExcluded
+              ? t('forecastList.emptyFilterTitle', 'No forecasts in this period')
+              : t('forecastList.emptyTitle', 'No manual overrides')
+          }
+          message={
+            periodFilterExcluded
+              ? t('forecastList.emptyFilterMessage', 'Try another period filter.')
+              : t(
+                  'forecastList.emptyMessage',
+                  'The projection above stands until a rep enters one.',
+                )
+          }
           action={
             canWrite ? (
               <Button size="sm" onClick={onNewForecast}>
