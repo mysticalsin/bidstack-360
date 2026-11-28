@@ -3908,9 +3908,17 @@
     "ofTotal": "de {{total}}"
   },
   "pipelineByStage": {
-    "regionLabel": "Cartera de oportunidades por etapa",
-    "title": "Cartera de oportunidades",
-    "caption": "Pipeline de todas las cuentas por etapa"
+    "accountRegion": "Pipeline de {{account}} por etapa",
+    "accountTitle": "Pipeline por etapa",
+    "accountCaption": "Ofertas de {{account}}",
+    "unlinkedTitle": "Sin ficha de empresa",
+    "unlinked": "Esta cuenta no está vinculada a una ficha de empresa.",
+    "errorTitle": "No se pudo cargar el pipeline de esta cuenta",
+    "errorMessage": "Los totales por etapa de esta cuenta no se cargaron.",
+    "retry": "Reintentar",
+    "emptyTitle": "Aún no hay ofertas en esta cuenta",
+    "emptyMessage": "Las ofertas vinculadas a esta empresa aparecerán aquí.",
+    "pagePartial": "Estas barras son las primeras {{count}} ofertas de esta cuenta, no todas."
   },
   "accountDashboardWidgets": {
     "railAriaLabel": "Estado de integración del CRM",

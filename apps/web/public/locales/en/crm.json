@@ -3897,9 +3897,17 @@
     "ofTotal": "of {{total}}"
   },
   "pipelineByStage": {
-    "regionLabel": "Portfolio pipeline by stage",
-    "title": "Portfolio pipeline",
-    "caption": "All-account pipeline by stage"
+    "accountRegion": "{{account}} pipeline by stage",
+    "accountTitle": "Pipeline by stage",
+    "accountCaption": "Bids on {{account}}",
+    "unlinkedTitle": "No company record",
+    "unlinked": "This account is not linked to a company record.",
+    "errorTitle": "Couldn't load this account's pipeline",
+    "errorMessage": "The stage totals for this account did not load.",
+    "retry": "Retry",
+    "emptyTitle": "No bids on this account yet",
+    "emptyMessage": "Bids linked to this company will show up here.",
+    "pagePartial": "These bars are the first {{count}} bids on this account, not every bid."
   },
   "accountDashboardWidgets": {
     "railAriaLabel": "CRM integration status",

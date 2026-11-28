@@ -3930,9 +3930,17 @@
     "ofTotal": "sur {{total}}"
   },
   "pipelineByStage": {
-    "regionLabel": "Pipeline du portefeuille par étape",
-    "title": "Pipeline du portefeuille",
-    "caption": "Pipeline de tous les comptes par étape"
+    "accountRegion": "Pipeline de {{account}} par étape",
+    "accountTitle": "Pipeline par étape",
+    "accountCaption": "Offres de {{account}}",
+    "unlinkedTitle": "Aucune fiche entreprise",
+    "unlinked": "Ce compte n'est pas lié à une fiche entreprise.",
+    "errorTitle": "Impossible de charger le pipeline de ce compte",
+    "errorMessage": "Les totaux par étape de ce compte ne se sont pas chargés.",
+    "retry": "Réessayer",
+    "emptyTitle": "Aucune offre sur ce compte",
+    "emptyMessage": "Les offres liées à cette entreprise apparaîtront ici.",
+    "pagePartial": "Ces barres montrent les {{count}} premières offres de ce compte, pas toutes les offres."
   },
   "accountDashboardWidgets": {
     "railAriaLabel": "État d'intégration du CRM",
