@@ -2928,9 +2928,26 @@ select:focus-visible {
     background-color 0.14s,
     transform 0.14s;
 }
+.key-contact-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 18px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 10px;
+}
+.key-contact-link:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
 .key-contact-row:hover {
   background: var(--surface-sunken);
   transform: translateX(2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .key-contact-row:hover { transform: none; }
 }
 
 /* ---------- KV list (Business Snapshot) ---------- */
