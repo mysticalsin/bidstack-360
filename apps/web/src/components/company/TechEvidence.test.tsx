@@ -58,10 +58,20 @@ describe('TechCoverageLine', () => {
     expect(line.textContent).not.toContain('\u2014');
   });
 
-  it('marks sample data and says when Apollo was asked to fill a thin stack', () => {
+  it('labels fixture coverage Reference so a seller does not read the stack as a demo', () => {
     render(<TechCoverageLine coverage={coverage({ sample: true, apolloFallback: 'queued', openItems: 2 })} />);
-    expect(screen.getByText('Sample')).toBeTruthy();
-    expect(screen.getByTestId('tech-coverage-line').textContent).toContain('Apollo asked to fill gaps.');
+    const line = screen.getByTestId('tech-coverage-line');
+    // sample:true still shows the badge. The words are production copy.
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(line.textContent).not.toMatch(/\bSample\b/);
+    expect(line.textContent).not.toMatch(/sample data/i);
+    expect(line.textContent).toContain('Apollo asked to fill gaps.');
+  });
+
+  it('leaves a checked coverage line unbadged when it is not a fixture', () => {
+    render(<TechCoverageLine coverage={coverage({ sample: false })} />);
+    expect(screen.queryByText('Reference')).toBeNull();
+    expect(screen.queryByText('Sample')).toBeNull();
   });
 
   it('renders nothing before the first check', () => {
@@ -90,6 +100,22 @@ describe('TechEvidenceChip', () => {
     const link = screen.getByRole('link', { name: /Open public record/ });
     expect(link.getAttribute('href')).toBe('https://crt.sh/?q=jira.example.com');
     expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('names a fixture chip reference records and keeps the source and confidence', () => {
+    render(<TechEvidenceChip item={{ ...dnsItem, sample: true }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ }));
+    expect(screen.getByText('DNS, 95% confidence, reference records')).toBeTruthy();
+    expect(screen.queryByText(/sample data/i)).toBeNull();
+    expect(screen.queryByText('Sample')).toBeNull();
+  });
+
+  it('does not call a live chip a reference record', () => {
+    render(<TechEvidenceChip item={{ ...dnsItem, sample: false }} />);
+    fireEvent.click(screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ }));
+    expect(screen.getByText('DNS, 95% confidence', { exact: true })).toBeTruthy();
+    expect(screen.queryByText(/reference records/i)).toBeNull();
+    expect(screen.queryByText(/sample data/i)).toBeNull();
   });
 
   it('maps every source family to a short chip label', () => {
