@@ -133,12 +133,12 @@
     "toastErrorTitle": "No se pudo instalar la plantilla"
   },
   "sampleDataBanner": {
-    "title": "Los datos de muestra están activados",
-    "description": "Los registros de demostración son visibles en este espacio de trabajo. Oculta este aviso o elimina por completo los registros de muestra antes de las demostraciones para ejecutivos o clientes.",
+    "title": "Este espacio de trabajo incluye registros de referencia",
+    "description": "Los registros de referencia son visibles en este espacio de trabajo. Oculta este aviso o elimina los registros de referencia cuando ya no los necesites.",
     "hide": "Ocultar",
-    "remove": "Eliminar datos de muestra",
+    "remove": "Eliminar registros de referencia",
     "removing": "Eliminando…",
-    "removedToast": "Datos de muestra eliminados",
-    "removeErrorToast": "No se pudieron eliminar los datos de muestra"
+    "removedToast": "Registros de referencia eliminados",
+    "removeErrorToast": "No se pudieron eliminar los registros de referencia"
   }
 }

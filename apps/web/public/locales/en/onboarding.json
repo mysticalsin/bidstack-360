@@ -141,12 +141,12 @@
     "toastErrorTitle": "Could not install template"
   },
   "sampleDataBanner": {
-    "title": "Sample data is on",
-    "description": "Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.",
+    "title": "Reference records are in this workspace",
+    "description": "Reference records are visible in this workspace. Hide this notice, or remove the reference records when you no longer need them.",
     "hide": "Hide",
-    "remove": "Remove sample data",
+    "remove": "Remove reference records",
     "removing": "Removing…",
-    "removedToast": "Sample data removed",
-    "removeErrorToast": "Could not remove sample data"
+    "removedToast": "Reference records removed",
+    "removeErrorToast": "Could not remove reference records"
   }
 }

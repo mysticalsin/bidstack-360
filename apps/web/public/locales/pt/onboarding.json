@@ -141,12 +141,12 @@
     "toastErrorTitle": "Não foi possível instalar o modelo"
   },
   "sampleDataBanner": {
-    "title": "Os dados de exemplo estão ativados",
-    "description": "Os registros de demonstração estão visíveis neste espaço de trabalho. Oculte este aviso ou remova completamente os registros de exemplo antes das demonstrações para executivos ou clientes.",
+    "title": "Este espaço de trabalho inclui registros de referência",
+    "description": "Os registros de referência estão visíveis neste espaço de trabalho. Oculte este aviso ou remova os registros de referência quando já não forem necessários.",
     "hide": "Ocultar",
-    "remove": "Remover dados de exemplo",
+    "remove": "Remover registros de referência",
     "removing": "Removendo…",
-    "removedToast": "Dados de exemplo removidos",
-    "removeErrorToast": "Não foi possível remover os dados de exemplo"
+    "removedToast": "Registros de referência removidos",
+    "removeErrorToast": "Não foi possível remover os registros de referência"
   }
 }

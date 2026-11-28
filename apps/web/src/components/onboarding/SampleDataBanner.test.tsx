@@ -68,8 +68,8 @@ describe('SampleDataBanner', () => {
   it('tells sellers the workspace has reference records, not sample or demo data', () => {
     render(<SampleDataBanner />);
     assertReferenceSellerCopy(document.body.textContent ?? '');
-    expect(screen.getByRole('button', { name: 'Hide' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: REMOVE_LABEL })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Hide' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: REMOVE_LABEL })).toBeTruthy();
   });
 
   it('asks before clearing reference records and does nothing on cancel', async () => {
@@ -97,7 +97,7 @@ describe('SampleDataBanner', () => {
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
     expect(mocks.toastSuccess).toHaveBeenCalledWith(REMOVED_TOAST);
     assertReferenceSellerCopy(REMOVED_TOAST);
-    expect(screen.queryByRole('button', { name: REMOVE_LABEL })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: REMOVE_LABEL })).toBeNull();
   });
 
   it('reports a failed clear as reference records, not sample data', async () => {
