@@ -1880,7 +1880,8 @@
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "save": "Enregistrer",
-      "edit": "Modifier"
+      "edit": "Modifier",
+      "openCockpit": "Ouvrir le cockpit du compte"
     },
     "tabs": {
       "label": "Sections de l'entreprise"
