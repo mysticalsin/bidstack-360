@@ -2,6 +2,8 @@
 // one accent, status colours always paired with a text label.
 import type { SignalCategory } from '@bidstack/shared';
 
+import { SIGNAL_REFERENCE_RECORD } from './reference-copy';
+
 export const CATEGORY_LABEL: Record<SignalCategory, string> = {
   funding: 'Funding',
   launch: 'Launch',
@@ -59,7 +61,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   enrichment: 'Hiring signals',
   meeting_intel: 'Meeting intel',
   financials: 'Filed financials',
-  sample: 'Sample data',
+  sample: SIGNAL_REFERENCE_RECORD,
 };
 
 export const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s;

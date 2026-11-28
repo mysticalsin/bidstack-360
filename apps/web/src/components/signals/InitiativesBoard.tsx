@@ -12,6 +12,7 @@ import type { Initiative } from '@bidstack/shared';
 import { useAccountInitiatives } from '@/hooks/useAccountSignals';
 
 import { noDash, sourceLabel } from './category';
+import { SIGNAL_REFERENCE_BADGE } from './reference-copy';
 import { initiativeEvidenceLabel, shownInitiativeEvidence } from './initiative-evidence-caption';
 
 const TOP = 4;
@@ -58,7 +59,7 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
           return <span key={k}>{n} {n === 1 ? one : many}</span>;
         })}
         {it.lastSeen ? <span>Last seen {dateFmt.format(new Date(it.lastSeen))}</span> : null}
-        {it.sample ? <span className="sg-sample">Sample</span> : null}
+        {it.sample ? <span className="sg-sample">{SIGNAL_REFERENCE_BADGE}</span> : null}
       </div>
       <div className="sg-hook">
         {it.hook.alreadySold ? (
@@ -79,7 +80,7 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
             ) : (
               <span>{noDash(e.title)}</span>
             )}
-            <span className="sg-meta"> · {e.sample ? 'Sample' : sourceLabel(e.source)}{e.at ? ` · ${dateFmt.format(new Date(e.at))}` : ''}</span>
+            <span className="sg-meta"> · {e.sample ? SIGNAL_REFERENCE_BADGE : sourceLabel(e.source)}{e.at ? ` · ${dateFmt.format(new Date(e.at))}` : ''}</span>
           </li>
         ))}
       </ul>

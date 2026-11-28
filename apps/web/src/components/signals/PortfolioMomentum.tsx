@@ -14,6 +14,7 @@ import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { usePortfolioMomentum } from '@/hooks/useAccountSignals';
 
 import { CATEGORY_LABEL, CATEGORY_TONE, noDash, sourceLabel } from './category';
+import { SIGNAL_REFERENCE_BADGE, SIGNAL_REFERENCE_RECORD } from './reference-copy';
 import { portfolioAccountLabel, shownPortfolioAccounts } from './portfolio-account-caption';
 
 type Trend = PortfolioData['accounts'][number]['trend'];
@@ -55,7 +56,7 @@ export function MomentumList({ data }: { data: PortfolioData }) {
             </button>
           ))}
         </div>
-        {accountPage.items.some((a) => a.sample) ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
+        {accountPage.items.some((a) => a.sample) ? <span className="sg-sample" title={SIGNAL_REFERENCE_RECORD}>{SIGNAL_REFERENCE_BADGE}</span> : null}
       </div>
       <p className="sr-only">
         {`${data.counts.gaining} accounts gaining, ${data.counts.steady} steady, ${data.counts.declining} declining. `}
@@ -117,7 +118,7 @@ export function AlertsList({ alerts }: { alerts: PortfolioData['alerts'] }) {
               </span>
               <span>{a.companyName}</span>
               <time dateTime={a.occurredAt}>{shortFmt.format(new Date(a.occurredAt))}</time>
-              {a.sample ? <span className="sg-sample">Sample</span> : <span>{sourceLabel(a.source)}</span>}
+              {a.sample ? <span className="sg-sample">{SIGNAL_REFERENCE_BADGE}</span> : <span>{sourceLabel(a.source)}</span>}
             </span>
             <Link id={`al-${a.id}`} to={`/accounts/${encodeURIComponent(a.companyId)}#watchdog`}>{noDash(a.title)}</Link>
           </article>

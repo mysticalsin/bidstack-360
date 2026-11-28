@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import type { AccountPulse, Initiative, PortfolioMomentum, TimelineItem } from '@bidstack/shared';
 
+import { sourceLabel } from './category';
 import { InitiativesView } from './InitiativesBoard';
 import { AlertsList, MomentumList } from './PortfolioMomentum';
 import { PulseView } from './PulseHero';
@@ -37,8 +38,9 @@ const pulse: AccountPulse = {
 };
 
 describe('PulseView', () => {
-  it('answers in one look: score, trend, verdict, top 3 drivers, sample badge; sources live in Settings', () => {
+  it('answers in one look: score, trend, verdict, top 3 drivers, reference badge; sources live in Settings', () => {
     wrap(<PulseView pulse={pulse} />);
+    expect(pulse.sample).toBe(true);
     expect(screen.getByRole('heading', { name: 'Account pulse' })).toBeTruthy();
     expect(screen.getByText('78')).toBeTruthy();
     expect(screen.getByText(/Gaining \+12/)).toBeTruthy();
@@ -46,7 +48,10 @@ describe('PulseView', () => {
     const drivers = within(screen.getByRole('group', { name: 'Top drivers' })).getAllByRole('button');
     expect(drivers.map((d) => d.textContent)).toEqual(['Pipeline+9', 'Meetings+7', 'News-4']);
     expect(screen.getByRole('img', { name: /Momentum over 13 weeks: from 60 to 72/ })).toBeTruthy();
-    expect(screen.getByText('Sample')).toBeTruthy();
+    // sample:true is still a fixture. The seller-facing badge says Reference.
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(document.querySelector('.sg-sample')?.getAttribute('title') ?? '').not.toMatch(/sample|demo/i);
     expect(screen.queryByText(/\(off\)/)).toBeNull();
     expect(screen.queryByText('Watching')).toBeNull();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
@@ -92,7 +97,10 @@ describe('TimelineView', () => {
     wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" />);
     fireEvent.click(screen.getByRole('button', { name: /^Funding,/ }));
     expect(screen.getByRole('heading', { name: 'Series C, 150M' })).toBeTruthy();
-    expect(screen.getByText(/Sample data, no live source/)).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.getByText('Reference record')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByText(/Sample data, no live source/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^Launch,/ }));
     expect(screen.getByRole('link', { name: /Open source/ }).getAttribute('href')).toBe('https://news.example/x');
     fireEvent.click(screen.getByRole('button', { name: /^Meeting,/ }));
@@ -113,6 +121,17 @@ const init = (n: number, over: Partial<Initiative> = {}): Initiative => ({
   ...over,
 });
 
+describe('fixture source label', () => {
+  it('calls source sample a reference record and leaves live providers named as they are', () => {
+    expect(sourceLabel('sample')).toBe('Reference record');
+    expect(sourceLabel('sample')).not.toMatch(/Sample/);
+    expect(sourceLabel('gdelt')).toBe('GDELT news');
+    expect(sourceLabel('sec_edgar')).toBe('SEC EDGAR');
+    expect(sourceLabel('google_news')).toBe('Google News');
+    expect(sourceLabel('company_rss')).toBe('Company newsroom');
+  });
+});
+
 describe('InitiativesView', () => {
   it('shows confidence, evidence counts, the hook, evidence on click and caps at four', () => {
     wrap(<InitiativesView items={[init(1), init(2, { confidence: 'low', hook: { offering: 'Cloud', pitch: '', nextStep: '', alreadySold: true } }), init(3), init(4), init(5)]} />);
@@ -126,6 +145,20 @@ describe('InitiativesView', () => {
     expect(screen.getByRole('link', { name: /Senior data engineer/ }).getAttribute('href')).toBe('https://jobs.example/1');
     fireEvent.click(screen.getByRole('button', { name: 'Show all 5 initiatives' }));
     expect(screen.getAllByRole('article')).toHaveLength(5);
+  });
+
+  it('labels a fixture initiative and its evidence as Reference', () => {
+    wrap(<InitiativesView items={[init(1, {
+      sample: true,
+      evidence: [{ kind: 'news', title: 'Data platform launch', url: null, at: null, source: 'sample', sample: true }],
+    })]} />);
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'See 1 evidence item' }));
+    const evidence = screen.getByText('Data platform launch').parentElement!;
+    expect(evidence.textContent).toMatch(/Reference/);
+    expect(evidence.textContent).not.toMatch(/Sample/);
+    expect(screen.queryByText('Sample data')).toBeNull();
   });
 });
 
@@ -145,6 +178,10 @@ const port: PortfolioMomentum = {
 describe('Portfolio momentum', () => {
   it('ranks accounts with score and delta, filters by trend and links to the account', () => {
     wrap(<MomentumList data={port} />);
+    expect(port.accounts.some((a) => a.sample)).toBe(true);
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(document.querySelector('.sg-sample')?.getAttribute('title') ?? '').not.toMatch(/sample|demo/i);
     const list = screen.getByRole('list', { name: 'Accounts ranked by size of momentum change' });
     // Biggest movers first in either direction: the decline is not buried.
     expect(within(list).getAllByRole('link').map((l) => l.textContent)).toEqual(['CI Financial', 'Example Corp', 'Mantu']);
@@ -155,11 +192,13 @@ describe('Portfolio momentum', () => {
     expect(screen.getByRole('link', { name: 'Example Corp' }).getAttribute('href')).toBe('/accounts/c');
   });
 
-  it('lists top alerts with category and Sample, linking to the account watchdog', () => {
+  it('lists top alerts with category and Reference, linking to the account watchdog', () => {
     wrap(<AlertsList alerts={port.alerts} />);
     const link = screen.getByRole('link', { name: 'Example Corp announces job cuts' });
     expect(link.getAttribute('href')).toBe('/accounts/c#watchdog');
+    expect(port.alerts[0]!.sample).toBe(true);
     expect(screen.getByText('Risk')).toBeTruthy();
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
   });
 });

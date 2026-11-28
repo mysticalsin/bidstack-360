@@ -1,7 +1,7 @@
 // Account page: watchdog feed (2/3) beside upcoming results (1/3), then
 // previous projects with us and related history (meetings, MSAs, signals). v21: the
 // feed is ordered by importance (Latest on toggle), each row carries its
-// category, outlet count and a Sample badge; the signal strip and the track
+// category, outlet count and a Reference badge; the signal strip and the track
 // record timeline moved into the Signals timeline above. Direction: Tony 13:12 BRT + /workspace/fleet/polo-DESIGN.md.
 // Density rules: top 3 signals by default, one line + one meta line per row,
 // details on click, a single tinted pill instead of severity dots.
@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { MiniCalendar, YearBars } from '@/components/viz/charts';
 import { CATEGORY_LABEL, noDash, sourceLabel } from '@/components/signals/category';
+import { SIGNAL_REFERENCE_BADGE } from '@/components/signals/reference-copy';
 import type { SignalCategory } from '@bidstack/shared';
 import { fmtCompact } from '@/components/viz/viz-data';
 import { useAccountWatchdog, useSetWatchEventStatus, type AccountWatchdog, type WatchImplication } from '@/hooks/useAccountWatchdog';
@@ -109,7 +110,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
             {sourceName(e.source)}
             {!e.group && e.mentions && e.mentions > 1 ? ` · ${e.mentions} outlets` : ''} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
             {e.status === 'NEW' ? <span className="wd-new"> · New</span> : null}
-            {isSample(e) ? <span className="wd-sample-badge">Sample</span> : null}
+            {isSample(e) ? <span className="wd-sample-badge">{SIGNAL_REFERENCE_BADGE}</span> : null}
           </span>
         </span>
         <Pill kind={e.implication}>{PILL[e.implication]}</Pill>
