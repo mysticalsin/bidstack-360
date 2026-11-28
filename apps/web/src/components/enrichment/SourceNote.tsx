@@ -11,5 +11,5 @@ export function SourceNote({ source, asOf, prefix }: { source: string; asOf: str
 
 export function SampleBadge({ show }: { show: boolean }) {
   if (!show) return null;
-  return <span className="en-sample" title="Illustrative data until the enrichment API is connected">Sample</span>;
+  return <span className="en-sample" title="Reference records until company enrichment is connected">Reference</span>;
 }
