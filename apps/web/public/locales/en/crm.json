@@ -1837,6 +1837,11 @@
       "cases": "Cases ({{shown}})",
       "notes": "Notes ({{count}})",
       "hierarchy": "Hierarchy"
+    },
+    "intelStrip": {
+      "loading": "Loading company intel",
+      "error": "Couldn't load company intel. Please try again.",
+      "retry": "Retry"
     }
   },
   "currencySelector": {

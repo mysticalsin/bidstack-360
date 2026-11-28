@@ -16,4 +16,9 @@ describe('company detail keeps the employee count', () => {
     expect(page).toMatch(/<IntelStrip/);
     expect(page).toMatch(/<AccountActivityCharts companyId=\{c\.id\} \/>/);
   });
+
+  it('does not paint an empty intel strip until the summary read has settled', () => {
+    expect(page).toMatch(/read=\{intelStripRead\(intelSummary\)\}/);
+    expect(page).toMatch(/onRetry=\{\(\) => void intelSummary\.refetch\(\)\}/);
+  });
 });
