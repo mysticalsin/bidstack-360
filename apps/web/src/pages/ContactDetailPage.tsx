@@ -3,6 +3,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
@@ -15,6 +16,39 @@ import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
+
+type RelatedQuery = {
+  isLoading?: boolean;
+  isPending?: boolean;
+  isError?: boolean;
+  data?: unknown;
+};
+
+// A first fetch has no payload. A later refetch keeps the last rows, so a
+// loading flag with data already in hand is not "empty".
+function relatedRead(query: RelatedQuery): 'loading' | 'error' | 'ready' {
+  const hasData = query.data != null;
+  if ((query.isLoading === true || query.isPending === true) && !hasData) return 'loading';
+  if (query.isError === true && !hasData) return 'error';
+  return 'ready';
+}
+
+// The notes API stores accountId lowercased. Comparing it to the display
+// customer name hid every note the request had just returned.
+function noteMatchesCustomer(accountId: string, customer: string): boolean {
+  return accountId.trim().toLowerCase() === customer.trim().toLowerCase();
+}
+
+// role="status" takes its accessible name from the author (aria-label), not
+// from the text inside it. The label and the visible sentence are the same
+// words so a screen reader announces the line a sighted reader sees.
+function StatusLine({ label }: { label: string }) {
+  return (
+    <p role="status" aria-label={label} className="p-5 text-sm text-[var(--fg-secondary)]">
+      {label}
+    </p>
+  );
+}
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
@@ -59,10 +93,33 @@ export function ContactDetailPage() {
   }
 
   const c = contact.data;
-  const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];
+  const oppRead = relatedRead(allOpps);
+  const taskRead = relatedRead(allTasks);
+  const noteRead = relatedRead(allNotes);
+  const relatedOpps =
+    oppRead === 'ready' ? (allOpps.data?.items.filter((o) => o.customer === c.customer) ?? []) : [];
+  // A task is related only through its deal. Until that deal list has settled,
+  // an empty task payload is not "no related tasks".
+  const taskView =
+    oppRead === 'loading' || taskRead === 'loading'
+      ? 'loading'
+      : oppRead === 'error'
+        ? 'blocked'
+        : taskRead === 'error'
+          ? 'error'
+          : 'ready';
   const relatedTasks =
-    allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
-  const relatedNotes = allNotes.data?.items.filter((n) => n.accountId === c.customer) ?? [];
+    taskView === 'ready'
+      ? (allTasks.data?.items.filter(
+          (task) => task.oppId && relatedOpps.some((o) => o.id === task.oppId),
+        ) ?? [])
+      : [];
+  const relatedNotes =
+    noteRead === 'ready'
+      ? (allNotes.data?.items.filter((n) => noteMatchesCustomer(n.accountId, c.customer)) ?? [])
+      : [];
+  const countCaption = (count: number) =>
+    t('contactDetail.relatedCount', '{{count}} related', { count });
 
   return (
     <div className="space-y-6">
@@ -154,11 +211,40 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.opportunitiesTitle', 'Opportunities')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedOpps.length,
-            })}
+            caption={
+              oppRead === 'loading'
+                ? t('contactDetail.relatedLoading', 'Loading')
+                : oppRead === 'error'
+                  ? t('contactDetail.relatedUnavailable', 'Unavailable')
+                  : countCaption(relatedOpps.length)
+            }
           />
-          {relatedOpps.length === 0 ? (
+          {oppRead === 'loading' ? (
+            <StatusLine
+              label={t(
+                'contactDetail.opportunitiesLoading',
+                'Loading opportunities for {{customer}}.',
+                {
+                  customer: c.customer,
+                },
+              )}
+            />
+          ) : oppRead === 'error' ? (
+            <div role="alert" className="space-y-3 p-5">
+              <p className="text-sm text-[var(--danger)]">
+                {t(
+                  'contactDetail.opportunitiesError',
+                  'Could not load opportunities for {{customer}}.',
+                  {
+                    customer: c.customer,
+                  },
+                )}
+              </p>
+              <Button size="sm" variant="secondary" onClick={() => void allOpps.refetch()}>
+                {t('contactDetail.retryOpportunities', 'Retry opportunities')}
+              </Button>
+            </div>
+          ) : relatedOpps.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
               {t('contactDetail.noOpportunities', 'No opportunities for {{customer}}.', {
                 customer: c.customer,
@@ -191,11 +277,33 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.tasksTitle', 'Tasks')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedTasks.length,
-            })}
+            caption={
+              taskView === 'loading'
+                ? t('contactDetail.relatedLoading', 'Loading')
+                : taskView === 'ready'
+                  ? countCaption(relatedTasks.length)
+                  : t('contactDetail.relatedUnavailable', 'Unavailable')
+            }
           />
-          {relatedTasks.length === 0 ? (
+          {taskView === 'loading' ? (
+            <StatusLine label={t('contactDetail.tasksLoading', 'Loading related tasks.')} />
+          ) : taskView === 'blocked' ? (
+            <StatusLine
+              label={t(
+                'contactDetail.tasksBlocked',
+                "Related tasks stay hidden until this contact's opportunities load.",
+              )}
+            />
+          ) : taskView === 'error' ? (
+            <div role="alert" className="space-y-3 p-5">
+              <p className="text-sm text-[var(--danger)]">
+                {t('contactDetail.tasksError', 'Could not load related tasks.')}
+              </p>
+              <Button size="sm" variant="secondary" onClick={() => void allTasks.refetch()}>
+                {t('contactDetail.retryTasks', 'Retry tasks')}
+              </Button>
+            </div>
+          ) : relatedTasks.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
               {t('contactDetail.noTasks', 'No related tasks.')}
             </div>
@@ -237,11 +345,28 @@ export function ContactDetailPage() {
         <Card>
           <SectionHeader
             title={t('contactDetail.notesTitle', 'Notes')}
-            caption={t('contactDetail.relatedCount', '{{count}} related', {
-              count: relatedNotes.length,
-            })}
+            caption={
+              noteRead === 'loading'
+                ? t('contactDetail.relatedLoading', 'Loading')
+                : noteRead === 'error'
+                  ? t('contactDetail.relatedUnavailable', 'Unavailable')
+                  : countCaption(relatedNotes.length)
+            }
           />
-          {relatedNotes.length === 0 ? (
+          {noteRead === 'loading' ? (
+            <StatusLine
+              label={t('contactDetail.notesLoading', 'Loading notes for this account.')}
+            />
+          ) : noteRead === 'error' ? (
+            <div role="alert" className="space-y-3 p-5">
+              <p className="text-sm text-[var(--danger)]">
+                {t('contactDetail.notesError', 'Could not load notes for this account.')}
+              </p>
+              <Button size="sm" variant="secondary" onClick={() => void allNotes.refetch()}>
+                {t('contactDetail.retryNotes', 'Retry notes')}
+              </Button>
+            </div>
+          ) : relatedNotes.length === 0 ? (
             <div className="p-5 text-sm text-[var(--fg-secondary)]">
               {t('contactDetail.noNotes', 'No notes for this account.')}
             </div>
