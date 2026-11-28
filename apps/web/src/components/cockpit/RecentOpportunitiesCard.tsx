@@ -5,9 +5,10 @@ import { Link } from 'react-router-dom';
 
 import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
@@ -69,6 +70,23 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
       />
       {opps.isLoading ? (
         <LoadingSkeleton rows={3} />
+      ) : opps.isError && opps.data == null ? (
+        <ErrorState
+          title={
+            accountScoped
+              ? t(
+                  'recentOpportunities.errorAccountTitle',
+                  "Couldn't load opportunities for this account",
+                )
+              : t('recentOpportunities.errorTitle', "Couldn't load opportunities")
+          }
+          message={t('recentOpportunities.errorMessage', 'Please try again.')}
+          action={
+            <Button variant="secondary" size="lg" onClick={() => void opps.refetch()}>
+              {t('recentOpportunities.retry', 'Retry')}
+            </Button>
+          }
+        />
       ) : visibleItems.length === 0 ? (
         <EmptyState
           title={

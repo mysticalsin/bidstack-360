@@ -17,6 +17,7 @@ import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { MetricSpark } from '@/components/viz/lazy-bklit';
 import CommandButton from '@/components/kokonutui/command-button';
 import { useOpportunities } from '@/hooks/useOpportunities';
+import { accountDealFilter, dealsForAccount } from '@/lib/account-deal-read';
 import { springSoft } from '@/lib/motion';
 import { useAccountHistory } from '@/stores/accountHistory';
 
@@ -42,10 +43,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   // We use the most recent opportunity for this customer as the brief target.
   // Briefs are scoped to a deal (the API endpoint is /opportunities/:id/brief)
   // — if no deal exists yet, the button stays disabled with a helpful tooltip.
-  const opps = useOpportunities({ limit: 50 });
-  const linkedOpp = opps.data?.items.find(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
+  const opps = useOpportunities(accountDealFilter(cockpit.company.id, 50));
+  // A company uuid is this account, including a bid labeled with the legal name.
+  // A name-keyed cockpit still keeps an exact customer match.
+  const accountOpps = dealsForAccount(opps.data?.items, cockpit.company.id, cockpit.company.name);
+  const linkedOpp = accountOpps[0];
 
   // Pulse a "Saved" chip whenever data verification finishes. Tracking a counter
   // lets the SavedFlash component re-trigger on each completion, even when
@@ -74,9 +76,6 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const toggleFavorite = useAccountHistory((s) => s.toggleFavorite);
   const isStarred = accountId ? favorites.some((f) => f.slug === accountId) : false;
   const { formatMoney } = useFormatMoney();
-  const accountOpps = (opps.data?.items ?? []).filter(
-    (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
-  );
   const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
   const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');

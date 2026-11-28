@@ -19,6 +19,7 @@ const cardProps = vi.hoisted(() => ({
   governanceKeys: [] as string[],
   spotlightKeys: [] as string[],
   contractKeys: [] as string[],
+  recentCustomers: [] as string[],
 }));
 
 vi.mock('react-i18next', () => ({
@@ -42,7 +43,14 @@ vi.mock('@/components/cockpit', () => ({
     <div data-testid="page-head">{cockpit.company.name}</div>
   ),
   PipelineByStageCard: () => <div data-testid="pipeline-card" />,
-  RecentOpportunitiesCard: () => <div data-testid="recent-opps" />,
+  RecentOpportunitiesCard: ({
+    items,
+  }: {
+    items?: Array<{ customer?: string | null }>;
+  }) => {
+    cardProps.recentCustomers = (items ?? []).map((item) => item.customer ?? '');
+    return <div data-testid="recent-opps" />;
+  },
   RevenueEvolutionCard: () => <div data-testid="revenue-card" />,
   WinLossCard: () => <div data-testid="winloss-card" />,
   TechStackCard: () => <div data-testid="tech-card" />,
@@ -255,6 +263,7 @@ describe('DashboardPage account cockpit', () => {
     cardProps.governanceKeys = [];
     cardProps.spotlightKeys = [];
     cardProps.contractKeys = [];
+    cardProps.recentCustomers = [];
     sessionStorage.clear();
     vi.mocked(usePipelineReport).mockReturnValue({} as never);
       vi.mocked(useOpportunities).mockReturnValue({
@@ -411,5 +420,84 @@ describe('DashboardPage account cockpit', () => {
         website: 'https://acme.com/',
       });
     });
+  });
+
+  it('reads this company for the recent deals card, including a bid whose label differs', () => {
+    // WHY: the card used to ask for the latest 5 bids in the whole book, then
+    // keep rows whose customer text matched the account name. On the demo book
+    // that is 6 bids, so one account's only bid never arrived, and a legal
+    // name was dropped even when it did.
+    const companyId = '11111111-1111-4111-8111-111111111111';
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.cockpit.company.id = companyId;
+    snapshot.cockpit.company.name = 'Globex';
+
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: {
+        items: [
+          {
+            id: 'labs',
+            customer: 'Globex Labs',
+            name: 'Labs bid',
+            code: 'OP-9',
+            stage: 's2_sent',
+            value: 10,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    renderAccountRoute();
+
+    const filters = vi.mocked(useOpportunities).mock.calls.map((call) => call[0]);
+    expect(filters.length).toBeGreaterThan(0);
+    expect(filters.every((filter) => filter?.companyId === companyId && filter.limit === 5)).toBe(
+      true,
+    );
+    expect(filters.every((filter) => !('search' in (filter ?? {})))).toBe(true);
+    expect(cardProps.recentCustomers).toEqual(['Globex Labs']);
+  });
+
+  it('does not send a name or a script as the deals company id', () => {
+    // WHY: companyId on the deals API is a uuid. A name would match a sibling
+    // account, and a script must not be written into the request.
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.cockpit.company.id = '<script>alert(1)</script>';
+    snapshot.cockpit.company.name = 'Globex';
+
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+    vi.mocked(useOpportunities).mockReturnValue({
+      data: {
+        items: [
+          { id: 'exact', customer: 'Globex', name: 'Exact', code: 'OP-1', stage: 's1_ongoing', value: 10 },
+          { id: 'sibling', customer: 'Globex Labs', name: 'Sibling', code: 'OP-2', stage: 's1_ongoing', value: 10 },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    } as never);
+
+    renderAccountRoute();
+
+    const filters = vi.mocked(useOpportunities).mock.calls.map((call) => call[0]);
+    expect(filters.every((filter) => filter?.companyId === undefined && filter?.limit === 5)).toBe(true);
+    expect(JSON.stringify(filters)).not.toContain('script');
+    expect(JSON.stringify(filters)).not.toContain('Globex');
+    expect(cardProps.recentCustomers).toEqual(['Globex']);
   });
 });
