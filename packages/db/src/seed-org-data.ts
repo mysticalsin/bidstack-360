@@ -3,9 +3,10 @@
  *
  * Populates ONE org with a compact, realistic Mantu bid/presales workspace:
  * teammates, real enterprise accounts (with company + enrichment rows so
- * employee count / revenue show out of the box), opportunities, contacts,
- * leads, tasks, and a spread of proposals across every status (so RFP
- * Analytics, the pipeline, and the lead Kanban all look alive).
+ * employee count / revenue show out of the box), sample company intel for
+ * those accounts, opportunities, contacts, leads, tasks, and a spread of
+ * proposals across every status (so RFP Analytics, the pipeline, and the
+ * lead Kanban all look alive).
  *
  * Accounts use REAL companies (Siemens, IKEA, …) so the live Apollo / open-data
  * enrichment (POST /crm/companies/:id/enrich) returns real employee + revenue
@@ -23,6 +24,7 @@ import type { Prisma, PrismaClient } from '../generated/client/index.js';
 import { seedRolesAndPermissions } from './seed.rbac.js';
 import { seedSigningEntities } from './seed-signing-entities.js';
 import { seedPfizerWhitespaceFixture } from './seed-msa-whitespace.js';
+import { seedVisitorDemoCompanyIntel } from './seed-visitor-demo-intel.js';
 
 /**
  * A Prisma client capable of running the seed. Accepts either the top-level
@@ -97,7 +99,7 @@ interface CompanySpec {
   keyAccountNotes?: string;
 }
 
-const COMPANIES: CompanySpec[] = [
+export const VISITOR_DEMO_ACCOUNTS: CompanySpec[] = [
   {
     name: 'Siemens',
     domain: 'siemens.com',
@@ -616,7 +618,7 @@ async function seedCompanies(
   visitorId: string,
 ): Promise<Map<string, string>> {
   const byName = new Map<string, string>();
-  for (const c of COMPANIES) {
+  for (const c of VISITOR_DEMO_ACCOUNTS) {
     const isKey = c.tier === 'key';
     const company = await prisma.company.create({
       data: {
@@ -649,7 +651,7 @@ async function seedCompanies(
 /** CompanyEnrichment rows back the CRM cockpit + are the target a live
  *  /crm/companies/:id/enrich refresh overwrites with Apollo/open-data values. */
 async function seedCompanyEnrichments(prisma: SeedClient, orgId: string): Promise<void> {
-  for (const c of COMPANIES) {
+  for (const c of VISITOR_DEMO_ACCOUNTS) {
     await prisma.companyEnrichment.create({
       data: {
         orgId,
@@ -892,6 +894,9 @@ export async function seedOrgData(
   await seedCompanyEnrichments(prisma, orgId);
   await seedHemaLeverageMsa(prisma, orgId, visitorId, companyByName);
   await seedPfizerWhitespaceFixture(prisma, orgId, visitorId);
+  // Sample revenue, open roles, and one post. Also summarises fixture postings
+  // the Pfizer whitespace seed already wrote. No live source is called.
+  await seedVisitorDemoCompanyIntel(prisma, orgId, VISITOR_DEMO_ACCOUNTS);
 
   const oppByCode = await seedOpps(prisma, orgId, byInitials, companyByName);
   await seedProposals(prisma, orgId, byInitials, oppByCode, visitorId);

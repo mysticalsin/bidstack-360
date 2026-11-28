@@ -13,7 +13,7 @@
  * Calendar fixtures are created through the API with no workspace grant, so
  * they stay in Polo: nothing reaches a real Google or Microsoft account.
  */
-import type { Page, Response } from '@playwright/test';
+import type { APIRequestContext, Page, Response } from '@playwright/test';
 
 import { expect, test } from '../fixtures.js';
 import {
@@ -40,14 +40,11 @@ function todayAt(hour: number, minute = 0): string {
   return d.toISOString();
 }
 
-test.beforeAll(async ({ request }) => {
-  test.setTimeout(180_000);
-  const contacts = await request.get(`${API}/api/contacts?limit=1`);
-  expect(contacts.ok()).toBe(true);
-  contactId = ((await contacts.json()) as { items: Array<{ id: string }> }).items[0]?.id ?? '';
-
-  // Two overlapping meetings and one long title: the grid must lay them out
-  // side by side and truncate with a tooltip. Fixed retry keys keep reruns idempotent.
+async function seedTodayMeetings(request: APIRequestContext): Promise<void> {
+  // The calendar opens on the day the assertion runs. A meeting created in
+  // beforeAll is yesterday once this file crosses midnight, and the same
+  // clientRequestId would return that row instead of moving it.
+  const day = new Date().toISOString().slice(0, 10);
   const fixtures = [
     { subject: 'Audit overlap A: pricing review with the client steering group', startAt: todayAt(10), endAt: todayAt(11) },
     { subject: 'Audit overlap B: bid kickoff', startAt: todayAt(10, 30), endAt: todayAt(11, 30) },
@@ -55,10 +52,18 @@ test.beforeAll(async ({ request }) => {
   ];
   for (const [i, f] of fixtures.entries()) {
     const res = await request.post(`${API}/api/calendar/events`, {
-      data: { ...f, provider: 'google_workspace', clientRequestId: `comms-audit-fixture-${i}` },
+      data: { ...f, provider: 'google_workspace', clientRequestId: `comms-audit-fixture-${day}-${i}` },
     });
     expect([200, 201]).toContain(res.status());
   }
+}
+
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(180_000);
+  const contacts = await request.get(`${API}/api/contacts?limit=1`);
+  expect(contacts.ok()).toBe(true);
+  contactId = ((await contacts.json()) as { items: Array<{ id: string }> }).items[0]?.id ?? '';
+  await seedTodayMeetings(request);
 });
 
 // Settings chrome and contact headers belong to other sections, so those
@@ -278,7 +283,8 @@ for (const route of ROUTES) {
 
 // ─── Behaviour ─────────────────────────────────────────────────────────────
 
-test('calendar lays overlapping meetings side by side with a full-title tooltip', async ({ page }) => {
+test('calendar lays overlapping meetings side by side with a full-title tooltip', async ({ page, request }) => {
+  await seedTodayMeetings(request);
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, '/calendar');
   await page.getByRole('button', { name: 'Day', exact: true }).click();
@@ -297,7 +303,8 @@ test('calendar lays overlapping meetings side by side with a full-title tooltip'
   await expect(panel.getByText('Only in Polo')).toBeVisible();
 });
 
-test('calendar agenda groups events by day and the time zone switch keeps the range', async ({ page }) => {
+test('calendar agenda groups events by day and the time zone switch keeps the range', async ({ page, request }) => {
+  await seedTodayMeetings(request);
   await open(page, '/calendar');
   await page.getByRole('button', { name: 'Agenda', exact: true }).click();
   await expect(page.getByTestId('calendar-agenda')).toContainText('Audit short sync');
