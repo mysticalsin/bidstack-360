@@ -1,4 +1,4 @@
-// Shared frame for every visual: title, meta, an optional "Sample" badge,
+// Shared frame for every visual: title, meta, an optional reference badge,
 // and a chart/table toggle so each chart has a text alternative.
 import './viz.css';
 
@@ -43,8 +43,8 @@ export function ChartCard({
         <div className="viz-tools">
           {actions}
           {sample ? (
-            <span className="viz-sample" title={typeof sample === 'string' ? sample : 'Illustrative data, not from your records'}>
-              Sample
+            <span className="viz-sample" title={typeof sample === 'string' ? sample : 'Reference record'}>
+              Reference
             </span>
           ) : null}
           {table ? (

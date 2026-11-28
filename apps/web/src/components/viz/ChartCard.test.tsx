@@ -13,7 +13,11 @@ describe('ChartCard', () => {
       </ChartCard>,
     );
     expect(screen.getByRole('img', { name: 'Open 2, won 1' })).toBeDefined();
-    expect(screen.getByText('Sample')).toBeDefined();
+    // Fixture charts stay marked with the viz-sample flag, but sellers read Reference.
+    const badge = screen.getByText('Reference');
+    expect(badge.classList.contains('viz-sample')).toBe(true);
+    expect(badge.getAttribute('title')).toBe('Reference record');
+    expect(screen.queryByText('Sample')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Table' }));
     expect(screen.getByRole('table')).toBeDefined();
     expect(screen.getByRole('rowheader', { name: 'Open' })).toBeDefined();
