@@ -66,9 +66,9 @@ function renderPage() {
 const node = async (name: string) => (await screen.findAllByTestId('orgchart-node')).find((n) => n.dataset.name === name)!;
 
 describe('OrgChartPage', () => {
-  it('builds a labelled Sample with real met people and shows their meetings, challenges and owner', async () => {
+  it('builds a labelled reference chart with real met people and shows their meetings, challenges and owner', async () => {
     renderPage();
-    expect(await screen.findByText('Sample')).toBeTruthy();
+    expect(await screen.findByText('Reference')).toBeTruthy();
     const mj = await node('Michael Johnson');
     expect(mj.dataset.met).toBe('true');
     expect((await node('Alex Morgan')).dataset.dim).toBe('true'); // placeholder, not met
@@ -79,10 +79,10 @@ describe('OrgChartPage', () => {
     expect(within(panel).getByText('Jane Smith (from meetings)')).toBeTruthy();
   });
 
-  it('directors count as senior gaps: the account card, the full page and the Sample agree', async () => {
-    // Sample: an unmet Head of (director) is a gap.
+  it('directors count as senior gaps: the account card, the full page and the reference chart agree', async () => {
+    // Uncharted reference chart: an unmet Head of (director) is a gap.
     const sample = renderPage();
-    expect(await screen.findByText('Sample')).toBeTruthy();
+    expect(await screen.findByText('Reference')).toBeTruthy();
     expect((await node('Samuel Reyes')).dataset.gap).toBe('true');
     sample.unmount();
     // Live chart: the API list (c_level, vp, director) drives both the page and the card.
@@ -233,5 +233,58 @@ describe('OrgChartPage', () => {
     await act(async () => { fireEvent.click(screen.getByTestId('orgchart-save')); });
     await waitFor(() => expect(srv.nodes.get(ceo.id)!.phone).toBe('+551155550101'));
     expect(srv.nodes.get(ceo.id)!.linkedinUrl).toBe('https://www.linkedin.com/in/ana-example');
+  });
+});
+
+// A seller must not be told an uncharted account is a sample or a demo.
+// The generated people stay source "sample" so the slot is never treated as live.
+const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
+
+describe('org chart reference copy', () => {
+  it('labels an uncharted account Reference and keeps each placeholder a sample slot', async () => {
+    renderPage();
+    const page = await screen.findByTestId('orgchart-page');
+    await node('Alex Morgan');
+    const badge = page.querySelector('.oc-sample');
+    expect(badge?.textContent).toBe('Reference');
+    expect(badge?.getAttribute('title') ?? '').not.toMatch(DEMO_COPY);
+    expect(page.textContent).toMatch(/reference record/i);
+    expect(page.textContent).not.toMatch(DEMO_COPY);
+    expect(page.textContent).not.toMatch(/\blive\b/i);
+
+    const alex = await node('Alex Morgan');
+    expect(alex.dataset.sample).toBe('true');
+    fireEvent.click(alex);
+    const panel = await screen.findByTestId('orgchart-panel');
+    expect(panel.textContent).toMatch(/Reference record/);
+    expect(panel.textContent).not.toMatch(DEMO_COPY);
+    expect(panel.textContent).not.toMatch(/\blive\b/i);
+  });
+
+  it('labels the account card Reference when nobody has saved a chart', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <OrgChartCard companyId={CI} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const card = await screen.findByTestId('account-orgchart-card');
+    await waitFor(() => expect(card.querySelector('.en-sample')?.textContent).toBe('Reference'));
+    expect(card.textContent).toMatch(/reference record/i);
+    expect(card.textContent).not.toMatch(DEMO_COPY);
+    expect(card.textContent).not.toMatch(/\blive\b/i);
+  });
+
+  it('does not mark a saved chart as Reference or live', async () => {
+    srv.add({ name: 'Ana Silva', title: 'Chief Executive Officer', seniority: 'c_level' }, null);
+    renderPage();
+    await node('Ana Silva');
+    const page = screen.getByTestId('orgchart-page');
+    expect(page.querySelector('.oc-sample')).toBeNull();
+    expect(screen.queryByText('Reference')).toBeNull();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(page.textContent).not.toMatch(/\blive\b/i);
   });
 });

@@ -9,6 +9,7 @@ import { childrenOf } from '@/lib/orgchart/tree';
 import type { NodeCov, OrgNode } from '@/lib/orgchart/types';
 
 import { OrgPhoto } from './OrgPhoto';
+import { ORG_CHART_REFERENCE_BADGE, ORG_CHART_REFERENCE_CARD } from './reference-copy';
 
 
 export function OrgChartCard({ companyId }: { companyId: string }) {
@@ -23,7 +24,7 @@ export function OrgChartCard({ companyId }: { companyId: string }) {
     <section className="en-section oc-card" aria-labelledby="oc-card-h" data-testid="account-orgchart-card" style={{ marginBottom: 24 }}>
       <div className="en-head">
         <h2 id="oc-card-h">Org chart</h2>
-        {chart?.sample ? <span className="en-sample">Sample</span> : null}
+        {chart?.sample ? <span className="en-sample">{ORG_CHART_REFERENCE_BADGE}</span> : null}
       </div>
       {error ? <p className="en-meta">The org chart could not be loaded.</p> : isLoading ? <p className="en-meta">Loading…</p> : (
         <>
@@ -34,7 +35,7 @@ export function OrgChartCard({ companyId }: { companyId: string }) {
               <div className="oc-card-row">{reports.slice(0, 6).map((n) => <CardPerson key={n.id} n={n} cov={covOf(n)} />)}{reports.length > 6 ? <span className="en-meta">+{reports.length - 6}</span> : null}</div>
             </div>
           ) : null}
-          <p className="en-src">{chart?.sample ? 'Nobody has charted this account yet. People you have met are real; the rest is a placeholder structure.' : `Saved chart, updated ${chart?.updatedAt ? new Date(chart.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'recently'}.`} Green ring: met.</p>
+          <p className="en-src">{chart?.sample ? ORG_CHART_REFERENCE_CARD : `Saved chart, updated ${chart?.updatedAt ? new Date(chart.updatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : 'recently'}.`} Green ring: met.</p>
         </>
       )}
       <div><Link className="en-link" to={`/accounts/${companyId}/org-chart`} data-testid="account-orgchart-open">Open org chart</Link></div>

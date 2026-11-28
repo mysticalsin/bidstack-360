@@ -1,7 +1,7 @@
 // Full-screen org chart for one account (/accounts/:accountId/org-chart).
 // Read-only for everyone; edit mode for holders of `orgchart:write`.
 // Data: the org chart API (/workspace/fleet/polo-orgchart-api.md). Accounts
-// nobody has charted yet show a labelled Sample built from meeting attendees.
+// nobody has charted yet show a labelled reference chart built from meeting attendees.
 // Edits stay in a local draft until Save, which replays them as versioned
 // per-node mutations; a 409 shows the conflict banner.
 import '@xyflow/react/dist/style.css';
@@ -18,6 +18,12 @@ import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { PersonNode, type PersonNodeT } from '@/components/orgchart/OrgPersonNode';
+import {
+  ORG_CHART_REFERENCE_BADGE,
+  ORG_CHART_REFERENCE_BADGE_TITLE,
+  ORG_CHART_REFERENCE_COVERAGE,
+  ORG_CHART_REFERENCE_RECORD,
+} from '@/components/orgchart/reference-copy';
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCompany } from '@/hooks/useCompanies';
@@ -316,7 +322,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
       <header className="oc-bar">
         <Link to={`/accounts/${companyId}`} className="oc-back" aria-label={`Back to ${companyName}`}>←</Link>
         <h1 className="oc-h1">Org chart <span>{companyName}</span></h1>
-        {chart?.sample ? <span className="oc-sample" title="Nobody has charted this account yet. People you have met are real; the rest are placeholders.">Sample</span> : null}
+        {chart?.sample ? <span className="oc-sample" title={ORG_CHART_REFERENCE_BADGE_TITLE}>{ORG_CHART_REFERENCE_BADGE}</span> : null}
         {dirty ? <span className="oc-muted" data-testid="orgchart-unsaved">Unsaved changes</span> : null}
         <div className="oc-search" role="search">
           <input
@@ -409,7 +415,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
               <h2>Coverage</h2>
               <p className="oc-big"><strong>{metCount}</strong> of {work.nodes.length} people met</p>
               <div className="oc-cover-bar" role="img" aria-label={`${pct(metCount, work.nodes.length)} percent met`}><i style={{ width: `${pct(metCount, work.nodes.length)}%` }} /></div>
-              <p className="oc-src">{chart?.sample ? 'From meeting intel attendees. Unmet names in the Sample structure are placeholders; saving keeps them as role placeholders.' : 'From the org chart API: meetings in the last 365 days.'}</p>
+              <p className="oc-src">{chart?.sample ? ORG_CHART_REFERENCE_COVERAGE : 'From the org chart API: meetings in the last 365 days.'}</p>
               {chart?.truncated ? <p className="oc-muted">Some deeper levels are not loaded.</p> : null}
               <h3>Senior gaps</h3>
               {seniorGaps.length ? (
@@ -473,7 +479,7 @@ function PersonPanel(props: {
         </div>
         <button type="button" className="oc-x" onClick={props.onClose} aria-label="Close details">×</button>
       </div>
-      {node.source === 'sample' ? <p className="oc-src">Sample placeholder, not a real person.</p> : null}
+      {node.source === 'sample' ? <p className="oc-src">{ORG_CHART_REFERENCE_RECORD}</p> : null}
       {node.redacted ? <p className="oc-src">This person&apos;s contact sits on an account you can&apos;t see, so their details are hidden. Their place in the chart is kept.</p> : null}
       {!node.redacted ? <ContactLinks node={node} /> : null}
       {cov?.met && cov.lastMetAt ? (

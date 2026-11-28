@@ -45,7 +45,8 @@ const SAMPLE: Array<[string, string, SeniorityLevel, string | null, number | nul
 /**
  * A Sample structure for an account nobody has charted yet: a typical
  * executive backbone, with every person we have actually met placed in it.
- * Met people keep their real names and titles; the rest are labelled Sample.
+ * Met people keep their real names and titles; the rest stay source "sample"
+ * and the screen labels them Reference.
  */
 export function sampleChart(companyId: string, people: PersonCoverage[]): OrgChart {
   let nodes: OrgNode[] = [];
