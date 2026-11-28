@@ -3,7 +3,7 @@
 // with its period and source, then the top early-warning cards. Strategic and
 // Top accounts are pulled automatically; General accounts show why not and,
 // for Admin / AE, a Track financials toggle. Never invents a number: missing
-// lines read "Not filed", and the built-in example is labelled Sample.
+// lines read "Not filed", and a fixture layout is labelled Reference.
 import '@/components/watchdog/watchdog.css';
 import './financials.css';
 
@@ -35,7 +35,7 @@ function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
       </div>
     );
   }
-  const source = sample ? 'Sample' : last.p.source;
+  const source = sample ? 'Reference' : last.p.source;
   return (
     <div className="fh-tile" data-testid={`fh-tile-${t.key}`}>
       <span className="wd-row-meta">{t.label}</span>
@@ -70,7 +70,7 @@ function SignalCard({ s }: { s: Signal }) {
           <span className="wd-row-title" title={noDash(s.title)}>{noDash(s.title)}</span>
           <span className="wd-row-meta">
             {CONF[s.confidence]} · period to {periodFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
-            {s.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            {s.sample ? <span className="wd-sample-badge">Reference</span> : null}
           </span>
         </span>
         <span className="wd-pill" data-kind={s.implication}>{PILL[s.implication]}</span>
@@ -117,7 +117,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
       <section className="wd-surface" aria-labelledby="fh-h">
         <header className="wd-head">
           <h2 id="fh-h" className="wd-h">
-            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Reference</span> : null}
           </h2>
           {d ? (
             <span className="wd-row-meta">
@@ -143,7 +143,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
               </div>
             ) : (
               <>
-                {d.sample ? <p className="wd-row-meta">Example layout. {d.statusCopy ?? 'Real filed numbers replace it after the next pull.'}</p> : null}
+                {d.sample ? <p className="wd-row-meta">Reference records.{d.statusCopy ? ` ${d.statusCopy}` : ''}</p> : null}
                 {!d.sample && d.statusCopy ? <p className="wd-row-meta" role="status">{d.statusCopy}</p> : null}
                 {stale ? (
                   <p className="wd-row-meta fh-stale" data-testid="fh-stale">
