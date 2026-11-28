@@ -59,7 +59,7 @@ export function provenance(
     m.method,
     day(m.asOf) ? `as of ${day(m.asOf)}` : null,
     m.inferred ? 'inferred' : null,
-    m.sample ? 'sample data' : null,
+    m.sample ? 'reference records' : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -252,7 +252,7 @@ export function IntelCellFor({
           <Sparkline
             values={t.monthly}
             tone={tone}
-            label={`New postings per month, last 6 months: ${t.monthly.join(', ')}. ${t.sourceLabel}${t.sample ? ', sample data' : ''}`}
+            label={`New postings per month, last 6 months: ${t.monthly.join(', ')}. ${t.sourceLabel}${t.sample ? ', reference records' : ''}`}
           />
         </span>
       );
@@ -272,7 +272,7 @@ export function IntelCellFor({
     case 'signal': {
       const g = s?.signal;
       if (!g) return <EmptyIntel gap={gapFor(s, 'signal')} />;
-      const label = `${g.label}: ${g.title}. ${g.sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${g.sample ? ', sample data' : ''}`;
+      const label = `${g.label}: ${g.title}. ${g.sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${g.sample ? ', reference records' : ''}`;
       return (
         <span aria-label={label} title={label} className="inline-flex">
           <StatusPill
