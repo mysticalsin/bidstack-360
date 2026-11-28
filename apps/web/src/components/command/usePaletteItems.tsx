@@ -31,6 +31,7 @@ import { getRecents, pushRecent, type RecentEntry } from '@/lib/palette-recents'
 import { useAccountHistory } from '@/stores/accountHistory';
 import type { OpportunityPage } from '@bidstack/shared';
 
+import { contactRecordPath } from './contact-record-path';
 import {
   ACCOUNT_RESULT_LIMIT,
   CONTACT_RESULT_LIMIT,
@@ -325,7 +326,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       pushNavigable(
         score,
         { id: `contact:${p.id}`, group: 'contact', label: p.name, hint: contactSubtitle(p) },
-        `/contacts?search=${encodeURIComponent(p.name)}`,
+        contactRecordPath(p.id),
         true,
       );
     }

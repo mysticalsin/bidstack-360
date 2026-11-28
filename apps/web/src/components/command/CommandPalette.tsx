@@ -323,7 +323,11 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
                   onClick={item.onSelect}
                   onKeyDown={(e) => handleItemKeyDown(e, item)}
                   // min-h-11 keeps touch targets ≥ 44px (WCAG 2.5.5 AA)
-                  className="relative flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg mx-2 my-0.5 bg-transparent z-10"
+                  className={cn(
+                    'relative flex min-h-11 cursor-pointer items-center justify-between gap-3 px-4 py-2.5 text-sm transition-colors rounded-lg mx-2 my-0.5 bg-transparent z-10',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]',
+                    'dark:focus-visible:ring-[var(--brand-deep)]',
+                  )}
                 >
                   {active && (
                     <motion.div
