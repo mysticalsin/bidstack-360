@@ -113,9 +113,9 @@
     "blankDesc": "Inizia da zero"
   },
   "sampleData": {
-    "banner": "Stai visualizzando dati dimostrativi.",
-    "clear": "Cancella dati dimostrativi",
-    "confirmClear": "Eliminare tutti i dati dimostrativi? Questa azione non può essere annullata."
+    "banner": "Stai visualizzando record di riferimento.",
+    "clear": "Cancella i record di riferimento",
+    "confirmClear": "Eliminare tutti i record di riferimento? Questa azione non può essere annullata."
   },
   "tourStep": {
     "dialogAriaLabel": "Passaggio {{current}} di {{total}} del tour: {{title}}",
@@ -127,7 +127,7 @@
   },
   "templatePicker": {
     "title": "Scegli una pipeline iniziale",
-    "subtitle": "Ogni modello imposta una pipeline con fasi e alcuni record di esempio così puoi esplorare subito. Puoi rimuovere i dati di esempio in qualsiasi momento.",
+    "subtitle": "Ogni modello imposta una pipeline con fasi e alcuni record di riferimento così puoi esplorare subito. Puoi rimuovere i record di riferimento in qualsiasi momento.",
     "loadErrorTitle": "Impossibile caricare i modelli",
     "tryAgain": "Riprova.",
     "stageCount": "{{count}} fasi",
@@ -135,18 +135,18 @@
     "installing": "Installazione…",
     "install": "Installa pipeline",
     "toastInstalledTitle": "Pipeline installata",
-    "toastInstalledDescription": "{{stages}} fasi, {{deals}} trattative di esempio, {{leads}} lead.",
+    "toastInstalledDescription": "{{stages}} fasi, {{deals}} record di riferimento, {{leads}} lead.",
     "toastConflictTitle": "Una pipeline è già installata",
-    "toastConflictDescription": "Rimuovi prima i dati di esempio esistenti oppure parti dalla tua pipeline attiva.",
+    "toastConflictDescription": "Rimuovi prima i record di riferimento esistenti, oppure parti dalla pipeline già presente in questo spazio di lavoro.",
     "toastErrorTitle": "Impossibile installare il modello"
   },
   "sampleDataBanner": {
-    "title": "I dati di esempio sono attivi",
-    "description": "I record demo sono visibili in questa area di lavoro. Nascondi questo avviso o rimuovi completamente i record di esempio prima delle demo per dirigenti o clienti.",
+    "title": "Riferimento",
+    "description": "I record di riferimento sono visibili in questa area di lavoro. Nascondi questo avviso, oppure rimuovi i record di riferimento quando vuoi lavorare dalla tua pipeline.",
     "hide": "Nascondi",
-    "remove": "Rimuovi dati di esempio",
+    "remove": "Rimuovi i record di riferimento",
     "removing": "Rimozione…",
-    "removedToast": "Dati di esempio rimossi",
-    "removeErrorToast": "Impossibile rimuovere i dati di esempio"
+    "removedToast": "Record di riferimento rimossi",
+    "removeErrorToast": "Impossibile rimuovere i record di riferimento"
   }
 }

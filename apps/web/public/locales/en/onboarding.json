@@ -113,8 +113,8 @@
     "blankDesc": "Start from scratch"
   },
   "sampleData": {
-    "banner": "You are viewing demonstration data.",
-    "clear": "Clear demo data",
+    "banner": "You are viewing reference records.",
+    "clear": "Clear reference records",
     "confirmClear": "Delete all demonstration data? This action cannot be undone."
   },
   "tourStep": {
@@ -127,7 +127,7 @@
   },
   "templatePicker": {
     "title": "Choose a starter pipeline",
-    "subtitle": "Each template sets up a pipeline with stages and a handful of sample records so you can explore right away. You can remove the sample data any time.",
+    "subtitle": "Each template sets up a pipeline with stages and a handful of reference records so you can explore right away. You can remove the reference records any time.",
     "loadErrorTitle": "Couldn't load templates",
     "tryAgain": "Please try again.",
     "stageCount": "{{count}} stages",
@@ -135,18 +135,18 @@
     "installing": "Installing…",
     "install": "Install pipeline",
     "toastInstalledTitle": "Pipeline installed",
-    "toastInstalledDescription": "{{stages}} stages, {{deals}} sample deals, {{leads}} leads.",
+    "toastInstalledDescription": "{{stages}} stages, {{deals}} reference records, {{leads}} leads.",
     "toastConflictTitle": "A pipeline is already installed",
-    "toastConflictDescription": "Remove the existing sample data first, or start from your live pipeline.",
+    "toastConflictDescription": "Remove the existing reference records first, or start from the pipeline already in this workspace.",
     "toastErrorTitle": "Could not install template"
   },
   "sampleDataBanner": {
-    "title": "Sample data is on",
-    "description": "Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.",
+    "title": "Reference",
+    "description": "Reference records are in this workspace. Hide this notice, or remove the reference records when you are ready to work from your own pipeline.",
     "hide": "Hide",
-    "remove": "Remove sample data",
+    "remove": "Remove reference records",
     "removing": "Removing…",
-    "removedToast": "Sample data removed",
-    "removeErrorToast": "Could not remove sample data"
+    "removedToast": "Reference records removed",
+    "removeErrorToast": "Could not remove reference records"
   }
 }

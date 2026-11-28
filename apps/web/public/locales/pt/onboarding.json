@@ -113,9 +113,9 @@
     "blankDesc": "Começar do zero"
   },
   "sampleData": {
-    "banner": "Está a visualizar dados de demonstração.",
-    "clear": "Limpar dados de demonstração",
-    "confirmClear": "Eliminar todos os dados de demonstração? Esta ação não pode ser anulada."
+    "banner": "Está a visualizar registos de referência.",
+    "clear": "Limpar registos de referência",
+    "confirmClear": "Eliminar todos os registos de referência? Esta ação não pode ser anulada."
   },
   "tourStep": {
     "dialogAriaLabel": "Etapa {{current}} de {{total}} do tour: {{title}}",
@@ -127,7 +127,7 @@
   },
   "templatePicker": {
     "title": "Escolha um pipeline inicial",
-    "subtitle": "Cada modelo configura um pipeline com etapas e alguns registros de exemplo para você explorar imediatamente. Você pode remover os dados de exemplo a qualquer momento.",
+    "subtitle": "Cada modelo configura um pipeline com etapas e alguns registros de referência para você explorar imediatamente. Você pode remover os registros de referência a qualquer momento.",
     "loadErrorTitle": "Não foi possível carregar os modelos",
     "tryAgain": "Tente novamente.",
     "stageCount": "{{count}} etapas",
@@ -135,18 +135,18 @@
     "installing": "Instalando…",
     "install": "Instalar pipeline",
     "toastInstalledTitle": "Pipeline instalado",
-    "toastInstalledDescription": "{{stages}} etapas, {{deals}} negócios de exemplo, {{leads}} leads.",
+    "toastInstalledDescription": "{{stages}} etapas, {{deals}} registros de referência, {{leads}} leads.",
     "toastConflictTitle": "Um pipeline já está instalado",
-    "toastConflictDescription": "Remova primeiro os dados de exemplo existentes ou comece a partir do seu pipeline ativo.",
+    "toastConflictDescription": "Remova primeiro os registros de referência existentes ou comece a partir do pipeline que já está neste espaço de trabalho.",
     "toastErrorTitle": "Não foi possível instalar o modelo"
   },
   "sampleDataBanner": {
-    "title": "Os dados de exemplo estão ativados",
-    "description": "Os registros de demonstração estão visíveis neste espaço de trabalho. Oculte este aviso ou remova completamente os registros de exemplo antes das demonstrações para executivos ou clientes.",
+    "title": "Referência",
+    "description": "Há registros de referência neste espaço de trabalho. Oculte este aviso ou remova os registros de referência quando quiser trabalhar a partir do seu próprio pipeline.",
     "hide": "Ocultar",
-    "remove": "Remover dados de exemplo",
+    "remove": "Remover registros de referência",
     "removing": "Removendo…",
-    "removedToast": "Dados de exemplo removidos",
-    "removeErrorToast": "Não foi possível remover os dados de exemplo"
+    "removedToast": "Registros de referência removidos",
+    "removeErrorToast": "Não foi possível remover os registros de referência"
   }
 }

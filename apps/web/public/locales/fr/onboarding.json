@@ -113,9 +113,9 @@
     "blankDesc": "Partir de zéro"
   },
   "sampleData": {
-    "banner": "Vous visualisez des données de démonstration.",
-    "clear": "Supprimer les données de démo",
-    "confirmClear": "Supprimer toutes les données de démonstration ? Cette action est irréversible."
+    "banner": "Vous consultez des enregistrements de référence.",
+    "clear": "Retirer les enregistrements de référence",
+    "confirmClear": "Supprimer tous les enregistrements de référence ? Cette action est irréversible."
   },
   "tourStep": {
     "dialogAriaLabel": "Étape {{current}} sur {{total}} de la visite : {{title}}",
@@ -127,7 +127,7 @@
   },
   "templatePicker": {
     "title": "Choisissez un pipeline de départ",
-    "subtitle": "Chaque modèle crée un pipeline avec des étapes et quelques enregistrements d'exemple pour que vous puissiez explorer immédiatement. Vous pouvez supprimer les données d'exemple à tout moment.",
+    "subtitle": "Chaque modèle crée un pipeline avec des étapes et quelques enregistrements de référence pour que vous puissiez explorer immédiatement. Vous pouvez retirer les enregistrements de référence à tout moment.",
     "loadErrorTitle": "Impossible de charger les modèles",
     "tryAgain": "Veuillez réessayer.",
     "stageCount": "{{count}} étapes",
@@ -135,18 +135,18 @@
     "installing": "Installation…",
     "install": "Installer le pipeline",
     "toastInstalledTitle": "Pipeline installé",
-    "toastInstalledDescription": "{{stages}} étapes, {{deals}} affaires d'exemple, {{leads}} leads.",
+    "toastInstalledDescription": "{{stages}} étapes, {{deals}} enregistrements de référence, {{leads}} leads.",
     "toastConflictTitle": "Un pipeline est déjà installé",
-    "toastConflictDescription": "Supprimez d'abord les données d'exemple existantes ou partez de votre pipeline en production.",
+    "toastConflictDescription": "Retirez d’abord les enregistrements de référence existants, ou partez du pipeline déjà présent dans cet espace de travail.",
     "toastErrorTitle": "Impossible d'installer le modèle"
   },
   "sampleDataBanner": {
-    "title": "Les données d'exemple sont activées",
-    "description": "Des enregistrements de démonstration sont visibles dans cet espace de travail. Masquez cet avis ou supprimez entièrement les enregistrements d'exemple avant les démonstrations destinées aux dirigeants ou aux clients.",
+    "title": "Référence",
+    "description": "Des enregistrements de référence sont visibles dans cet espace de travail. Masquez cet avis, ou retirez les enregistrements de référence lorsque cet espace est prêt pour votre propre pipeline.",
     "hide": "Masquer",
-    "remove": "Supprimer les données d'exemple",
+    "remove": "Retirer les enregistrements de référence",
     "removing": "Suppression…",
-    "removedToast": "Données d'exemple supprimées",
-    "removeErrorToast": "Impossible de supprimer les données d'exemple"
+    "removedToast": "Enregistrements de référence retirés",
+    "removeErrorToast": "Impossible de retirer les enregistrements de référence"
   }
 }

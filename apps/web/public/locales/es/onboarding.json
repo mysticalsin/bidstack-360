@@ -105,9 +105,9 @@
     }
   },
   "sampleData": {
-    "banner": "Estás viendo datos de demostración.",
-    "clear": "Eliminar datos de demo",
-    "confirmClear": "¿Eliminar todos los datos de demostración? Esta acción es irreversible."
+    "banner": "Estás viendo registros de referencia.",
+    "clear": "Quitar registros de referencia",
+    "confirmClear": "¿Eliminar todos los registros de referencia? Esta acción es irreversible."
   },
   "tourStep": {
     "dialogAriaLabel": "Paso {{current}} de {{total}} del recorrido: {{title}}",
@@ -119,7 +119,7 @@
   },
   "templatePicker": {
     "title": "Elige un pipeline inicial",
-    "subtitle": "Cada plantilla configura un pipeline con etapas y algunos registros de ejemplo para que puedas explorar de inmediato. Puedes eliminar los datos de ejemplo en cualquier momento.",
+    "subtitle": "Cada plantilla configura un pipeline con etapas y algunos registros de referencia para que puedas explorar de inmediato. Puedes quitar los registros de referencia en cualquier momento.",
     "loadErrorTitle": "No se pudieron cargar las plantillas",
     "tryAgain": "Inténtalo de nuevo.",
     "stageCount": "{{count}} etapas",
@@ -127,18 +127,18 @@
     "installing": "Instalando…",
     "install": "Instalar pipeline",
     "toastInstalledTitle": "Pipeline instalado",
-    "toastInstalledDescription": "{{stages}} etapas, {{deals}} negocios de ejemplo, {{leads}} leads.",
+    "toastInstalledDescription": "{{stages}} etapas, {{deals}} registros de referencia, {{leads}} leads.",
     "toastConflictTitle": "Ya hay un pipeline instalado",
-    "toastConflictDescription": "Elimina primero los datos de ejemplo existentes o empieza desde tu pipeline en vivo.",
+    "toastConflictDescription": "Quita primero los registros de referencia existentes o empieza desde el pipeline que ya está en este espacio de trabajo.",
     "toastErrorTitle": "No se pudo instalar la plantilla"
   },
   "sampleDataBanner": {
-    "title": "Los datos de muestra están activados",
-    "description": "Los registros de demostración son visibles en este espacio de trabajo. Oculta este aviso o elimina por completo los registros de muestra antes de las demostraciones para ejecutivos o clientes.",
+    "title": "Referencia",
+    "description": "Hay registros de referencia en este espacio de trabajo. Oculta este aviso o quita los registros de referencia cuando quieras trabajar con tu propio pipeline.",
     "hide": "Ocultar",
-    "remove": "Eliminar datos de muestra",
+    "remove": "Quitar registros de referencia",
     "removing": "Eliminando…",
-    "removedToast": "Datos de muestra eliminados",
-    "removeErrorToast": "No se pudieron eliminar los datos de muestra"
+    "removedToast": "Registros de referencia quitados",
+    "removeErrorToast": "No se pudieron quitar los registros de referencia"
   }
 }

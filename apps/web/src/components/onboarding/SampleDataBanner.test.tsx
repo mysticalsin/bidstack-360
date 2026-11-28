@@ -21,11 +21,44 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
+// A seller reading the notice must not be told the workspace is a sample or a demo.
+// Fixture rows stay sample on the server. The destructive sentence is pinned in
+// DESIGN.md 9.5 and is the only place that sentence may still say demonstration.
+const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
+
+describe('onboarding reference copy', () => {
+  it('calls fixture rows Reference and does not call them Sample, demo, or live', () => {
+    render(<SampleDataBanner />);
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/Reference/);
+    expect(text).toMatch(/reference record/i);
+    expect(text).not.toMatch(DEMO_COPY);
+    expect(text).not.toMatch(/\blive\b/i);
+  });
+
+  it('names the remove action as reference records and keeps the pinned warning', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    render(<SampleDataBanner />);
+    fireEvent.click(screen.getByRole('button', { name: /remove/i }));
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]?.[0] as {
+      title: string;
+      description: string;
+      confirmLabel: string;
+    };
+    expect(arg.title).toBe('Remove reference records');
+    expect(arg.confirmLabel).toBe('Remove reference records');
+    expect(arg.title).not.toMatch(DEMO_COPY);
+    expect(arg.confirmLabel).not.toMatch(DEMO_COPY);
+    expect(arg.description).toBe('Delete all demonstration data? This action cannot be undone.');
+  });
+});
+
 describe('SampleDataBanner', () => {
   it('asks before deleting all demonstration data and does nothing on cancel', async () => {
     mocks.confirm.mockResolvedValue(false);
     render(<SampleDataBanner />);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove sample data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove reference records' }));
     await waitFor(() =>
       expect(mocks.confirm).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -40,7 +73,7 @@ describe('SampleDataBanner', () => {
   it('deletes after the user confirms', async () => {
     mocks.confirm.mockResolvedValue(true);
     render(<SampleDataBanner />);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove sample data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove reference records' }));
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
   });
 });

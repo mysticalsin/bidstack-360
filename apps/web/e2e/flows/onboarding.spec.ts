@@ -35,7 +35,7 @@ test.describe('Onboarding flow', () => {
     await expect(tourElement.first()).toBeVisible();
   });
 
-  test('sample data banner appears on clean state', async ({ page, context }) => {
+  test('reference records notice appears on clean state', async ({ page, context }) => {
     await context.clearCookies();
     await page.addInitScript(() => {
       localStorage.clear();
@@ -45,9 +45,9 @@ test.describe('Onboarding flow', () => {
 
     const banner = page
       .locator('[data-testid="sample-data-banner"]')
-      .or(page.getByText(/sample data|demo data/i).first());
+      .or(page.getByText(/reference records/i).first());
     const visible = await banner.isVisible({ timeout: 5_000 }).catch(() => false);
-    test.skip(!visible, 'Sample data banner not shown — may only appear on a truly empty org');
+    test.skip(!visible, 'Reference records notice not shown — may only appear when fixture rows are installed');
     await expect(banner.first()).toBeVisible();
   });
 

@@ -15,6 +15,7 @@ import { toast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api';
 import { useOnboardingStore } from '@/stores/onboarding';
 import { useTemplates, useInstallTemplate, type TemplateKey } from '@/hooks/useOnboarding';
+import { ONBOARDING_SELLER_COPY } from './reference-copy';
 
 export function TemplatePicker() {
   const open = useOnboardingStore((s) => s.templatePickerOpen);
@@ -39,7 +40,7 @@ export function TemplatePicker() {
         toast.success(t('templatePicker.toastInstalledTitle', 'Pipeline installed'), {
           description: t(
             'templatePicker.toastInstalledDescription',
-            '{{stages}} stages, {{deals}} sample deals, {{leads}} leads.',
+            ONBOARDING_SELLER_COPY['templatePicker.toastInstalledDescription'],
             {
               stages: result.stagesCreated,
               deals: result.dealsCreated,
@@ -55,7 +56,7 @@ export function TemplatePicker() {
           toast.error(t('templatePicker.toastConflictTitle', 'A pipeline is already installed'), {
             description: t(
               'templatePicker.toastConflictDescription',
-              'Remove the existing sample data first, or start from your live pipeline.',
+              ONBOARDING_SELLER_COPY['templatePicker.toastConflictDescription'],
             ),
           });
           close();
@@ -78,7 +79,7 @@ export function TemplatePicker() {
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
           {t(
             'templatePicker.subtitle',
-            'Each template sets up a pipeline with stages and a handful of sample records so you can explore right away. You can remove the sample data any time.',
+            ONBOARDING_SELLER_COPY['templatePicker.subtitle'],
           )}
         </p>
 

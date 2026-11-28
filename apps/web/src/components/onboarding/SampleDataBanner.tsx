@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { toast } from '@/components/ui/Toast';
 import { useSampleDataStatus, useDeleteSampleData } from '@/hooks/useOnboarding';
+import { ONBOARDING_SELLER_COPY } from './reference-copy';
 
 export function SampleDataBanner() {
   const { t } = useTranslation('onboarding');
@@ -22,9 +23,9 @@ export function SampleDataBanner() {
 
   async function removeSampleData() {
     const ok = await confirm({
-      title: t('sampleDataBanner.remove', 'Remove sample data'),
-      description: t('sampleData.confirmClear', 'Delete all demonstration data? This action cannot be undone.'),
-      confirmLabel: t('sampleDataBanner.remove', 'Remove sample data'),
+      title: t('sampleDataBanner.remove', ONBOARDING_SELLER_COPY['sampleDataBanner.remove']),
+      description: t('sampleData.confirmClear', ONBOARDING_SELLER_COPY['sampleData.confirmClear']),
+      confirmLabel: t('sampleDataBanner.remove', ONBOARDING_SELLER_COPY['sampleDataBanner.remove']),
       destructive: true,
     });
     if (!ok) return;
@@ -32,10 +33,12 @@ export function SampleDataBanner() {
       onSuccess: () => {
         setHasSampleData(false);
         setHidden(true);
-        toast.success(t('sampleDataBanner.removedToast', 'Sample data removed'));
+        toast.success(t('sampleDataBanner.removedToast', ONBOARDING_SELLER_COPY['sampleDataBanner.removedToast']));
       },
       onError: () =>
-        toast.error(t('sampleDataBanner.removeErrorToast', 'Could not remove sample data')),
+        toast.error(
+          t('sampleDataBanner.removeErrorToast', ONBOARDING_SELLER_COPY['sampleDataBanner.removeErrorToast']),
+        ),
     });
   }
 
@@ -44,13 +47,10 @@ export function SampleDataBanner() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[var(--fg-primary)]">
-            {t('sampleDataBanner.title', 'Sample data is on')}
+            {t('sampleDataBanner.title', ONBOARDING_SELLER_COPY['sampleDataBanner.title'])}
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">
-            {t(
-              'sampleDataBanner.description',
-              'Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.',
-            )}
+            {t('sampleDataBanner.description', ONBOARDING_SELLER_COPY['sampleDataBanner.description'])}
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -60,7 +60,7 @@ export function SampleDataBanner() {
           <Button variant="secondary" size="sm" onClick={() => void removeSampleData()} disabled={del.isPending}>
             {del.isPending
               ? t('sampleDataBanner.removing', 'Removing…')
-              : t('sampleDataBanner.remove', 'Remove sample data')}
+              : t('sampleDataBanner.remove', ONBOARDING_SELLER_COPY['sampleDataBanner.remove'])}
           </Button>
         </div>
       </div>
