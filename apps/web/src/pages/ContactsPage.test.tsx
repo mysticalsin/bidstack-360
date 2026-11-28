@@ -145,6 +145,19 @@ describe('ContactsPage — contacts:write gating', () => {
     expect(screen.getByRole('button', { name: /Import contacts from CSV/i })).toBeTruthy();
   });
 
+  it('says a full email is searchable, because the row prints the address', () => {
+    // Pasting klaus.vogt.<namespace>@example.com used to return no rows. The
+    // box has to say a full address matches, or the list still looks like it
+    // only searches name, customer, and role.
+    vi.mocked(useHasPermission).mockReturnValue(true);
+
+    renderWithProviders(<ContactsPage />);
+
+    expect(screen.getByRole('searchbox', { name: /Search contacts/i }).getAttribute('placeholder')).toMatch(
+      /full email/i,
+    );
+  });
+
   it('hides the empty-state "Add first contact" action for a user without contacts:write', () => {
     vi.mocked(useHasPermission).mockReturnValue(false);
     mockContacts({

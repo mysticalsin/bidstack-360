@@ -102,6 +102,37 @@ describe('pii-encryption middleware — bulk createMany path', () => {
     expect(result[0].email).toBe('roundtrip@example.com');
   });
 
+  it('rewrites a contacts-list OR email equality to emailHash without touching name contains', async () => {
+    // The contacts list ORs a full address as email.equals beside name/customer/role
+    // contains. contains on email throws. This shape must rewrite only the email
+    // branch, using the parent orgId, or the list 500s when encryption is on.
+    const middleware = makePiiMiddleware();
+    const params = {
+      model: 'Contact',
+      action: 'findMany',
+      args: {
+        where: {
+          orgId: ORG,
+          deletedAt: null,
+          OR: [
+            { name: { contains: 'KLAUS.VOGT.DEMO@EXAMPLE.COM', mode: 'insensitive' } },
+            { email: { equals: 'KLAUS.VOGT.DEMO@EXAMPLE.COM' } },
+          ],
+        },
+      },
+    };
+
+    await middleware(params, async (rewritten) => rewritten);
+
+    const or = params.args.where.OR as Array<Record<string, unknown>>;
+    expect(or[0]).toEqual({
+      name: { contains: 'KLAUS.VOGT.DEMO@EXAMPLE.COM', mode: 'insensitive' },
+    });
+    expect(or[1]).toEqual({
+      emailHash: { equals: hashPiiField('klaus.vogt.demo@example.com', ORG) },
+    });
+  });
+
   it('rewrites encrypted email equality lookups to emailHash', async () => {
     const middleware = makePiiMiddleware();
     const params = {
