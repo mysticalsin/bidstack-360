@@ -45,6 +45,7 @@ import {
   type DueQuickFilter,
 } from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
+import { countBidsInFlight } from './opportunities/opportunity-flight-count';
 
 export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
@@ -119,6 +120,8 @@ export function OpportunitiesPage() {
   // a column header to override. Stage sorts by canonical funnel order rather
   // than alphabetically — that's what users mean when they sort by stage.
   const rawItems = useMemo(() => data?.items ?? [], [data?.items]);
+  // "Bids in flight" is the open rows. A won or lost row is still listed.
+  const flight = useMemo(() => countBidsInFlight(rawItems), [rawItems]);
   const stageOptions = useMemo(
     () => getPipelineStages(rawItems, configuredStageOptions),
     [configuredStageOptions, rawItems],
@@ -397,6 +400,9 @@ export function OpportunitiesPage() {
         stageFilter={stageFilter}
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
+        inFlightCount={flight.inFlight}
+        closedCount={flight.closed}
+        pageContinues={Boolean(data?.nextCursor)}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
         onClearSearch={clearSearch}

@@ -2144,6 +2144,8 @@
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
     "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "bidsInFlightWithClosed": "{{open}} bids in flight · {{closed}} closed on this page.",
+    "bidsInFlightWithClosedPage": "{{open}} bids in flight on this page · {{closed}} closed on this page.",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",
