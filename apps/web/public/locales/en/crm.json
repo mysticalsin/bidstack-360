@@ -3266,6 +3266,7 @@
     "opportunityLink": "Opportunity",
     "assignedTo": "Assigned to {{assignee}}",
     "due": "Due {{date}}",
+    "overdue": "Overdue: {{count}}d late",
     "noDate": "no date",
     "cancel": "Cancel",
     "save": "Save",

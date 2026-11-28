@@ -3283,6 +3283,7 @@
     "opportunityLink": "Oportunidad",
     "assignedTo": "Asignado a {{assignee}}",
     "due": "Vence {{date}}",
+    "overdue": "Vencida: {{count}} d de retraso",
     "noDate": "sin fecha",
     "cancel": "Cancelar",
     "save": "Guardar",

@@ -10,6 +10,7 @@ import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
+import { openFollowUpLateDays } from '@/components/task/task-follow-up-late';
 import { formatDate } from '@/lib/format';
 
 export function TaskDetailPage() {
@@ -47,6 +48,8 @@ export function TaskDetailPage() {
         message={t('taskDetail.notFoundMessage', 'This task may have been deleted.')}
       />
     );
+
+  const lateDays = openFollowUpLateDays(task.dueDate, task.status);
 
   const startEdit = () => {
     setTitle(task.title);
@@ -120,6 +123,11 @@ export function TaskDetailPage() {
                   ? formatDate(task.dueDate)
                   : t('taskDetail.noDate', 'no date'),
               })}
+              {lateDays !== null ? (
+                <span className="ml-2 font-semibold text-[var(--danger)]">
+                  {t('taskDetail.overdue', 'Overdue: {{count}}d late', { count: lateDays })}
+                </span>
+              ) : null}
             </span>
           </div>
         </div>

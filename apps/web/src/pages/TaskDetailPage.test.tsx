@@ -208,3 +208,62 @@ describe('TaskDetailPage — tasks:write gating', () => {
     expect(screen.queryByLabelText('Task title')).toBeNull();
   });
 });
+
+// The tasks list says "Overdue: Nd late" for a May 2026 demo follow-up. The
+// record that link opens only printed the date, so the lateness disappeared
+// on the way in. Due today at 18:00 UTC is still today's work. A finished
+// follow-up is not late.
+describe('TaskDetailPage — a past follow-up says it is late', () => {
+  const LATE: Task = {
+    ...TASK,
+    title: 'Submit revised pricing & SoW v2',
+    dueDate: '2026-05-15',
+    status: 'in_progress',
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T18:00:00.000Z'));
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    vi.mocked(useUpdateTask).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTask>);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
+
+  function show(task: Task) {
+    vi.mocked(useTasks).mockReturnValue({
+      data: { items: [task], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useTasks>);
+    renderPage();
+  }
+
+  it('says the May demo follow-up is 194 days late', () => {
+    show(LATE);
+
+    expect(screen.getByText('Submit revised pricing & SoW v2')).toBeTruthy();
+    expect(screen.getByText('Overdue: 194d late')).toBeTruthy();
+  });
+
+  it('does not call a follow-up due today late', () => {
+    show({ ...LATE, dueDate: '2026-11-25', title: 'Call the buyer today' });
+
+    expect(screen.getByText('Call the buyer today')).toBeTruthy();
+    expect(screen.queryByText(/Overdue:/)).toBeNull();
+  });
+
+  it('does not call a finished follow-up late', () => {
+    show({ ...LATE, status: 'done' });
+
+    expect(screen.queryByText(/Overdue:/)).toBeNull();
+  });
+});
