@@ -235,11 +235,11 @@ function dashboardSnapshot(freshness: 'fresh' | 'stale' | 'never' = 'fresh') {
 
 // Cards on the cockpit use React Query directly (watchdog, org chart, ...);
 // give every render a fresh client so a new card never breaks this suite.
-function renderAccountRoute() {
+function renderAccountRoute(accountId = 'acme') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <MemoryRouter initialEntries={['/accounts/acme']}>
+      <MemoryRouter initialEntries={[`/accounts/${accountId}`]}>
         <Routes>
           <Route path="/accounts/:accountId" element={<DashboardPage />} />
         </Routes>
@@ -369,6 +369,41 @@ describe('DashboardPage account cockpit', () => {
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.getByText("Couldn't load the account cockpit")).toBeDefined();
     expect(screen.queryByTestId('page-head')).toBeNull();
+  });
+
+  it('loads this account’s deals by company id instead of the latest portfolio page', () => {
+    // WHY: the cockpit asked for the latest 5 deals in the whole book, then
+    // kept rows whose customer text matched the account name. An account
+    // whose bids were older than those 5 showed an empty list.
+    const accountId = '11111111-1111-4111-8111-111111111111';
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: dashboardSnapshot('fresh'),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute(accountId);
+
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toEqual({
+      limit: 5,
+      companyId: accountId,
+    });
+  });
+
+  it('does not send a name-keyed cockpit as a company id', () => {
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: dashboardSnapshot('fresh'),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch,
+    } as never);
+
+    renderAccountRoute('acme');
+
+    expect(vi.mocked(useOpportunities).mock.calls.at(-1)?.[0]).toEqual({ limit: 5 });
   });
 
   it('passes the route account key to account-scoped intelligence cards', () => {

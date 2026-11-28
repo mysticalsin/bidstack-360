@@ -25,6 +25,7 @@ import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
 import { api, downloadFromApi } from '@/lib/api';
+import { companyIdParam } from '@/lib/company-id-param';
 import {
   getPipelineStages,
   isLegacyOpportunityStage,
@@ -50,6 +51,7 @@ export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
+  const companyId = companyIdParam(searchParams.get('companyId'));
   const qc = useQueryClient();
   // useTransition: typing in the search box (URL state) is urgent; the
   // table re-render is non-urgent.
@@ -83,10 +85,11 @@ export function OpportunitiesPage() {
   };
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}|${companyId ?? ''}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
+    ...(companyId ? { companyId } : {}),
     ...(search ? { search } : {}),
     ...(stageFilter
       ? isPipelineStageIdUuid(stageFilter)
@@ -301,6 +304,12 @@ export function OpportunitiesPage() {
     });
   };
 
+  const clearAccount = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('companyId');
+    setSearchParams(next, { replace: true });
+  };
+
   // WHY backend streaming: the previous client-side export was capped at the
   // in-memory page (100 rows). The backend streams all matching opportunities
   // cursor-paginated from Postgres — no row limit, flat heap.
@@ -322,6 +331,7 @@ export function OpportunitiesPage() {
                 ? { stage: stageFilter }
                 : {}
             : {}),
+          ...(companyId ? { companyId } : {}),
           ...(search ? { search } : {}),
           ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
           ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
@@ -339,7 +349,7 @@ export function OpportunitiesPage() {
 
   return (
     <div className="space-y-6">
-      {isLoading ? (
+      {!companyId && isLoading ? (
         <div aria-hidden="true" className="grid min-h-[74px] grid-cols-2 gap-3 sm:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <div
@@ -351,14 +361,16 @@ export function OpportunitiesPage() {
             </div>
           ))}
         </div>
-      ) : data && data.items.length > 0 ? (
+      ) : !companyId && data && data.items.length > 0 ? (
         <OppKpiBar opps={data.items} summary={orgSummary.data} />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {!isLoading && data
-          ? search
+          ? companyId
+            ? t('opportunities.liveRegion.account', 'Deals linked to this account')
+            : search
             ? data.items.length === 1
               ? t(
                   'opportunities.liveRegion.matchingOne',
@@ -394,6 +406,8 @@ export function OpportunitiesPage() {
 
       <OppPageHeader
         search={search}
+        accountScoped={Boolean(companyId)}
+        onClearAccount={clearAccount}
         stageFilter={stageFilter}
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
@@ -429,8 +443,8 @@ export function OpportunitiesPage() {
         </div>
       </div>
 
-      {/* Industry visibility — the bids we're working on, split by sector. */}
-      <OppIndustryBreakdown />
+      {/* Industry totals are the whole book. Hide them on one account. */}
+      {companyId ? null : <OppIndustryBreakdown />}
 
       {selectedOpps.length > 0 && (
         <OppBulkBar
@@ -455,25 +469,41 @@ export function OpportunitiesPage() {
             }
           />
         ) : data?.items.length === 0 ? (
-          <EmptyState
-            icon="target"
-            title={t('opportunities.empty.headline', 'No open bids yet')}
-            message={t(
-              'opportunities.empty.body',
-              "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
-            )}
-            action={<CreateOpportunityDialog />}
-            secondary={
-              <EmptyStateLink to="/settings?tab=data-import">
-                {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
-              </EmptyStateLink>
-            }
-          />
+          companyId ? (
+            <EmptyState
+              icon="target"
+              title={t('opportunities.empty.accountTitle', 'No deals linked to this account')}
+              message={t(
+                'opportunities.empty.accountBody',
+                'Deals stored on this company show up here. A similar name on another company stays with that company.',
+              )}
+            />
+          ) : (
+            <EmptyState
+              icon="target"
+              title={t('opportunities.empty.headline', 'No open bids yet')}
+              message={t(
+                'opportunities.empty.body',
+                "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
+              )}
+              action={<CreateOpportunityDialog />}
+              secondary={
+                <EmptyStateLink to="/settings?tab=data-import">
+                  {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
+                </EmptyStateLink>
+              }
+            />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <caption className="sr-only">
-                {search
+                {companyId
+                  ? t(
+                      'opportunities.caption.account',
+                      'Deals linked to this account. Cells are inline-editable.',
+                    )
+                  : search
                   ? t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
                       search,
                     })

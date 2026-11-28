@@ -120,16 +120,20 @@ export function OppKpiBar({ opps, summary }: { opps: Opportunity[]; summary?: Or
 
 export function OppPageHeader({
   search,
+  accountScoped = false,
   stageFilter,
   stageOptions,
   itemCount,
   hasData,
   isExporting = false,
   onClearSearch,
+  onClearAccount,
   onClearStageFilter,
   onExportCsv,
 }: {
   search: string | undefined;
+  /** True when the list is one company's deals. */
+  accountScoped?: boolean;
   stageFilter: string | null;
   stageOptions: PipelineStage[];
   itemCount: number;
@@ -137,6 +141,7 @@ export function OppPageHeader({
   /** True while the CSV download fetch is in flight — disables + relabels the button. */
   isExporting?: boolean;
   onClearSearch: () => void;
+  onClearAccount?: () => void;
   onClearStageFilter: () => void;
   onExportCsv: () => void;
 }) {
@@ -154,7 +159,18 @@ export function OppPageHeader({
       <div className="min-w-0">
         <h1 className="page-title">{t('oppToolbar.title', 'Opportunities')}</h1>
         <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-          {search ? (
+          {accountScoped ? (
+            <>
+              {t('oppToolbar.accountOnly', 'This account only')}
+              <button
+                type="button"
+                onClick={onClearAccount}
+                className={`${clearBtnClass} inline-flex min-h-11 items-center px-2`}
+              >
+                {t('oppToolbar.showEveryDeal', 'Show every deal')}
+              </button>
+            </>
+          ) : search ? (
             <>
               <span className="font-medium text-[var(--fg-primary)]">{itemCount}</span>{' '}
               {t('oppToolbar.resultsFor', 'results for')}{' '}

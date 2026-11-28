@@ -25,6 +25,7 @@ import { usePipelineReport } from '@/hooks/usePipelineReport';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
+import { companyIdParam } from '@/lib/company-id-param';
 import {
   getOpportunityStageBusinessKey,
   getPipelineStageBusinessKey,
@@ -43,7 +44,12 @@ export function PipelinePage() {
   const reduced = useReducedMotion();
   const navigate = useNavigate();
   const { formatMoney } = useFormatMoney();
-  const { data, isLoading, isError, error } = useOpportunities({ limit: PIPELINE_BOARD_LIMIT });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const companyId = companyIdParam(searchParams.get('companyId'));
+  const { data, isLoading, isError, error } = useOpportunities({
+    limit: PIPELINE_BOARD_LIMIT,
+    ...(companyId ? { companyId } : {}),
+  });
   const pageContinues = Boolean(data?.nextCursor);
   const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
@@ -61,12 +67,16 @@ export function PipelinePage() {
 
   // Stage filter via the URL. `?pipelineStageId=...` collapses the board to a
   // single column so the user can focus that slice and share the link.
-  const [searchParams, setSearchParams] = useSearchParams();
   const stageFilter = searchParams.get('pipelineStageId') ?? null;
   const setStageFilter = (next: string | null) => {
     const params = new URLSearchParams(searchParams);
     if (next) params.set('pipelineStageId', next);
     else params.delete('pipelineStageId');
+    setSearchParams(params, { replace: true });
+  };
+  const clearAccount = () => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('companyId');
     setSearchParams(params, { replace: true });
   };
 
@@ -199,6 +209,15 @@ export function PipelinePage() {
               'Drag a card between columns, or focus a card and use ← / → to move stages.',
             )}
           </p>
+          {companyId ? (
+            <button
+              type="button"
+              onClick={clearAccount}
+              className="mt-1 inline-flex min-h-11 items-center rounded px-2 text-sm text-[var(--fg-secondary)] underline hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+            >
+              {t('pipeline.showEveryDeal', 'Show every deal')}
+            </button>
+          ) : null}
         </div>
         <div className="flex items-center gap-2">
           <PipelineViewSwitch current="board" />
@@ -246,7 +265,8 @@ export function PipelinePage() {
                 : count === 1
                   ? t('pipeline.liveRegionCountOne', '{{count}} opportunity', { count })
                   : t('pipeline.liveRegionCountOther', '{{count}} opportunities', { count });
-              return stageFilter ? `${label} · ${filteredStageName}` : label;
+              const scoped = companyId ? `${label}. This account only` : label;
+              return stageFilter ? `${scoped} · ${filteredStageName}` : scoped;
             })()
           : ''}
       </p>

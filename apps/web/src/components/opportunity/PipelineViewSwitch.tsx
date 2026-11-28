@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { companyIdParam } from '@/lib/company-id-param';
 
 export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ export function PipelineViewSwitch({ current }: { current: 'list' | 'board' }) {
     const next = new URLSearchParams();
     const stage = params.get('pipelineStageId');
     if (stage) next.set('pipelineStageId', stage);
+    const companyId = companyIdParam(params.get('companyId'));
+    if (companyId) next.set('companyId', companyId);
     const qs = next.toString();
     navigate(`${view === 'list' ? '/opportunities' : '/pipeline'}${qs ? `?${qs}` : ''}`);
   };
