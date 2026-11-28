@@ -36,6 +36,7 @@ import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch'
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
+import { pipelineColumnConversion } from './pipelineBoard/pipeline-column-conversion';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -360,20 +361,25 @@ export function PipelinePage() {
             const items = byStage.get(stage.id) ?? [];
             const total = items.reduce((acc, o) => acc + o.value, 0);
             const isHover = hoverStageId === stage.id;
-            // Funnel ratio: how many opps advanced past this stage into any
-            // later one. We exclude closed_lost from the "advanced" pool so
-            // it isn't counted as forward progress — losses are terminal.
-            // The closed_* stages themselves get no chip (no "next" stage).
-            const nextStages = stages.slice(stageIdx + 1).filter((s) => s.name !== 'Closed Lost');
-            const advanced = nextStages.reduce(
-              (acc, s) => acc + (byStage.get(s.id)?.length ?? 0),
-              0,
-            );
-            const totalReached = items.length + advanced;
-            const conversion =
-              stage.name === 'Closed Won' || stage.name === 'Closed Lost' || totalReached === 0
-                ? null
-                : Math.round((advanced / totalReached) * 100);
+            // Snapshot of loaded cards past this column. An empty column is
+            // not 100%, and a continued page is not the book. A loss is not
+            // forward progress. Wins later in the book still count. A won or
+            // lost column itself has no rate.
+            const isClosed =
+              stage.isWon ||
+              stage.isLost ||
+              stage.name === 'Closed Won' ||
+              stage.name === 'Closed Lost';
+            const laterCount = stages
+              .slice(stageIdx + 1)
+              .filter((s) => !s.isLost && s.name !== 'Closed Lost')
+              .reduce((acc, s) => acc + (byStage.get(s.id)?.length ?? 0), 0);
+            const conversion = pipelineColumnConversion({
+              stageCount: items.length,
+              laterCount,
+              isClosed,
+              pageContinues,
+            });
             return (
               <StageColumn
                 key={stage.id}
