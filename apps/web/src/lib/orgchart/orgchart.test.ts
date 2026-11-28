@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { coverageFor, coverageFromMeetings, covFromPerson, strengthOf } from './coverage';
 import { exportCsv } from './csv';
-import { layoutTree, NODE_H } from './layout';
+import { layoutTree, NODE_H, NODE_W, ORG_EDGE } from './layout';
 import { mergePeople, sampleChart, seniorityFromTitle } from './sample';
 import * as T from './tree';
 import type { OrgNode, PersonCoverage } from './types';
@@ -50,6 +50,20 @@ describe('layout', () => {
     const pos = layoutTree(base);
     expect(pos.get('b')!.y).toBeGreaterThanOrEqual(pos.get('a')!.y + NODE_H);
     expect(pos.get('d')!.y).toBeGreaterThan(pos.get('b')!.y);
+  });
+
+  // WHY: cards that overlap, or sit closer than a card-height apart, make the
+  // reporting line run through a person. The gap is the hierarchy.
+  it('keeps sibling cards and ranks from colliding', () => {
+    const pos = layoutTree(base);
+    expect(Math.abs(pos.get('b')!.x - pos.get('c')!.x)).toBeGreaterThanOrEqual(NODE_W);
+    expect(pos.get('b')!.y - pos.get('a')!.y).toBeGreaterThanOrEqual(NODE_H);
+  });
+
+  // WHY: bezier curves read as a mind map. An org chart's line is an elbow.
+  it('draws reporting lines as orthogonal elbows', () => {
+    expect(ORG_EDGE.type).toBe('smoothstep');
+    expect(ORG_EDGE.pathOptions.borderRadius).toBeGreaterThan(0);
   });
 });
 

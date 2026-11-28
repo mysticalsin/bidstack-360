@@ -114,8 +114,8 @@ export const AccountCard = memo(function AccountCard({
             <Icon name="zap" size={13} ariaHidden />
             {topTech.length > 0 ? (
               topTech.map((tech) => (
-                <span key={tech.name} className="account-card-tech-item" data-tech-name={tech.name}>
-                  <TechLogo name={tech.name} size={16} />
+                <span key={tech.name} className="account-card-tech-item" data-tech-name={tech.name} title={tech.name}>
+                  <TechLogo name={tech.name} size={20} />
                   <span className="account-card-tech-name">{tech.name}</span>
                 </span>
               ))

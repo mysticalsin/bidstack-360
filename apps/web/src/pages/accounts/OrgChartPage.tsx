@@ -30,7 +30,7 @@ import { ContactLinks } from '@/components/orgchart/ContactLinks';
 import { ProfileDetails } from '@/components/orgchart/ProfileDetails';
 import { STRENGTH_LABEL, strengthOf } from '@/lib/orgchart/coverage';
 import { exportCsv } from '@/lib/orgchart/csv';
-import { layoutTree, NODE_H, NODE_W } from '@/lib/orgchart/layout';
+import { layoutTree, NODE_H, NODE_W, ORG_EDGE } from '@/lib/orgchart/layout';
 import * as T from '@/lib/orgchart/tree';
 import { initials } from '@/lib/orgchart/tree';
 import { OrgChartConflictError, type NodeCov, type OrgChart, type OrgNode } from '@/lib/orgchart/types';
@@ -120,7 +120,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
   const rfEdges: Edge[] = useMemo(() => visible.filter((n) => n.parentId && !hidden.has(n.parentId)).map((n) => {
     const s = strengthOf(covOf(n), asOf);
-    return { id: `${n.parentId}-${n.id}`, source: n.parentId!, target: n.id, type: 'default', className: showStrength ? `oc-edge oc-edge-${s}` : 'oc-edge', focusable: false, selectable: false };
+    return { id: `${n.parentId}-${n.id}`, source: n.parentId!, target: n.id, type: ORG_EDGE.type, pathOptions: ORG_EDGE.pathOptions, className: showStrength ? `oc-edge oc-edge-${s}` : 'oc-edge', focusable: false, selectable: false };
   }), [visible, hidden, covOf, asOf, showStrength]);
 
   const selected = selectedId ? work.nodes.find((n) => n.id === selectedId) ?? null : null;
@@ -359,7 +359,7 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
 
       <div className="oc-body">
         <div className="oc-canvas" ref={wrapRef} onKeyDownCapture={onKeyDownCapture} aria-label={`Org chart for ${companyName}. Arrow keys move between people, Enter opens details, C collapses.`} role="application">
-          {error ? <p className="oc-loading" role="alert">The org chart could not be loaded. {error instanceof Error ? error.message : ''}</p> : isLoading ? <p className="oc-loading">Loading org chart…</p> : (
+          {error ? <div className="oc-status" role="alert"><p className="oc-loading">The org chart could not be loaded. {error instanceof Error ? error.message : ''}</p></div> : isLoading ? <OrgChartLoading /> : work.nodes.length === 0 ? <OrgChartEmpty /> : (
             <ReactFlow<PersonNodeT, Edge>
               nodes={rfNodes} edges={rfEdges} nodeTypes={nodeTypes}
               onNodesChange={onNodesChange} onNodeClick={onNodeClick} onNodeDrag={onNodeDrag} onNodeDragStop={onNodeDragStop}
@@ -434,6 +434,33 @@ function OrgChartScreen({ companyId }: { companyId: string }) {
       <button type="button" className="oc-sr" onClick={() => navigate(`/accounts/${companyId}`)}>Close org chart</button>
     </div>,
     document.body,
+  );
+}
+
+function OrgChartLoading() {
+  return (
+    <div className="oc-status" role="status" data-testid="orgchart-loading">
+      <p className="oc-loading">Loading org chart…</p>
+      <div className="oc-skel-tree" aria-hidden="true">
+        <span className="oc-skel" />
+        <i />
+        <div className="oc-skel-row">
+          <span className="oc-skel" />
+          <span className="oc-skel" />
+          <span className="oc-skel" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OrgChartEmpty() {
+  return (
+    <div className="oc-status" data-testid="orgchart-empty">
+      <span className="oc-empty-mark" aria-hidden="true" />
+      <p>No people on this chart yet.</p>
+      <p className="oc-muted">Add someone in edit mode, import a directory, or auto-fill from contacts.</p>
+    </div>
   );
 }
 

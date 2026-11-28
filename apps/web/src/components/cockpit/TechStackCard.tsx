@@ -659,7 +659,7 @@ function ReadOnlyStackCategory({
             whileTap={reducedMotion ? undefined : { scale: 0.98 }}
             transition={{ ...springSnap, delay: reducedMotion ? 0 : index * 0.025 }}
           >
-            <TechLogo name={item.name} size={14} />
+            <TechLogo name={item.name} size={20} />
             <span className="tech-pill-name">{item.name}</span>
             {item.evidence ? (
               <TechEvidenceChip item={item} />
@@ -1132,7 +1132,7 @@ function TechStackEditor({
                     aria-label={`Add ${suggestion.name} to ${suggestion.category}`}
                     onClick={() => addQuickSuggestion(suggestion)}
                   >
-                    <TechLogo name={suggestion.name} size={13} />
+                    <TechLogo name={suggestion.name} size={16} />
                     <span>{suggestion.name}</span>
                   </button>
                 ))}
@@ -1157,7 +1157,7 @@ function TechStackEditor({
                     aria-label={`Use ${suggestion.item.name} from ${sourceLabelForTechItem(suggestion.item)} source match`}
                     onClick={() => addInlineSourceSuggestion(suggestion)}
                   >
-                    <TechLogo name={suggestion.item.name} size={13} />
+                    <TechLogo name={suggestion.item.name} size={16} />
                     <span>{suggestion.item.name}</span>
                     <small>{sourceLabelForTechItem(suggestion.item)}</small>
                     <strong>{Math.round(suggestion.item.confidence * 100)}%</strong>
@@ -1276,7 +1276,7 @@ function TechStackEditor({
                   data-duplicate={item.duplicate}
                   key={`${item.category}-${item.name}`}
                 >
-                  <TechLogo name={item.name} size={12} />
+                  <TechLogo name={item.name} size={16} />
                   <span className="tech-editor-preview-name">{item.name}</span>
                   <small>
                     {item.duplicate
@@ -1315,7 +1315,7 @@ function TechStackEditor({
                     className="tech-editor-staged-chip"
                     key={`${item.category}-${item.name}-${index}`}
                   >
-                    <TechLogo name={item.name} size={12} />
+                    <TechLogo name={item.name} size={16} />
                     <span>{item.name}</span>
                     <small>{item.sourceLabel ?? item.category}</small>
                   </span>
@@ -1432,7 +1432,7 @@ function TechStackEditor({
                     aria-label={`Add ${suggestion.item.name} from ${sourceLabelForTechItem(suggestion.item)}`}
                     onClick={() => addSourceSuggestion(suggestion)}
                   >
-                    <TechLogo name={suggestion.item.name} size={14} />
+                    <TechLogo name={suggestion.item.name} size={16} />
                     <span className="tech-editor-source-name">{suggestion.item.name}</span>
                     <small>{suggestion.label}</small>
                     <strong className="tech-editor-source-confidence">
@@ -1695,7 +1695,7 @@ function TechStackSourceFirstAssist({
             aria-label={`Accept source-backed match ${bestSourceMatch.item.name}`}
             onClick={onAcceptBestMatch}
           >
-            <TechLogo name={bestSourceMatch.item.name} size={13} />
+            <TechLogo name={bestSourceMatch.item.name} size={16} />
             <span>{t('techStack.sourceFirstAcceptBest', 'Accept match')}</span>
             <strong>{sourceMatchConfidence}%</strong>
           </button>
@@ -2141,7 +2141,7 @@ function TechStackIntakeReviewPanel({
             data-status={item.status}
             key={`${item.category}-${item.name}-${item.status}`}
           >
-            <TechLogo name={item.name} size={13} />
+            <TechLogo name={item.name} size={16} />
             <span className="tech-editor-intake-review-main">
               <strong>{item.name}</strong>
               <small>{item.sourceLabel ?? item.category}</small>
@@ -2451,7 +2451,7 @@ function ProviderSuggestions({
       {suggestions.slice(0, 3).map((suggestion) => (
         <div className="tech-suggestion" key={suggestion.id}>
           <div className="tech-suggestion-main">
-            <TechLogo name={suggestion.item.name} size={14} />
+            <TechLogo name={suggestion.item.name} size={16} />
             <span>{suggestion.item.name}</span>
             <SourceBadge
               label={sourceLabelForTechItem(suggestion.item)}

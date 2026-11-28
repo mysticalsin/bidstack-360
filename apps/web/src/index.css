@@ -4181,8 +4181,8 @@ select:focus-visible {
 .account-card-tech {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 28px;
+  gap: 8px;
+  min-height: 36px;
   overflow: hidden;
   color: var(--brand-primary);
 }
@@ -4206,8 +4206,10 @@ select:focus-visible {
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px 2px 3px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 10px;
 }
 .account-card-tech-name {
   min-width: 0;

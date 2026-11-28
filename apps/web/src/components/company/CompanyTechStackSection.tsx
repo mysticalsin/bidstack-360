@@ -118,21 +118,24 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
                       >
                         {cat.label}
                       </h4>
-                      <div className="flex flex-wrap gap-2">
+                      <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5 p-0">
                         {cat.items.map((item) => (
-                          <span
+                          <li
                             key={`${cat.label}-${item.name}`}
                             data-tech-item={item.name}
-                            className="inline-flex min-h-9 min-w-0 max-w-full items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-1.5"
+                            data-logo-tile="true"
+                            className="flex min-h-[76px] min-w-0 items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-3 py-2.5 hover:border-[color-mix(in_srgb,var(--brand-primary)_32%,var(--border-subtle))] hover:bg-[var(--surface-hover)] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--brand-primary)]"
                           >
-                            <TechLogo name={item.name} size={20} />
-                            <span className="min-w-0 truncate text-sm text-[var(--fg-primary)]" title={item.name}>
-                              {item.name}
+                            <TechLogo name={item.name} size={36} />
+                            <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                              <span className="max-w-full truncate text-sm font-semibold text-[var(--fg-primary)]" title={item.name}>
+                                {item.name}
+                              </span>
+                              <TechEvidenceChip item={item} />
                             </span>
-                            <TechEvidenceChip item={item} />
-                          </span>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     </section>
                   );
                 })}
@@ -225,7 +228,7 @@ function TechStackEditor({
                   key={item.name}
                   className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2.5 py-1"
                 >
-                  <TechLogo name={item.name} size={18} />
+                  <TechLogo name={item.name} size={28} />
                   <span className="text-sm text-[var(--fg-primary)]">{item.name}</span>
                   <button
                     type="button"

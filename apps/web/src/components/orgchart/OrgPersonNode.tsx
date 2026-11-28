@@ -60,6 +60,7 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
       data-sample={node.source === 'sample' || undefined}
       data-gap={(showMet && seniorGap) || undefined}
       data-redacted={node.redacted || undefined}
+      data-level={node.seniority}
       data-testid="orgchart-node"
       data-name={node.name}
       aria-label={label}
@@ -69,14 +70,11 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
         <OrgPhoto url={node.photoUrl} name={node.name} />
         {showMet && met && recency !== 'stale' ? <i className="oc-met-dot" data-r={recency} aria-hidden="true" /> : null}
       </div>
-      {badge ? (
-        <span className="oc-recency" data-r={recency} title={recencyTitle(lastMetAt)} data-testid="orgchart-recency">{badge}</span>
-      ) : null}
-      <div className="oc-pill">
+      <div className="oc-id">
         <span className="oc-name">{node.name}</span>
+        <span className="oc-title">{node.redacted ? 'Outside your access' : node.title ?? 'No title'}</span>
       </div>
-      <span className="oc-title">{node.redacted ? 'Outside your access' : node.title ?? 'No title'}</span>
-      <span className="oc-chips">
+      <div className="oc-meta">
         {sen ? <span className="oc-chip" data-sen={node.seniority}>{sen}</span> : null}
         {node.region ? <span className="oc-chip">{node.region}</span> : null}
         {showStrength ? (
@@ -84,7 +82,10 @@ function PersonNodeImpl({ id, data, selected }: NodeProps<PersonNodeT>) {
             {[1, 2, 3].map((i) => <i key={i} data-on={i <= STRENGTH_BARS[strength] || undefined} />)}
           </span>
         ) : null}
-      </span>
+        {badge ? (
+          <span className="oc-recency" data-r={recency} title={recencyTitle(lastMetAt)} data-testid="orgchart-recency">{badge}</span>
+        ) : null}
+      </div>
       {!node.redacted ? <ContactLinks node={node} compact /> : null}
       {childCount ? (
         <button
