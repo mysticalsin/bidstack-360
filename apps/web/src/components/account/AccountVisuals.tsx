@@ -11,7 +11,12 @@ import { fmtCompact, OPEN_STAGES, stageFunnel, stageKey, statusMix, type OppRow 
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
+import { contactRecordHref } from './contactRecordHref';
 import { layoutOrg, type MapPerson } from './org-layout';
+
+// Link text uses the measured brand foreground. The node box is already 176×52.
+const PERSON_LINK =
+  'text-[var(--brand-primary)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--viz-brand)] dark:text-[var(--brand-deep)]';
 
 // Standing is evidence quality; map it to the shared colour + shape language.
 const STANDING: Record<string, { kind: string; label: string }> = {
@@ -52,14 +57,27 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
       {people.map((p, i) => {
         const at = pos.get(p.id)!;
         const st = STANDING[p.standing] ?? STANDING.unknown!;
-        return (
-          <g key={p.id} className="viz-pop" style={{ '--i': i } as React.CSSProperties}>
+        const href = contactRecordHref(p.id);
+        const body = (
+          <>
             <title>{`${p.name}${p.title ? `, ${p.title}` : ''} (${st.label})`}</title>
             <rect className="rel-node" x={at.x} y={at.y} width={NW} height={NH} rx={8} />
             <SignalShape kind={st.kind} x={at.x + 16} y={at.y + 18} r={4} />
             <text className="rel-name" x={at.x + 28} y={at.y + 22}>{p.name.length > 20 ? `${p.name.slice(0, 19)}…` : p.name}</text>
             <text className="tick" x={at.x + 12} y={at.y + 40}>{(p.title ?? '').length > 26 ? `${p.title!.slice(0, 25)}…` : p.title}</text>
-          </g>
+          </>
+        );
+        if (!href) {
+          return (
+            <g key={p.id || `text-${i}`} className="viz-pop" style={{ '--i': i } as React.CSSProperties}>
+              {body}
+            </g>
+          );
+        }
+        return (
+          <Link key={p.id} to={href} className={`rel-person viz-pop ${PERSON_LINK}`} aria-label={p.name} style={{ '--i': i } as React.CSSProperties}>
+            {body}
+          </Link>
         );
       })}
     </svg>
@@ -76,6 +94,10 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
+  const personCell = (p: MapPerson) => {
+    const href = contactRecordHref(p.id);
+    return href ? <Link className={`rel-row-link inline-flex min-h-11 items-center ${PERSON_LINK}`} to={href}>{p.name}</Link> : p.name;
+  };
 
   return (
     <div className="acct-visuals" data-testid="account-visuals">
@@ -104,9 +126,10 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
+        interactive={ppl.some((p) => contactRecordHref(p.id) !== null)}
         meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
         summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
-        table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
+        table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [personCell(p), p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
       >
         {ppl.length ? (
           <>
