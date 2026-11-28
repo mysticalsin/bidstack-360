@@ -31,7 +31,14 @@ const base: AccountWatchdog = {
 };
 
 describe('AccountWatchdogSection', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    state.data = undefined;
+    state.isLoading = false;
+    state.isError = false;
+    enr.data = undefined;
+    mi.data = undefined;
+  });
   it('explains an empty feed with the watched identifiers', () => {
     state.data = base;
     render(<AccountWatchdogSection companyId="c1" />);
@@ -182,8 +189,9 @@ describe('AccountWatchdogSection', () => {
     enr.data = mockEnrichment('c1');
     render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
     const rows = screen.getAllByRole('button', { name: /^Potential project:/ });
-    // The "Sample: " prefix becomes a badge.
-    expect(screen.getAllByText('Sample', { selector: '.wd-sample-badge' }).length).toBe(rows.length);
+    // The "Sample:" title prefix still marks the row. The badge a seller reads says Reference.
+    expect(screen.getAllByText('Reference', { selector: '.wd-sample-badge' }).length).toBe(rows.length);
+    expect(screen.queryByText('Sample', { selector: '.wd-sample-badge' })).toBeNull();
     expect(rows.length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Hiring signals ·/).length).toBe(rows.length);
     fireEvent.click(rows[0]!);
@@ -192,12 +200,12 @@ describe('AccountWatchdogSection', () => {
     enr.data = undefined;
   });
 
-  it('orders by importance with a Latest toggle and shows category, outlets and Sample', () => {
+  it('orders by importance with a Latest toggle and shows category, outlets and Reference', () => {
     state.data = {
       ...base,
       events: [
         { ...ev(1), title: 'Older funding', occurredAt: '2026-09-01T00:00:00Z', importance: 90, category: 'funding', mentions: 4, source: 'gdelt' },
-        { ...ev(2), title: 'Sample: Newer hiring note', displayTitle: 'Newer hiring note', occurredAt: '2026-10-25T00:00:00Z', importance: 30, category: 'hiring', sample: true },
+        { ...ev(2), title: 'Sample: Newer hiring note', displayTitle: 'Newer hiring note', occurredAt: '2026-10-25T00:00:00Z', importance: 30, category: 'hiring', sample: true, source: 'sample', sourceUrl: '' },
         { ...ev(3), title: 'Middle filing \u2014 restated', occurredAt: '2026-10-01T00:00:00Z', importance: 60 },
       ],
     };
@@ -205,7 +213,10 @@ describe('AccountWatchdogSection', () => {
     const titles = () => screen.getAllByRole('button', { expanded: false }).map((b) => b.querySelector('.wd-row-title')?.textContent ?? '').filter(Boolean);
     expect(titles()).toEqual(['ImportantOlder funding', 'Middle filing, restated', 'Newer hiring note']);
     expect(screen.getByText(/Funding · News · 4 outlets ·/)).toBeTruthy();
-    expect(screen.getByText('Sample', { selector: '.wd-sample-badge' })).toBeTruthy();
+    expect(screen.getByText('Reference', { selector: '.wd-sample-badge' })).toBeTruthy();
+    expect(screen.queryByText('Sample', { selector: '.wd-sample-badge' })).toBeNull();
+    expect(screen.getByText(/Hiring · Reference record ·/)).toBeTruthy();
+    expect(screen.queryByText(/Sample data/)).toBeNull();
     expect(screen.getByText(/1 important/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Latest' }));
     expect(titles()).toEqual(['Newer hiring note', 'Middle filing, restated', 'ImportantOlder funding']);
