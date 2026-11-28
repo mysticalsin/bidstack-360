@@ -165,6 +165,11 @@ describe('workspace dashboard bid read', () => {
     expect(seen.hero?.rowsFailed).toBe(false);
     expect(seen.performance?.rowsFailed).toBe(false);
     expect(seen.needs?.rowsFailed).toBe(false);
+    // The kept row is the open-deal count. The workspace summary is a different book.
+    expect(seen.hero?.openCount).toBe(1);
+    const sub = screen.getByText(/companies/).closest('.page-sub');
+    expect(sub?.textContent).toContain('1 open deals');
+    expect(sub?.textContent).not.toContain(`${summary.openOpportunities} open deals`);
   });
 
   it('holds the charts while the first bid read is in flight', () => {
@@ -192,7 +197,9 @@ describe('workspace dashboard bid read', () => {
     const sub = screen.getByText(/companies/).closest('.page-sub');
     expect(sub).toBeTruthy();
     expect(sub?.textContent).toContain('2 companies');
-    expect(sub?.textContent).toContain('2 open deals');
+    // The hero holds the open-bid count on a failed read. The subtitle must not
+    // keep announcing the workspace summary's open deals beside that error.
+    expect(sub?.textContent).not.toContain('open deals');
     expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
     expect(sub?.textContent).not.toContain(formatUnspecifiedAmount(summary.pipelineValue));
     expect(within(sub as HTMLElement).queryByRole('button', { name: /Pipeline/i })).toBeNull();
@@ -209,9 +216,11 @@ describe('workspace dashboard bid read', () => {
 
     const sub = screen.getByText(/companies/).closest('.page-sub');
     expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
+    expect(sub?.textContent).not.toContain('open deals');
     expect(within(sub as HTMLElement).queryByRole('button', { name: /Pipeline/i })).toBeNull();
     expect(seen.hero?.openValue).toBe(0);
     expect(seen.hero?.weighted).toBe(0);
+    expect(seen.hero?.openCount).toBe(0);
   });
 
   it('shows zero pipeline on the page only after the bid read succeeds with no rows', () => {
@@ -222,6 +231,8 @@ describe('workspace dashboard bid read', () => {
 
     const sub = screen.getByText(/companies/).closest('.page-sub');
     expect(sub?.textContent).toContain('0 pipeline');
+    expect(sub?.textContent).toContain('0 open deals');
+    expect(sub?.textContent).not.toContain(`${summary.openOpportunities} open deals`);
     expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
     const info = within(sub as HTMLElement).getByRole('button', { name: /Pipeline/i });
     expect(info.getAttribute('aria-label')).toContain(formatUnspecifiedAmount(0));
@@ -256,6 +267,8 @@ describe('workspace dashboard bid read', () => {
     expect(seen.hero?.openCount).not.toBe(summary.openOpportunities);
     const sub = screen.getByText(/companies/).closest('.page-sub');
     expect(sub?.textContent).toContain(fmtCompact(2_500_000));
+    expect(sub?.textContent).toContain('1 open deals');
+    expect(sub?.textContent).not.toContain(`${summary.openOpportunities} open deals`);
     expect(sub?.textContent).not.toContain(fmtCompact(summary.pipelineValue));
     const info = within(sub as HTMLElement).getByRole('button', { name: /Pipeline/i });
     expect(info.getAttribute('aria-label')).toContain(formatUnspecifiedAmount(2_500_000));
