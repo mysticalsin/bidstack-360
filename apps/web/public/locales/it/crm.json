@@ -3689,7 +3689,11 @@
     "viewAll": "Vedi tutto",
     "emptyAccountTitle": "Ancora nessuna opportunità per questo account",
     "emptyTitle": "Ancora nessuna opportunità",
-    "emptyAccountMessage": "Crea un'opportunità dall'intestazione dell'account per avviare uno spazio di lavoro per l'offerta."
+    "emptyAccountMessage": "Crea un'opportunità dall'intestazione dell'account per avviare uno spazio di lavoro per l'offerta.",
+    "errorAccountTitle": "Impossibile caricare le opportunità di questo account",
+    "errorTitle": "Impossibile caricare le opportunità",
+    "errorMessage": "L'elenco delle offerte non ha risposto.",
+    "retry": "Riprova"
   },
   "spotlightRefs": {
     "regionLabel": "Riferimenti Spotlight",

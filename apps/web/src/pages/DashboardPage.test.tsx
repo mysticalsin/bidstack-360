@@ -279,6 +279,26 @@ describe('DashboardPage account cockpit', () => {
     cleanup();
   });
 
+  it("loads this account's bids instead of the five newest in the book", () => {
+    const snapshot = dashboardSnapshot('fresh');
+    snapshot.cockpit.company.id = '11111111-1111-4111-8111-111111111111';
+    vi.mocked(useCrmDashboard).mockReturnValue({
+      data: snapshot,
+      isLoading: false,
+      isError: false,
+      refetch,
+    } as never);
+
+    renderAccountRoute();
+
+    const filters = vi.mocked(useOpportunities).mock.calls.map((call) => call[0]);
+    expect(filters).toContainEqual({
+      companyId: '11111111-1111-4111-8111-111111111111',
+      limit: 50,
+    });
+    expect(filters).not.toContainEqual({ limit: 5 });
+  });
+
   it('keeps the last verified cockpit visible when a background dashboard refresh fails', () => {
     vi.mocked(useCrmDashboard).mockReturnValue({
       data: dashboardSnapshot('fresh'),

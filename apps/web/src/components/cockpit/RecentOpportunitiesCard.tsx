@@ -7,7 +7,7 @@ import { AnimatedMetric } from '@/components/motion/AnimatedMetric';
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { EmptyState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import type { useOpportunities } from '@/hooks/useOpportunities';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
@@ -29,6 +29,8 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
   const { t } = useTranslation('crm');
   const visibleItems = items ?? opps.data?.items ?? [];
   const accountScoped = Boolean(accountName);
+  // No data yet (including a read that has not started) is not an empty book.
+  const waiting = (opps.isPending || opps.isLoading) && !opps.data;
   return (
     <Card
       role="region"
@@ -67,8 +69,29 @@ export const RecentOpportunitiesCard = memo(function RecentOpportunitiesCard({
           </Link>
         }
       />
-      {opps.isLoading ? (
+      {waiting ? (
         <LoadingSkeleton rows={3} />
+      ) : opps.isError && visibleItems.length === 0 ? (
+        <ErrorState
+          title={
+            accountScoped
+              ? t(
+                  'recentOpportunities.errorAccountTitle',
+                  "Couldn't load this account's opportunities",
+                )
+              : t('recentOpportunities.errorTitle', "Couldn't load opportunities")
+          }
+          message={t('recentOpportunities.errorMessage', 'The bid list did not respond.')}
+          action={
+            <button
+              type="button"
+              className="btn btn-secondary min-h-11 min-w-11"
+              onClick={() => void opps.refetch()}
+            >
+              {t('recentOpportunities.retry', 'Retry')}
+            </button>
+          }
+        />
       ) : visibleItems.length === 0 ? (
         <EmptyState
           title={

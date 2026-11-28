@@ -3711,7 +3711,11 @@
     "viewAll": "View all",
     "emptyAccountTitle": "No opportunities for this account yet",
     "emptyTitle": "No opportunities yet",
-    "emptyAccountMessage": "Create an opportunity from the account header to start a bid workspace."
+    "emptyAccountMessage": "Create an opportunity from the account header to start a bid workspace.",
+    "errorAccountTitle": "Couldn't load this account's opportunities",
+    "errorTitle": "Couldn't load opportunities",
+    "errorMessage": "The bid list did not respond.",
+    "retry": "Retry"
   },
   "spotlightRefs": {
     "regionLabel": "Spotlight references",

@@ -3695,7 +3695,11 @@
     "viewAll": "查看全部",
     "emptyAccountTitle": "此客户暂无机会",
     "emptyTitle": "暂无机会",
-    "emptyAccountMessage": "从客户标题创建机会以启动投标工作区。"
+    "emptyAccountMessage": "从客户标题创建机会以启动投标工作区。",
+    "errorAccountTitle": "无法加载此客户的商机",
+    "errorTitle": "无法加载商机",
+    "errorMessage": "投标列表没有响应。",
+    "retry": "重试"
   },
   "spotlightRefs": {
     "regionLabel": "Spotlight 参考项目",

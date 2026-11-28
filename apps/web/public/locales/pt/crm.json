@@ -3695,7 +3695,11 @@
     "viewAll": "Ver tudo",
     "emptyAccountTitle": "Ainda não há oportunidades para esta conta",
     "emptyTitle": "Ainda não há oportunidades",
-    "emptyAccountMessage": "Crie uma oportunidade no cabeçalho da conta para iniciar um espaço de trabalho de proposta."
+    "emptyAccountMessage": "Crie uma oportunidade no cabeçalho da conta para iniciar um espaço de trabalho de proposta.",
+    "errorAccountTitle": "Não foi possível carregar as oportunidades desta conta",
+    "errorTitle": "Não foi possível carregar as oportunidades",
+    "errorMessage": "A lista de propostas não respondeu.",
+    "retry": "Tentar de novo"
   },
   "spotlightRefs": {
     "regionLabel": "Referências do Spotlight",
