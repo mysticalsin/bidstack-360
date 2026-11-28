@@ -81,7 +81,11 @@ describe('KeyNumbersStrip', () => {
     expect(rev.getAttribute('aria-describedby')).toBe(tip.id);
     expect(within(screen.getByTestId('kn-open_jobs')).getByText('No job postings tracked yet')).toBeTruthy();
     const mom = screen.getByTestId('kn-momentum');
-    expect(within(mom).getByText('Sample')).toBeTruthy();
+    // Fixture key numbers stay sample:true. The seller sees Reference, never the word Sample.
+    const badge = within(mom).getByText('Reference');
+    expect(badge.classList.contains('sg-sample')).toBe(true);
+    expect(mom.textContent).not.toMatch(/\bSample\b/);
+    expect(rev.querySelector('.sg-sample')).toBeNull();
     const md = mom.querySelector('.kn-delta')!;
     expect(md.textContent).toContain('-4.0 pts');
     expect(md.getAttribute('data-tone')).toBe('neg');
