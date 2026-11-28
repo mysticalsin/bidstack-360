@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { formatStage, formatMoney, daysUntil } from './format.js';
 
@@ -32,4 +32,26 @@ describe('daysUntil', () => {
     const past = new Date(Date.now() - 3 * 86400 * 1000).toISOString();
     expect(daysUntil(past)).toBeLessThan(0);
   });
+
+  // A task dueDate is a calendar day (YYYY-MM-DD), the same contract as
+  // due_date < today's UTC date on the dashboard overdue count. Elapsed
+  // milliseconds round a due-today follow-up to -1 after 12:00 UTC, so Needs
+  // you says 0 overdue tasks and the list it opens says the follow-up is late.
+  it('keeps a date-only due day at 0 for the whole UTC day', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T18:00:00.000Z'));
+    expect(daysUntil('2026-11-25')).toBe(0);
+    expect(daysUntil('2026-11-24')).toBe(-1);
+    expect(daysUntil('2026-11-26')).toBe(1);
+  });
+
+  it('still rounds a timestamp by elapsed time so a results clock is unchanged', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T18:00:00.000Z'));
+    expect(daysUntil('2026-11-25T00:00:00.000Z')).toBe(-1);
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });

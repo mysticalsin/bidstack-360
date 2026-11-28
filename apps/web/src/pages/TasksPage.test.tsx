@@ -53,10 +53,10 @@ function mockTasks(value: Partial<ReturnType<typeof useTasks>>) {
   vi.mocked(useTasks).mockReturnValue(value as ReturnType<typeof useTasks>);
 }
 
-function renderPage() {
+function renderPage(path = '/tasks') {
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <TasksPage />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -129,5 +129,58 @@ describe('TasksPage — tasks:write gating', () => {
     expect(snoozeButton.getAttribute('title')).toBe(
       'You need task write access to edit this task.',
     );
+  });
+});
+
+// Needs you counts overdue follow-ups with due_date < today's UTC date. The
+// list that link opens must use the same day: a follow-up due today is still
+// today's work at 18:00 UTC, and one due yesterday is the late one.
+describe('TasksPage — due today is not overdue', () => {
+  const today: Task = {
+    ...TASK,
+    id: 'due-today',
+    title: 'Call the buyer today',
+    dueDate: '2026-11-25',
+  };
+  const yesterday: Task = {
+    ...TASK,
+    id: 'due-yesterday',
+    title: 'Send the pricing note',
+    dueDate: '2026-11-24',
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-25T18:00:00.000Z'));
+    vi.clearAllMocks();
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    mockTasks({
+      data: { items: [today, yesterday], nextCursor: null },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it('leaves a follow-up due today off the overdue list the dashboard opens', () => {
+    renderPage('/tasks?filter=overdue');
+
+    expect(screen.getByText('Send the pricing note')).toBeTruthy();
+    expect(screen.queryByText('Call the buyer today')).toBeNull();
+    expect(screen.getByText(/Overdue: 1d late/)).toBeTruthy();
+  });
+
+  it('keeps the due-today follow-up on the today list, not marked late', () => {
+    renderPage('/tasks?filter=today');
+
+    expect(screen.getByText('Call the buyer today')).toBeTruthy();
+    expect(screen.queryByText('Send the pricing note')).toBeNull();
+    expect(screen.getByText('in 0d')).toBeTruthy();
+    expect(screen.queryByText(/Overdue:/)).toBeNull();
   });
 });
