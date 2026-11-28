@@ -3562,8 +3562,8 @@
   "infoSearchLeads": {
     "regionLabel": "InfoSearch 潜在客户情报",
     "title": "InfoSearch 潜在客户",
-    "captionPreview": "示例潜在客户情报 — 连接 InfoSearch (INFOSEARCH_ENABLED) 以获取实时通话名单",
-    "captionLive": "此客户的通话名单和潜在客户情报 — 从 InfoSearch 实时拉取",
+    "captionPreview": "参考记录 — 连接 InfoSearch (INFOSEARCH_ENABLED) 以获取通话名单",
+    "captionLive": "此客户的通话名单和潜在客户情报 — 从 InfoSearch 拉取",
     "errorTitle": "无法访问 InfoSearch",
     "errorMessage": "无法加载潜在客户情报。",
     "empty": "没有与此客户匹配的 InfoSearch 潜在客户。",

@@ -52,11 +52,11 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
           preview
             ? t(
                 'infoSearchLeads.captionPreview',
-                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
+                'Reference records — connect InfoSearch (INFOSEARCH_ENABLED) for call lists',
               )
             : t(
                 'infoSearchLeads.captionLive',
-                'Call lists and lead intel for this account — pulled live from InfoSearch',
+                'Call lists and lead intel for this account — pulled from InfoSearch',
               )
         }
       />

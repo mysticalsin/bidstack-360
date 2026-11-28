@@ -3562,8 +3562,8 @@
   "infoSearchLeads": {
     "regionLabel": "Inteligência de leads do InfoSearch",
     "title": "Leads do InfoSearch",
-    "captionPreview": "Inteligência de leads de amostra — conecte o InfoSearch (INFOSEARCH_ENABLED) para listas de chamadas ao vivo",
-    "captionLive": "Listas de chamadas e inteligência de leads para esta conta — obtidas ao vivo do InfoSearch",
+    "captionPreview": "Registros de referência — conecte o InfoSearch (INFOSEARCH_ENABLED) para listas de chamadas",
+    "captionLive": "Listas de chamadas e inteligência de leads para esta conta — obtidas do InfoSearch",
     "errorTitle": "O InfoSearch está inacessível",
     "errorMessage": "Não foi possível carregar a inteligência de leads.",
     "empty": "Nenhum lead do InfoSearch correspondeu a esta conta.",
