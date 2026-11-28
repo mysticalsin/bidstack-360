@@ -21,7 +21,10 @@ vi.mock('framer-motion', () => ({
 vi.mock('@/hooks/useOrgSummary', () => ({ useOrgSummary: vi.fn() }));
 vi.mock('@/hooks/usePipelineReport', () => ({ usePipelineReport: vi.fn() }));
 vi.mock('@/hooks/useForecasts', () => ({ useForecastProjection: () => ({ data: undefined }) }));
-vi.mock('@/hooks/useOpportunityRows', () => ({ useOpportunityRows: () => ({ data: { items: [] } }) }));
+vi.mock('@/hooks/useOpportunityRows', () => ({
+  OPPORTUNITY_VIZ_LIMIT: 100,
+  useOpportunityRows: () => ({ data: { items: [] } }),
+}));
 vi.mock('@/hooks/useWatchdogFeed', () => ({ useWatchdogFeed: () => ({ data: undefined }) }));
 vi.mock('./DashboardVisuals', () => ({
   DashboardHero: () => <div data-testid="dashboard-hero" />,

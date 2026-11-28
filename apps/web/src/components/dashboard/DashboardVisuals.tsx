@@ -28,10 +28,12 @@ import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, wonThisYear, feed, onDrill, rowsPending = false, feedPending = false }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, wonThisYear, monthlySample, feed, onDrill, rowsPending = false, feedPending = false }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number;
   /** Full-org won value for the current UTC year. The row sample is not the book. */
   wonThisYear?: number;
+  /** When set, the monthly bars are that many latest bids, not the whole book. */
+  monthlySample?: number;
   feed?: WatchdogFeed; onDrill?: OnDrill;
   /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
   rowsPending?: boolean;
@@ -100,7 +102,12 @@ export function DashboardHero({ rows, openValue, weighted, openCount, wonThisYea
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      <div className="viz-caption">
+        {monthlySample
+          ? `Monthly bars are the latest ${monthlySample} bids, not the whole book. `
+          : null}
+        Overdue bids hang below the line. Select a month or a number to see the bids.
+      </div>
     </ChartCard>
   );
 }
