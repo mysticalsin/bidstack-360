@@ -23,6 +23,7 @@ import {
   EnrichmentProviderId,
   type FieldProvenance,
   Firmographics,
+  hostedFirmographicLocations,
   HiringBreakdown,
   HiringRegion,
   JobFunction,
@@ -105,7 +106,7 @@ function parseHiring(v: unknown): HiringBreakdown {
   return out.success ? out.data : EMPTY_HIRING;
 }
 
-function toFirmographics(companyId: string, row: Row | null, openJobs: number, now: Date): Firmographics {
+function toFirmographics(companyName: string, companyId: string, row: Row | null, openJobs: number, now: Date): Firmographics {
   const providers: Firmographics['providers'] = {};
   for (const [k, s] of Object.entries(rec(row?.providerStatus))) {
     const r = rec(s);
@@ -116,9 +117,14 @@ function toFirmographics(companyId: string, row: Row | null, openJobs: number, n
       ...(typeof r.error === 'string' ? { error: r.error } : {}),
     };
   }
-  const locations = z
-    .array(z.object({ city: z.string().nullable(), state: z.string().nullable(), country: z.string().nullable(), kind: z.enum(['hq', 'subsidiary']) }))
-    .safeParse(row?.locations ?? []);
+  const fetchedAt = row?.fetchedAt?.toISOString() ?? null;
+  const hosted = hostedFirmographicLocations({
+    companyName,
+    locations: row?.locations ?? [],
+    provenance: row?.provenance ?? {},
+    fetchedAt: fetchedAt ?? new Date(0).toISOString(),
+  });
+  const provenance = { ...rec(row?.provenance), ...(hosted.provenancePatch ?? {}) };
   const dept = rec(row?.departmentHeadcount);
   return {
     companyId,
@@ -132,13 +138,13 @@ function toFirmographics(companyId: string, row: Row | null, openJobs: number, n
     headcountGrowth24m: row?.headcountGrowth24m ?? null,
     industry: row?.industry ?? null,
     industries: row?.industries ?? [],
-    locations: locations.success ? locations.data : [],
+    locations: hosted.locations,
     techStack: row?.techStack ?? [],
     departmentHeadcount: Object.keys(dept).length
       ? Object.fromEntries(Object.entries(dept).filter((e): e is [string, number] => typeof e[1] === 'number'))
       : null,
     openJobs,
-    provenance: rec(row?.provenance) as Record<string, FieldProvenance>,
+    provenance: provenance as Record<string, FieldProvenance>,
     providers,
     fetchedAt: row?.fetchedAt?.toISOString() ?? null,
     expiresAt: row?.expiresAt?.toISOString() ?? null,
@@ -215,7 +221,7 @@ export const accountEnrichmentRoutes: FastifyPluginAsyncZod = async (server) => 
         prisma.companyJobPosting.count({ where: { orgId: req.auth.orgId, companyId: company.id } }),
       ]);
       await audit(req, 'enrichment.view', company.id, { status: row?.status ?? 'not_enriched' });
-      return toFirmographics(company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
+      return toFirmographics(company.name, company.id, row && row.orgId === req.auth.orgId ? row : null, openJobs, new Date());
     },
   );
 

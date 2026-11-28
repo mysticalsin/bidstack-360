@@ -8,6 +8,8 @@ export * from './calendar/index.js';
 export * from './rfp-crew.js';
 export * from './competitor-intel/index.js';
 export * from './company-intel/index.js';
+export { hostedFirmographicLocations } from './company-intel/hosted-location.js';
+export type { HostedLocationInput, HostedLocationResult } from './company-intel/hosted-location.js';
 export * from './company-figures/index.js';
 export * from './tech-stack/index.js';
 export * from './bid-classification/index.js';
