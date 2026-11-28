@@ -238,6 +238,49 @@ describe('OpportunitiesPage', () => {
       '/settings?tab=data-import',
     );
   });
+
+  // WHY: the customer under a deal is how a reader opens that account. A name
+  // search also matches Globex Labs, and a deal with no company id must stay
+  // text instead of inventing that search.
+  it('opens the linked account from the customer and leaves an unlinked name as text', () => {
+    const companyId = 'c0000000-0000-4000-8000-0000000000bb';
+    mockOpportunities({
+      data: {
+        items: [
+          { ...seededOpportunity(), companyId },
+          {
+            ...seededOpportunity(),
+            id: '22222222-2222-4222-8222-222222222222',
+            code: 'OP-0002',
+            name: 'Loose bid',
+            customer: 'Globex',
+            companyId: null,
+          },
+          {
+            ...seededOpportunity(),
+            id: '33333333-3333-4333-8333-333333333333',
+            code: 'OP-0003',
+            name: 'Named only',
+            customer: 'Globex Labs',
+            companyId: 'Globex Labs',
+          },
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    expect(screen.getByRole('link', { name: 'Acme Corp account' }).getAttribute('href')).toBe(
+      `/accounts/${companyId}`,
+    );
+    expect(screen.getByText('Globex').closest('a')).toBeNull();
+    expect(screen.getByText('Globex Labs').closest('a')).toBeNull();
+    expect(screen.queryByRole('link', { name: /search/i })).toBeNull();
+  });
 });
 
 // The backend 403s every opportunity PATCH/DELETE/stage-move for a role

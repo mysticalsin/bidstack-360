@@ -4,7 +4,9 @@ import {
   Opportunity,
   OpportunityCreate,
   OpportunityFilter,
+  OpportunityPatch,
   PipelineStage,
+  readCompanyId,
 } from './opportunity.js';
 
 describe('PipelineStage', () => {
@@ -58,6 +60,34 @@ describe('Opportunity', () => {
 
   it('accepts legacy persisted codes on read so historical records do not crash list views', () => {
     expect(() => Opportunity.parse({ ...valid, code: 'RFP-ABCD-1234' })).not.toThrow();
+  });
+
+  // WHY: the deals screens open /accounts/<uuid>. A customer name must not
+  // pass as that id, and a client must not be able to assign it on write.
+  it('reads a company id and strips it from create and patch', () => {
+    const companyId = 'c0000000-0000-4000-8000-0000000000bb';
+    expect(Opportunity.parse({ ...valid, companyId }).companyId).toBe(companyId);
+    expect(Opportunity.parse({ ...valid, companyId: null }).companyId).toBeNull();
+    expect(() => Opportunity.parse({ ...valid, companyId: 'Globex' })).toThrow();
+    expect(readCompanyId(companyId)).toBe(companyId);
+    expect(readCompanyId('Globex')).toBeNull();
+    expect(readCompanyId(null)).toBeNull();
+
+    const created = OpportunityCreate.parse({
+      customer: 'X',
+      name: 'X bid',
+      value: 100,
+      probability: 30,
+      dueDate: null,
+      owner: null,
+      industry: null,
+      logo: null,
+      country: null,
+      territoryId: null,
+      companyId,
+    });
+    expect(created).not.toHaveProperty('companyId');
+    expect(OpportunityPatch.parse({ name: 'Renamed', companyId })).not.toHaveProperty('companyId');
   });
 });
 

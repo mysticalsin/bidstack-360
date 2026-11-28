@@ -32,4 +32,39 @@ describe('serializeOpportunity', () => {
     expect(naive).not.toBe(9_007_199_254.740993);
     expect(serializeOpportunity(row).value).toBe(9_007_199_254.740993);
   });
+
+  // WHY: the deals list and the deal page open /accounts/<uuid>. A customer
+  // name in that field would send the reader to a search, which matches the
+  // wrong book (Globex vs Globex Labs).
+  it('keeps a company id and drops a customer name', () => {
+    const id = 'c0000000-0000-4000-8000-0000000000bb';
+    const row = {
+      id: '00000000-0000-4000-8000-000000000001',
+      code: 'OP-2041',
+      customer: 'Globex',
+      name: 'Globex deal',
+      stage: 's1_lead' as const,
+      pipelineStageId: null,
+      pipelineStage: null,
+      valueMicros: 1_000_000n,
+      probability: 50,
+      dueDate: null,
+      industry: null,
+      logoUrl: null,
+      country: null,
+      territoryId: null,
+      updatedAt: new Date('2026-11-02T00:00:00.000Z'),
+      closedAt: null,
+      viewCount: 0,
+      owner: null,
+    };
+    const linked = serializeOpportunity({ ...row, companyId: id } as never) as {
+      companyId?: string | null;
+    };
+    const named = serializeOpportunity({ ...row, companyId: 'Globex' } as never) as {
+      companyId?: string | null;
+    };
+    expect(linked.companyId).toBe(id);
+    expect(named.companyId).toBeNull();
+  });
 });

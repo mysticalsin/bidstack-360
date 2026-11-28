@@ -86,6 +86,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
               id: true,
               code: true,
               customer: true,
+              companyId: true,
               name: true,
               stage: true,
               pipelineStageId: true,

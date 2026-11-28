@@ -4,6 +4,7 @@
 import type { Task, Document, OpportunityStage } from '@bidstack/db';
 import {
   microsToUnits,
+  readCompanyId,
   type Opportunity as ApiOpportunity,
   type OpportunityFull as ApiOpportunityFull,
 } from '@bidstack/shared';
@@ -38,6 +39,7 @@ type SerializedOpportunity = {
   bidClass?: string | null;
   fteEstimate?: number | null;
   commitmentLevel?: string | null;
+  companyId?: string | null;
   // Only the detail/full path reads intel; the list query omits the column to
   // avoid fetching the large JSONB per row, so this is optional here.
   intel?: unknown;
@@ -76,6 +78,7 @@ export function serializeOpportunity(
     id: o.id,
     code: o.code,
     customer: o.customer,
+    companyId: readCompanyId(o.companyId),
     name: o.name,
     stage: o.pipelineStage?.name ?? o.stage ?? null,
     pipelineStageId: o.pipelineStageId ?? null,
