@@ -923,6 +923,7 @@
     "decisionUnitEmptyTitle": "No decision-unit members yet",
     "decisionUnitEmptyMessage": "Add a contact from the Contacts page or sync from Dust.",
     "decisionUnitTitle": "Decision unit",
+    "openContact": ", open contact",
     "stakeholdersCount": "{{count}} stakeholders",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influence {{value}} out of 5",

@@ -1007,6 +1007,7 @@
     "decisionUnitEmptyTitle": "Aucun membre de l'unité de décision pour l'instant",
     "decisionUnitEmptyMessage": "Ajoutez un contact depuis la page Contacts ou synchronisez depuis Dust.",
     "decisionUnitTitle": "Unité de décision",
+    "openContact": ", ouvrir le contact",
     "stakeholdersCount": "{{count}} parties prenantes",
     "dustBadge": "Dust",
     "influenceAriaLabel": "Influence {{value}} sur 5",

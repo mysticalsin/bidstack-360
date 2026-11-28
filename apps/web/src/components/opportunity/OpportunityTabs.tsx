@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -26,6 +27,7 @@ import {
   shownOpportunityDocuments,
 } from './opportunity-document-caption';
 
+import { decisionUnitContactHref } from './decision-unit-contact-href';
 import { ContactsPanel } from './opportunityTabs/ContactsPanel';
 
 // Call status → Badge tone. Calls live in this tab now rather than a standalone
@@ -106,6 +108,33 @@ export function OpportunityTabs({
       </TabsContent>
       <TabsContent value="activity">{activityContent}</TabsContent>
     </Tabs>
+  );
+}
+
+function DecisionUnitName({
+  name,
+  contactId,
+  source,
+}: {
+  name: string;
+  contactId: string;
+  source: 'crm' | 'intel';
+}) {
+  const { t } = useTranslation('crm');
+  // Dust-only members are not CRM contacts yet. A uuid-shaped id there still
+  // has no record to open.
+  const href = source === 'crm' ? decisionUnitContactHref(contactId) : null;
+  if (!href) {
+    return <div className="text-sm font-medium text-[var(--fg-primary)]">{name}</div>;
+  }
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-sm font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)]"
+    >
+      {name}
+      <span className="sr-only">{t('opportunityTabs.openContact', ', open contact')}</span>
+    </Link>
   );
 }
 
@@ -206,7 +235,7 @@ function DecisionUnitPanel({
           <li key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <div className="text-sm font-medium text-[var(--fg-primary)]">{r.name}</div>
+                <DecisionUnitName name={r.name} contactId={r.id} source={r.source} />
                 {r.source === 'intel' ? (
                   <Badge tone="purple">{t('opportunityTabs.dustBadge', 'Dust')}</Badge>
                 ) : null}
