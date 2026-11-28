@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, SectionHeader } from '@/components/ui/Card';
@@ -22,6 +23,25 @@ import {
   opportunityContactCaption,
   shownOpportunityContacts,
 } from '@/components/opportunity/opportunity-contact-caption';
+
+import { contactRecordHref } from './contactRecordHref';
+
+function ContactName({ name, contactId }: { name: string; contactId: string }) {
+  const { t } = useTranslation('crm');
+  const href = contactRecordHref(contactId);
+  if (!href) {
+    return <span className="text-sm font-medium text-[var(--fg-primary)]">{name}</span>;
+  }
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-sm font-medium text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)]"
+    >
+      {name}
+      <span className="sr-only">{t('contacts.openContact', ', open contact')}</span>
+    </Link>
+  );
+}
 
 export function ContactsPanel({ oppId }: { oppId: string }) {
   const { t } = useTranslation('crm');
@@ -88,9 +108,7 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
             <li key={oc.id} className="flex items-center justify-between gap-3 px-5 py-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-[var(--fg-primary)]">
-                    {oc.contact.name}
-                  </span>
+                  <ContactName name={oc.contact.name} contactId={oc.contact.id} />
                   {oc.isPrimary && <Badge tone="jade">{t('contacts.primaryBadge', 'Primary')}</Badge>}
                 </div>
                 <div className="text-xs text-[var(--fg-tertiary)]">
@@ -99,7 +117,8 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
               </div>
               <div className="flex items-center gap-2">
                 <select
-                  className="text-xs rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 py-1"
+                  className="min-h-11 rounded border border-[var(--border-subtle)] bg-[var(--surface-card)] px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+                  aria-label={t('contacts.roleLabel', 'Role for {{name}}', { name: oc.contact.name })}
                   value={oc.role}
                   onChange={(e) =>
                     update.mutate({
@@ -116,7 +135,8 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                   <option>blocker</option>
                 </select>
                 <button
-                  className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
+                  type="button"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
                   onClick={() =>
                     update.mutate({
                       opportunityId: oppId,
@@ -124,16 +144,17 @@ export function ContactsPanel({ oppId }: { oppId: string }) {
                       patch: { isPrimary: !oc.isPrimary },
                     })
                   }
-                  title={
+                  aria-label={
                     oc.isPrimary
                       ? t('contacts.unsetPrimary', 'Unset primary')
                       : t('contacts.setPrimary', 'Set as primary')
                   }
                 >
-                  {oc.isPrimary ? '★' : '☆'}
+                  <span aria-hidden>{oc.isPrimary ? '★' : '☆'}</span>
                 </button>
                 <button
-                  className="text-xs text-[var(--fg-tertiary)] hover:text-[var(--rose-9)]"
+                  type="button"
+                  className="inline-flex min-h-11 items-center rounded px-2 text-xs text-[var(--fg-secondary)] hover:text-[var(--danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
                   onClick={() => {
                     if (confirm(t('contacts.unlinkConfirm', 'Unlink {{name}}?', { name: oc.contact.name })))
                       unlink.mutate({ opportunityId: oppId, contactId: oc.contactId });
