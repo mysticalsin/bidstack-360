@@ -141,12 +141,12 @@
     "toastErrorTitle": "无法安装模板"
   },
   "sampleDataBanner": {
-    "title": "示例数据已启用",
-    "description": "演示记录在此工作区中可见。在向高管或客户演示之前，请隐藏此提示或完全删除示例记录。",
+    "title": "此工作区包含参考记录",
+    "description": "参考记录在此工作区中可见。可隐藏此提示，或在不再需要时移除这些参考记录。",
     "hide": "隐藏",
-    "remove": "删除示例数据",
-    "removing": "正在删除…",
-    "removedToast": "示例数据已删除",
-    "removeErrorToast": "无法删除示例数据"
+    "remove": "移除参考记录",
+    "removing": "正在移除…",
+    "removedToast": "参考记录已移除",
+    "removeErrorToast": "无法移除参考记录"
   }
 }

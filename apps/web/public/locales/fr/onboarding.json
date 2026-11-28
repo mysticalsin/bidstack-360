@@ -141,12 +141,12 @@
     "toastErrorTitle": "Impossible d'installer le modèle"
   },
   "sampleDataBanner": {
-    "title": "Les données d'exemple sont activées",
-    "description": "Des enregistrements de démonstration sont visibles dans cet espace de travail. Masquez cet avis ou supprimez entièrement les enregistrements d'exemple avant les démonstrations destinées aux dirigeants ou aux clients.",
+    "title": "Cet espace de travail contient des enregistrements de référence",
+    "description": "Des enregistrements de référence sont visibles dans cet espace de travail. Masquez cet avis ou supprimez les enregistrements de référence lorsqu'ils ne sont plus nécessaires.",
     "hide": "Masquer",
-    "remove": "Supprimer les données d'exemple",
+    "remove": "Supprimer les enregistrements de référence",
     "removing": "Suppression…",
-    "removedToast": "Données d'exemple supprimées",
-    "removeErrorToast": "Impossible de supprimer les données d'exemple"
+    "removedToast": "Enregistrements de référence supprimés",
+    "removeErrorToast": "Impossible de supprimer les enregistrements de référence"
   }
 }

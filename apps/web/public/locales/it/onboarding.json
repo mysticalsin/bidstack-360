@@ -141,12 +141,12 @@
     "toastErrorTitle": "Impossibile installare il modello"
   },
   "sampleDataBanner": {
-    "title": "I dati di esempio sono attivi",
-    "description": "I record demo sono visibili in questa area di lavoro. Nascondi questo avviso o rimuovi completamente i record di esempio prima delle demo per dirigenti o clienti.",
+    "title": "Questa area di lavoro include record di riferimento",
+    "description": "I record di riferimento sono visibili in questa area di lavoro. Nascondi questo avviso o rimuovi i record di riferimento quando non servono più.",
     "hide": "Nascondi",
-    "remove": "Rimuovi dati di esempio",
+    "remove": "Rimuovi i record di riferimento",
     "removing": "Rimozione…",
-    "removedToast": "Dati di esempio rimossi",
-    "removeErrorToast": "Impossibile rimuovere i dati di esempio"
+    "removedToast": "Record di riferimento rimossi",
+    "removeErrorToast": "Impossibile rimuovere i record di riferimento"
   }
 }

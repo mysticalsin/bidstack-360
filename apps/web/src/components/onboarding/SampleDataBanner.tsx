@@ -22,9 +22,9 @@ export function SampleDataBanner() {
 
   async function removeSampleData() {
     const ok = await confirm({
-      title: t('sampleDataBanner.remove', 'Remove sample data'),
+      title: t('sampleDataBanner.remove', 'Remove reference records'),
       description: t('sampleData.confirmClear', 'Delete all demonstration data? This action cannot be undone.'),
-      confirmLabel: t('sampleDataBanner.remove', 'Remove sample data'),
+      confirmLabel: t('sampleDataBanner.remove', 'Remove reference records'),
       destructive: true,
     });
     if (!ok) return;
@@ -32,10 +32,10 @@ export function SampleDataBanner() {
       onSuccess: () => {
         setHasSampleData(false);
         setHidden(true);
-        toast.success(t('sampleDataBanner.removedToast', 'Sample data removed'));
+        toast.success(t('sampleDataBanner.removedToast', 'Reference records removed'));
       },
       onError: () =>
-        toast.error(t('sampleDataBanner.removeErrorToast', 'Could not remove sample data')),
+        toast.error(t('sampleDataBanner.removeErrorToast', 'Could not remove reference records')),
     });
   }
 
@@ -44,12 +44,12 @@ export function SampleDataBanner() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[var(--fg-primary)]">
-            {t('sampleDataBanner.title', 'Sample data is on')}
+            {t('sampleDataBanner.title', 'Reference records are in this workspace')}
           </div>
           <p className="mt-1 text-xs leading-5 text-[var(--fg-secondary)]">
             {t(
               'sampleDataBanner.description',
-              'Demo records are visible in this workspace. Hide this notice, or remove the sample records entirely before executive or client demos.',
+              'Reference records are visible in this workspace. Hide this notice, or remove the reference records when you no longer need them.',
             )}
           </p>
         </div>
@@ -60,7 +60,7 @@ export function SampleDataBanner() {
           <Button variant="secondary" size="sm" onClick={() => void removeSampleData()} disabled={del.isPending}>
             {del.isPending
               ? t('sampleDataBanner.removing', 'Removing…')
-              : t('sampleDataBanner.remove', 'Remove sample data')}
+              : t('sampleDataBanner.remove', 'Remove reference records')}
           </Button>
         </div>
       </div>
