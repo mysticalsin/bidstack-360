@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
+import { AGREEMENT_FILE_EMPTY, AGREEMENT_UPLOAD_OFF } from '@/components/agreements/reference-copy';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
@@ -64,7 +65,7 @@ function Viewer({ agreement, version, sample }: { agreement: MsaDetail; version:
       <div className="agr-viewer-empty" data-testid="agreement-viewer-sample">
         <Icon name="file" size={24} />
         <span><strong style={{ fontWeight: 500 }}>{version.fileName}</strong> · {fmtBytes(version.bytes)}</span>
-        <span>The document preview opens here once the Agreements service is live.</span>
+        <span>{AGREEMENT_FILE_EMPTY}</span>
       </div>
     );
   }
@@ -127,7 +128,7 @@ export default function AgreementDetailPage() {
   const sample = detail.data.sample;
   const version = a.versions.find((v) => v.id === versionId) ?? a.versions[0] ?? null;
   const disabledReason = sample
-    ? 'Uploading is off in this Sample preview. It turns on once the Agreements service is live on this server.'
+    ? AGREEMENT_UPLOAD_OFF
     : !canWrite ? 'You can view this agreement but not change it. Ask an admin for the "Agreements: edit" permission.' : undefined;
   const terms: Array<[string, string]> = [
     ['Type', KIND_LABEL[a.kind]],

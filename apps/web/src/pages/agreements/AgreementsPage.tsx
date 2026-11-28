@@ -10,13 +10,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { DocumentHits } from '@/components/agreements/DocumentHits';
 import { IntakeDropzone } from '@/components/agreements/IntakeDropzone';
+import {
+  AGREEMENT_LIBRARY_EMPTY,
+  AGREEMENT_LIBRARY_EMPTY_TITLE,
+  AGREEMENT_UPLOAD_OFF,
+} from '@/components/agreements/reference-copy';
 import { SampleBanner } from '@/components/agreements/SampleBanner';
 import { SourcesPanel } from '@/components/agreements/SourcesPanel';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { UploadDialog } from '@/components/agreements/UploadDialog';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useMsaList } from '@/hooks/useMsa';
 import { fmtDate, fmtDays, KIND_LABEL, STATUS_LABEL, urgency } from '@/lib/msa/labels';
@@ -75,7 +80,7 @@ export default function AgreementsPage() {
   };
   const filtered = [...params.keys()].length > 0;
   const disabledReason = sample
-    ? 'Uploading is off in this Sample preview. It turns on once the Agreements service is live on this server.'
+    ? AGREEMENT_UPLOAD_OFF
     : !canWrite ? 'You can view agreements but not add them. Ask an admin for the "Agreements: edit" permission.' : undefined;
 
   const KPI: Array<{ id: AgreementsView; label: string; value: number; sub: string }> = [
@@ -107,6 +112,10 @@ export default function AgreementsPage() {
       {sample ? <SampleBanner /> : null}
       {list.isLoading ? <LoadingSkeleton rows={6} /> : list.isError ? (
         <ErrorState title="Couldn't load agreements" message={list.error instanceof Error ? list.error.message : 'Try again in a moment.'} />
+      ) : rows.length === 0 ? (
+        <div data-testid="agreements-empty">
+          <EmptyState icon="file" title={AGREEMENT_LIBRARY_EMPTY_TITLE} message={AGREEMENT_LIBRARY_EMPTY} />
+        </div>
       ) : (
         <>
           <div
