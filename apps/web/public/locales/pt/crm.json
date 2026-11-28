@@ -1137,7 +1137,7 @@
     "map": {
       "summary": "{{rows}} linhas. Associe cada coluna a um campo ou deixe como Não importar.",
       "colCsvColumn": "Coluna CSV",
-      "colSample": "Amostra",
+      "colSample": "Referência",
       "colMapsTo": "Mapeia para",
       "mapColumnAria": "Mapear coluna {{header}}",
       "dontImport": "Não importar",

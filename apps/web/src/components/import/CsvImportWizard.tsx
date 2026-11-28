@@ -323,7 +323,7 @@ export function CsvImportWizard() {
                     {t('csvImport.map.colCsvColumn', 'CSV column')}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
-                    {t('csvImport.map.colSample', 'Sample')}
+                    {t('csvImport.map.colSample', 'Reference')}
                   </th>
                   <th scope="col" className="px-3 py-2 font-medium">
                     {t('csvImport.map.colMapsTo', 'Maps to')}

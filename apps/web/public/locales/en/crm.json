@@ -1138,7 +1138,7 @@
     "map": {
       "summary": "{{rows}} rows. Match each column to a field, or leave it as Don’t import.",
       "colCsvColumn": "CSV column",
-      "colSample": "Sample",
+      "colSample": "Reference",
       "colMapsTo": "Maps to",
       "mapColumnAria": "Map column {{header}}",
       "dontImport": "Don’t import",

@@ -1200,7 +1200,7 @@
     "map": {
       "summary": "{{rows}} filas. Asigna cada columna a un campo o déjala como No importar.",
       "colCsvColumn": "Columna CSV",
-      "colSample": "Muestra",
+      "colSample": "Referencia",
       "colMapsTo": "Se asigna a",
       "mapColumnAria": "Asignar columna {{header}}",
       "dontImport": "No importar",
