@@ -70,6 +70,9 @@ describe('FinancialHealthSection', () => {
     expect(screen.getByTestId('fh-tile-margin').textContent).toContain('-5.9 pts');
     expect(screen.getByTestId('fh-tile-capex').textContent).toContain('Not filed');
     expect(screen.queryByText('Sample')).toBeNull();
+    // A filed account is not a fixture. The Reference badge is only for sample: true.
+    expect(screen.queryByText('Reference', { selector: '.wd-sample-badge' })).toBeNull();
+    expect(rev.textContent).not.toContain('Reference');
     // tier accounts never show the toggle
     expect(screen.queryByRole('switch')).toBeNull();
   });
@@ -86,11 +89,36 @@ describe('FinancialHealthSection', () => {
     expect(document.body.textContent).not.toMatch(/[\u2014]/);
   });
 
-  it('sample state is labelled Sample everywhere', () => {
+  it('fixture layout is labelled Reference, and the numbers stay unlinked', () => {
+    // Sellers should see reference records, not a demo. The sample flag still withholds filing links.
     state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
     render(<FinancialHealthSection companyId="c1" />);
-    expect(screen.getAllByText('Sample').length).toBeGreaterThan(2);
-    expect(screen.getByTestId('fh-tile-revenue').querySelector('a')).toBeNull();
+    const badges = screen.queryAllByText('Sample', { selector: '.wd-sample-badge' });
+    expect(badges.map((b) => b.textContent)).toEqual([]);
+    // Header plus one badge on each fixture warning.
+    expect(screen.getAllByText('Reference', { selector: '.wd-sample-badge' }).length).toBe(1 + SAMPLE_FINANCIAL_SIGNALS.length);
+    for (const key of ['revenue', 'margin', 'capex', 'cash']) {
+      const src = screen.getByTestId(`fh-tile-${key}`).querySelector('.fh-src');
+      expect(src?.textContent).toContain('Reference');
+      expect(src?.textContent).not.toMatch(/Sample/);
+      expect(src?.querySelector('a')).toBeNull();
+    }
+  });
+
+  it('fixture meta says reference records and drops the example-layout line', () => {
+    state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
+    render(<FinancialHealthSection companyId="c1" />);
+    const section = screen.getByTestId('financial-health');
+    expect(section.textContent).toContain('Reference records. Queued: the next financials pull will fill this in.');
+    expect(section.textContent).not.toContain('Example layout');
+    expect(section.textContent).not.toContain('Real filed numbers replace it');
+  });
+
+  it('a fixture with no status line is only "Reference records."', () => {
+    state.data = { ...real, statusCopy: null, entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: [], sample: true };
+    render(<FinancialHealthSection companyId="c1" />);
+    expect(screen.getByText('Reference records.').textContent).toBe('Reference records.');
+    expect(screen.getByTestId('financial-health').textContent).not.toMatch(/Example layout|Real filed numbers replace it|Sample/);
   });
 
   it('falls back to net margin for banks and formats money', () => {
