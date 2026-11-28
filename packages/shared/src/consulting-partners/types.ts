@@ -87,7 +87,7 @@ export const PARTNER_SOURCE_LABEL: Record<PartnerEvidenceSource, string> = {
   win_loss: 'Win/loss record',
   bid_intel: 'Bid competitor field',
   competitor_insight: 'Competitor insight',
-  fixture: 'Sample data',
+  fixture: 'Reference record',
 };
 
 /** Sources that are our own records (subject to record access). */

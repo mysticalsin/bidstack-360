@@ -22,6 +22,8 @@ import {
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useConsultingPartners, usePartnerEvidence, useRefreshConsultingPartners } from '@/hooks/useConsultingPartners';
 
+import { PARTNER_REFERENCE_BADGE, PARTNERS_EMPTY } from './reference-copy';
+
 import { fmtDate, safeHref } from '../company-intel/intel-format';
 
 const RadarChart = lazy(() => import('@/components/charts/PolarCharts').then((m) => ({ default: m.RadarChart })));
@@ -222,7 +224,7 @@ function EvidenceItem({ e }: { e: PartnerEvidence }) {
         <span className="ci-tag">{e.sourceLabel}</span>
         {e.date ? <span className="ci-meta">{fmtDate(e.date)}</span> : null}
         {e.inferred ? <span className="ci-basis">Inferred</span> : null}
-        {e.sample ? <span className="sg-sample">Sample</span> : null}
+        {e.sample ? <span className="sg-sample">{PARTNER_REFERENCE_BADGE}</span> : null}
         {href ? (
           <a className="ci-cite" href={href} target="_blank" rel="noopener noreferrer nofollow">
             Source <ExternalLink size={12} aria-hidden />
@@ -355,7 +357,7 @@ export function ConsultingPartnersSection({ companyId }: { companyId: string }) 
     <section className="sg ci cp sg-surface" aria-labelledby="cp-h" data-testid="consulting-partners">
       <header className="sg-head cp-head">
         <h2 id="cp-h" className="sg-h">
-          Consulting partners {q.data?.sample ? <span className="sg-sample">Sample</span> : null}
+          Consulting partners {q.data?.sample ? <span className="sg-sample">{PARTNER_REFERENCE_BADGE}</span> : null}
         </h2>
         {q.data ? <RunStatus run={q.data.run} canRefresh={canRefresh} pending={refresh.isPending} onRefresh={() => refresh.mutate()} /> : null}
       </header>
@@ -371,7 +373,7 @@ export function ConsultingPartnersSection({ companyId }: { companyId: string }) 
         </p>
       ) : partners.length === 0 || !current ? (
         <p className="ci-none" data-testid="partners-empty">
-          No consulting partners found
+          {PARTNERS_EMPTY}
         </p>
       ) : (
         <>

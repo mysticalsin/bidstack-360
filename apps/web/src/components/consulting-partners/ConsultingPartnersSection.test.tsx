@@ -62,6 +62,7 @@ describe('ConsultingPartnersSection', () => {
   afterEach(() => {
     cleanup();
     refresh.mockReset();
+    ev.sample = false;
     Object.assign(state, { data: summary, isLoading: false, canWrite: true });
   });
 
@@ -125,13 +126,26 @@ describe('ConsultingPartnersSection', () => {
     expect(screen.queryByRole('button', { name: 'Refresh consulting partners' })).toBeNull();
   });
 
-  it('shows the empty line and the Sample tag', () => {
-    state.data = { ...summary, partners: [] };
+  const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
+
+  it('says the account has no consulting partners on file', () => {
+    state.data = { ...summary, partners: [], sample: false };
     view();
-    expect(screen.getByTestId('partners-empty').textContent).toBe('No consulting partners found');
-    cleanup();
+    const empty = screen.getByTestId('partners-empty');
+    expect(empty.textContent).toBe('No consulting partners on file');
+    expect(empty.textContent).not.toMatch(DEMO_COPY);
+  });
+
+  it('labels fixture partners and their notes as Reference', () => {
     state.data = { ...summary, sample: true };
+    ev.sample = true;
     view();
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.getAllByText('Reference').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /Evidence/ }));
+    const list = screen.getByTestId('partner-evidence');
+    expect(within(list).getByText('Reference')).toBeTruthy();
+    expect(within(list).queryByText('Sample')).toBeNull();
+    expect(list.textContent).not.toMatch(DEMO_COPY);
   });
 });

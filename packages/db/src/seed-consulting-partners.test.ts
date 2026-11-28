@@ -18,6 +18,33 @@ describe('consulting partner demo fixtures', () => {
     }
   });
 
+  it('names fixture notes as reference records and keeps those rows sample', () => {
+    // A seller reading the note title must not be told the workspace is a demo.
+    // The evidence flag stays sample so the row is never treated as live.
+    const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
+    const titles = PARTNER_FIXTURES.flatMap((f) => f.notes.map((n) => n.title));
+    expect(titles).toEqual([
+      'Reference: MAPFRE IT steering debrief',
+      'Reference: DNB procurement feedback',
+      'Reference: MAHLE test bench review',
+    ]);
+    for (const f of PARTNER_FIXTURES) {
+      for (const n of f.notes) {
+        const drafts = readInternalRecord(
+          { source: 'note', recordType: 'note', recordId: 'n', title: n.title, text: n.body, occurredAt: NOW, sample: true },
+          DEFAULT_CONSULTING_FIRMS,
+        );
+        expect(drafts.length).toBeGreaterThan(0);
+        for (const d of drafts) {
+          expect(d.sample).toBe(true);
+          expect(d.title).toBe(n.title);
+          expect(`${d.title ?? ''} ${d.excerpt}`).not.toMatch(DEMO_COPY);
+        }
+      }
+      for (const d of partnerFixtureDrafts(f, NOW)) expect(d.sample).toBe(true);
+    }
+  });
+
   it('ship notes whose remarks the keyword reader scores against the partner', () => {
     const remarks = (name: string, firm: string) =>
       byAccount(name).notes.flatMap((n) => readInternalRecord({ source: 'note', recordType: 'note', recordId: 'n', title: n.title, text: n.body, occurredAt: NOW }, DEFAULT_CONSULTING_FIRMS))
