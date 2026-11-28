@@ -36,6 +36,7 @@ import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch'
 
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
+import { pipelineKpiReadiness } from './pipelineBoard/pipeline-kpi';
 import { StageColumn } from './pipelineBoard/StageColumn';
 
 export function PipelinePage() {
@@ -252,58 +253,98 @@ export function PipelinePage() {
       </p>
 
       {/* Reserve the KPI row while opportunities load: inserting it above
-          the still-visible stage skeleton pushes the whole board down. */}
-      {(isLoading || data) && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
-          {(() => {
-            const rep = report.data;
-            const byStage = rep?.byStage ?? [];
-            const totalValue = byStage.reduce((acc, s) => acc + s.valueSum, 0);
-            const closedWon = byStage.find((s) => s.stage === 'closed_won')?.count ?? 0;
-            const closedLost = byStage.find((s) => s.stage === 'closed_lost')?.count ?? 0;
-            const closedTotal = closedWon + closedLost;
-            const winRate =
-              closedTotal > 0
-                ? `${Math.round((closedWon / closedTotal) * 100)}%`
-                : t('pipeline.winRateNoClosedBids', 'No closed bids');
-            const loading = isLoading || report.isLoading;
-            return [
-              {
-                label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
-                tone: 'blue' as const,
-              },
-              {
-                label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
-                tone: 'jade' as const,
-              },
-              {
-                label: t('pipeline.kpiWinRate', 'Win rate'),
-                value: loading ? '…' : winRate,
-                tone: 'amber' as const,
-              },
-              {
-                label: t('pipeline.kpiActiveDeals', 'Active deals'),
-                value: loading ? '…' : String(rep?.totalOpen ?? 0),
-                tone: 'purple' as const,
-              },
-            ];
-          })().map((kpi) => (
+          the still-visible stage skeleton pushes the whole board down.
+          A missing report is not a zero book — the cards below can still be
+          the latest bids. */}
+      {(isLoading || data) &&
+        (() => {
+          const readiness = pipelineKpiReadiness({
+            opportunitiesLoading: isLoading,
+            reportLoading: report.isLoading,
+            report: report.data,
+          });
+          if (readiness === 'unavailable') {
+            const unavailable = t(
+              'pipeline.kpiUnavailable',
+              'Pipeline totals are unavailable. The board below is still the latest bids.',
+            );
+            return (
+              <div
+                data-testid="pipeline-totals"
+                data-tour="pipeline-kanban"
+                role="status"
+                aria-label={unavailable}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+              >
+                <p className="text-sm text-[var(--fg-secondary)]">{unavailable}</p>
+                <button
+                  type="button"
+                  onClick={() => void report.refetch()}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--surface-card)] px-3 text-sm font-medium text-[var(--fg-primary)] hover:bg-[var(--surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+                >
+                  {t('pipeline.kpiRetry', 'Retry pipeline totals')}
+                </button>
+              </div>
+            );
+          }
+          const rep = report.data;
+          const stageRows = rep?.byStage ?? [];
+          const totalValue = stageRows.reduce((acc, s) => acc + s.valueSum, 0);
+          const closedWon = stageRows.find((s) => s.stage === 'closed_won')?.count ?? 0;
+          const closedLost = stageRows.find((s) => s.stage === 'closed_lost')?.count ?? 0;
+          const closedTotal = closedWon + closedLost;
+          const winRate =
+            closedTotal > 0
+              ? `${Math.round((closedWon / closedTotal) * 100)}%`
+              : t('pipeline.winRateNoClosedBids', 'No closed bids');
+          const loading = readiness === 'loading';
+          const kpis = [
+            {
+              label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
+              value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+            },
+            {
+              label: t('pipeline.kpiOpenValue', 'Open value'),
+              value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+            },
+            {
+              label: t('pipeline.kpiWinRate', 'Win rate'),
+              value: loading ? '…' : winRate,
+            },
+            {
+              label: t('pipeline.kpiActiveDeals', 'Active deals'),
+              value: loading ? '…' : String(rep?.totalOpen ?? 0),
+            },
+          ];
+          return (
             <div
-              key={kpi.label}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+              data-testid="pipeline-totals"
+              role="group"
+              aria-busy={loading}
+              aria-label={
+                loading
+                  ? t('pipeline.kpiLoading', 'Pipeline totals are still loading.')
+                  : t('pipeline.kpiRegion', 'Pipeline totals')
+              }
+              className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+              data-tour="pipeline-kanban"
             >
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                {kpi.label}
-              </div>
-              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                {kpi.value}
-              </div>
+              {kpis.map((kpi) => (
+                <div
+                  key={kpi.label}
+                  className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-secondary)]">
+                    {kpi.label}
+                  </div>
+                  <div className="mt-1 text-lg font-bold tabular-nums text-[var(--fg-primary)]">
+                    {kpi.value}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })()}
 
       {isError ? (
         <ErrorState
