@@ -3612,8 +3612,8 @@
   "infoSearchLeads": {
     "regionLabel": "Renseignements sur les leads InfoSearch",
     "title": "Leads InfoSearch",
-    "captionPreview": "Renseignements sur les leads (exemple) — connectez InfoSearch (INFOSEARCH_ENABLED) pour des listes d'appels en direct",
-    "captionLive": "Listes d'appels et renseignements sur les leads pour ce compte — récupérés en direct depuis InfoSearch",
+    "captionPreview": "Enregistrements de référence — connectez InfoSearch (INFOSEARCH_ENABLED) pour des listes d'appels",
+    "captionLive": "Listes d'appels et renseignements sur les leads pour ce compte — récupérés depuis InfoSearch",
     "errorTitle": "InfoSearch est inaccessible",
     "errorMessage": "Impossible de charger les renseignements sur les leads.",
     "empty": "Aucun lead InfoSearch ne correspond à ce compte.",

@@ -3578,8 +3578,8 @@
   "infoSearchLeads": {
     "regionLabel": "InfoSearch lead intel",
     "title": "InfoSearch leads",
-    "captionPreview": "Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists",
-    "captionLive": "Call lists and lead intel for this account — pulled live from InfoSearch",
+    "captionPreview": "Reference records — connect InfoSearch (INFOSEARCH_ENABLED) for call lists",
+    "captionLive": "Call lists and lead intel for this account — pulled from InfoSearch",
     "errorTitle": "InfoSearch is unreachable",
     "errorMessage": "Lead intel could not be loaded.",
     "empty": "No InfoSearch leads matched this account.",

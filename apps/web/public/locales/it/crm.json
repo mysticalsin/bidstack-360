@@ -3557,8 +3557,8 @@
   "infoSearchLeads": {
     "regionLabel": "Intelligence sui lead di InfoSearch",
     "title": "Lead di InfoSearch",
-    "captionPreview": "Intelligence sui lead di esempio — collega InfoSearch (INFOSEARCH_ENABLED) per elenchi di chiamate in tempo reale",
-    "captionLive": "Elenchi di chiamate e intelligence sui lead per questo account — estratti in tempo reale da InfoSearch",
+    "captionPreview": "Record di riferimento — collega InfoSearch (INFOSEARCH_ENABLED) per elenchi di chiamate",
+    "captionLive": "Elenchi di chiamate e intelligence sui lead per questo account — estratti da InfoSearch",
     "errorTitle": "InfoSearch non è raggiungibile",
     "errorMessage": "Impossibile caricare l'intelligence sui lead.",
     "empty": "Nessun lead di InfoSearch corrisponde a questo account.",
