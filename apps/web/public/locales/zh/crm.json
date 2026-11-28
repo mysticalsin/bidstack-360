@@ -852,6 +852,8 @@
     "title": "公司",
     "subtitleOne": "显示 {{count}} 家公司。",
     "subtitleMany": "显示 {{count}} 家公司。",
+    "listLoading": "正在加载公司列表。",
+    "listFailed": "公司列表没有加载。",
     "newCompany": "新建公司",
     "summaryAriaLabel": "公司列表摘要",
     "stats": {
@@ -872,7 +874,8 @@
     "clear": "清除",
     "error": {
       "title": "加载公司失败",
-      "fallback": "出了点问题"
+      "fallback": "出了点问题",
+      "retry": "重试"
     },
     "empty": {
       "searchTitle": "没有公司符合您的搜索",

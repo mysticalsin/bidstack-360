@@ -937,6 +937,8 @@
     "title": "Entreprises",
     "subtitleOne": "{{count}} entreprise visible.",
     "subtitleMany": "{{count}} entreprises visibles.",
+    "listLoading": "Chargement de la liste des entreprises.",
+    "listFailed": "La liste des entreprises ne s'est pas chargée.",
     "newCompany": "Nouvelle entreprise",
     "summaryAriaLabel": "Résumé de la liste des entreprises",
     "stats": {
@@ -957,7 +959,8 @@
     "clear": "Effacer",
     "error": {
       "title": "Échec du chargement des entreprises",
-      "fallback": "Une erreur s'est produite"
+      "fallback": "Une erreur s'est produite",
+      "retry": "Réessayer"
     },
     "empty": {
       "searchTitle": "Aucune entreprise ne correspond à votre recherche",

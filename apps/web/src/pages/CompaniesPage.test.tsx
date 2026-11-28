@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -113,6 +113,10 @@ describe('CompaniesPage — companies:write gating', () => {
     renderWithProviders(<CompaniesPage />);
 
     expect(screen.queryByRole('button', { name: /Add company/i })).toBeNull();
+    // A settled empty book may use the count sentence. A missing read may not.
+    // This suite does not interpolate, so the sentence stays the message template.
+    expect(screen.getByText('{{count}} companies visible.')).toBeTruthy();
+    expect(screen.queryByText('Loading the company list.')).toBeNull();
   });
 
   it('checks the admin+permission gate, not just the permission grant', () => {
@@ -127,5 +131,72 @@ describe('CompaniesPage — companies:write gating', () => {
 
     expect(useHasAdminPermission).toHaveBeenCalledWith('companies:write');
     expect(screen.queryByRole('button', { name: /New company/i })).toBeNull();
+  });
+
+  // WHY: the header and the summary used the missing page as "0 companies
+  // visible" while the request was still out. On the demo book that flash
+  // says the account list is empty before the companies arrive.
+  it('does not call an in-flight list an empty book', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+    mockCompanies({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.queryByText('{{count}} companies visible.')).toBeNull();
+    expect(screen.queryByText('Showing latest 50 companies')).toBeNull();
+    expect(screen.queryByText('Visible companies')).toBeNull();
+    expect(screen.queryByText('No accounts on the radar')).toBeNull();
+    expect(screen.getByText('Loading the company list.')).toBeTruthy();
+  });
+
+  // WHY: a failed read is not an empty book, and an error with no control
+  // leaves the list stranded. Retry reloads the same read.
+  it('retries a failed list instead of saying there are no companies', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+    const refetch = vi.fn();
+    mockCompanies({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: null,
+      refetch,
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.queryByText('{{count}} companies visible.')).toBeNull();
+    expect(screen.queryByText('Showing latest 50 companies')).toBeNull();
+    expect(screen.queryByText('No accounts on the radar')).toBeNull();
+    expect(screen.getByText('The company list did not load.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Failed to load companies' })).toBeTruthy();
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry.className).toContain('h-11');
+    expect(retry.className).toContain('focus-visible:ring-2');
+    fireEvent.click(retry);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // WHY: a failed refresh is not a new empty book. The last rows stay.
+  it('keeps the last companies when a later refresh fails', () => {
+    vi.mocked(useHasAdminPermission).mockReturnValue(true);
+    mockCompanies({
+      data: { items: [baseCompany()], nextCursor: undefined },
+      isLoading: false,
+      isError: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<CompaniesPage />);
+
+    expect(screen.getByText('Acme Corp')).toBeTruthy();
+    expect(screen.queryByText('No accounts on the radar')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Failed to load companies' })).toBeNull();
   });
 });
