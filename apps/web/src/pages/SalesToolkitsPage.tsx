@@ -174,12 +174,12 @@ function SampleBanner() {
     >
       <Icon name="info" size={16} aria-hidden />
       <div>
-        <strong className="font-semibold">{t('salesToolkits.sampleDataLabel', 'Sample data.')}</strong>{' '}
-        {t('salesToolkits.sampleDataIntro', 'These are illustrative toolkits. Set')}{' '}
+        <strong className="font-semibold">{t('salesToolkits.sampleDataLabel', 'Reference.')}</strong>{' '}
+        {t('salesToolkits.sampleDataIntro', 'These are reference records. Set')}{' '}
         <code className="text-xs">LMS_360L_ENABLED</code>{' '}
         {t(
           'salesToolkits.sampleDataOutro',
-          '+ credentials to pull live courses from Mantu Academy.',
+          '+ credentials to pull courses from Mantu Academy.',
         )}
       </div>
     </div>

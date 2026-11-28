@@ -74,7 +74,8 @@ function catalog(locale: (typeof LOCALES)[number]): Record<(typeof BANNER_KEYS)[
 
 function pageFallback(key: (typeof BANNER_KEYS)[number]): string {
   const src = read('src/pages/SalesToolkitsPage.tsx');
-  const match = src.match(new RegExp(`salesToolkits\\.${key}', '([^']*)'`));
+  // The outro call wraps the fallback onto the next line.
+  const match = src.match(new RegExp(`salesToolkits\\.${key}',\\s*'([^']*)'`));
   if (!match?.[1]) throw new Error(`SalesToolkitsPage is missing the ${key} fallback`);
   return match[1];
 }
