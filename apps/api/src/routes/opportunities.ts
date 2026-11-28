@@ -31,7 +31,7 @@ import {
 import { augmentTriggersWithSillage, sillageIsConfigured } from '../lib/sillage-intel-augment.js';
 import { visibleOpportunityWhere } from '../lib/visible-opportunity.js';
 import { serializeOpportunity, serializeOpportunityFull } from '../serializers/opportunity.js';
-import { opportunityDueDateWhere, resolveCompanyIdByName } from './opportunities.helpers.js';
+import { opportunityListFilters, resolveCompanyIdByName } from './opportunities.helpers.js';
 import { opportunityExportRoutes } from './opportunities.export.js';
 import { opportunityMutationsRoutes } from './opportunities.mutations.js';
 import { opportunityTransitionRoutes } from './opportunities.transitions.js';
@@ -53,7 +53,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
       // M7 access scoping: group-restricted users only see opportunities in
       // their countries (or that they own). See lib/access-scope.ts.
       const accessScope = await getAccessScope(req.auth.orgId, req.auth.userId);
-      const dueDateFilter = opportunityDueDateWhere({ dueWithinDays, overdue }).dueDate;
+      const listFilters = opportunityListFilters({ stage, dueWithinDays, overdue });
       return req.cache(
         async () => {
           const items = await prisma.opportunity.findMany({
@@ -62,11 +62,10 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
                 orgId: req.auth.orgId,
                 deletedAt: null,
                 ...(pipelineStageId ? { pipelineStageId } : {}),
-                ...(stage ? { stage } : {}),
+                ...listFilters,
                 ...(industry ? { industry } : {}),
                 ...(companyId ? { companyId } : {}),
                 ...(owner ? { owner: { email: owner } } : {}),
-                ...(dueDateFilter ? { dueDate: dueDateFilter } : {}),
                 ...(search
                   ? {
                       OR: [
@@ -130,7 +129,7 @@ export const opportunityRoutes: FastifyPluginAsyncZod = async (server) => {
             // from "not yet" among equal sort keys). The unique `id` makes the
             // sort total, matching companies.ts/tasks.ts/activities.ts. Tiebreaker
             // direction follows the primary sort so the cursor walks monotonically.
-            orderBy: dueDateFilter
+            orderBy: listFilters.dueDate
               ? [{ dueDate: 'asc' }, { id: 'asc' }]
               : [{ updatedAt: 'desc' }, { id: 'desc' }],
             take: limit + 1,
