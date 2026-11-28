@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Liquid } from 'liquid-gooey';
 
+import { chooseQuickAdd } from '@/components/quickadd/quickAddOptions';
 import { Icon } from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 
 // A floating quick-actions button. Tapping the "+" morphs three round actions
-// out of it with a liquid/gooey merge (liquid-gooey) — the fastest way to start
-// the three core moves (new account / opportunity / task) from anywhere.
-type QuickAction = { key: string; icon: IconName; to: string; label: string; y: number };
+// out of it with a liquid/gooey merge (liquid-gooey). Each action starts the
+// create itself: opportunity and task open the same dialogs as the N menu,
+// and a new account opens the company form. Landing on the bare list left a
+// second click that the label had already promised.
+type QuickAction = { key: string; icon: IconName; label: string; y: number; run: () => void };
 
 const FAB = 52; // px — keep in lockstep with --fab-size in index.css
 
@@ -19,14 +22,32 @@ export function LiquidQuickActions() {
   const { t } = useTranslation('common');
 
   const actions: QuickAction[] = [
-    { key: 'opp', icon: 'briefcase', to: '/opportunities', label: t('quickActions.opportunity', 'New opportunity'), y: -186 },
-    { key: 'acct', icon: 'building', to: '/companies', label: t('quickActions.account', 'New account'), y: -124 },
-    { key: 'task', icon: 'tasks', to: '/tasks', label: t('quickActions.task', 'New task'), y: -62 },
+    {
+      key: 'opp',
+      icon: 'briefcase',
+      label: t('quickActions.opportunity', 'New opportunity'),
+      y: -186,
+      run: () => chooseQuickAdd('opportunity', navigate),
+    },
+    {
+      key: 'acct',
+      icon: 'building',
+      label: t('quickActions.account', 'New account'),
+      y: -124,
+      run: () => navigate('/companies?new=1'),
+    },
+    {
+      key: 'task',
+      icon: 'tasks',
+      label: t('quickActions.task', 'New task'),
+      y: -62,
+      run: () => chooseQuickAdd('task', navigate),
+    },
   ];
 
-  const go = (to: string) => {
+  const go = (run: () => void) => {
     setOpen(false);
-    navigate(to);
+    run();
   };
 
   return (
@@ -55,7 +76,7 @@ export function LiquidQuickActions() {
           >
             <button
               type="button"
-              onClick={() => go(a.to)}
+              onClick={() => go(a.run)}
               aria-label={a.label}
               title={a.label}
               tabIndex={open ? 0 : -1}

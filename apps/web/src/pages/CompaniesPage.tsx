@@ -51,7 +51,6 @@ import { NewCompanyDialog } from './companiesPage/NewCompanyDialog';
 export function CompaniesPage() {
   const { t } = useTranslation('crm');
   const [params, setParams] = useSearchParams();
-  const [showNew, setShowNew] = useState(false);
   const [showDuplicates, setShowDuplicates] = useState(false);
 
   const searchParam = params.get('search') ?? undefined;
@@ -98,6 +97,15 @@ export function CompaniesPage() {
   // 'admin' role — hide the write affordances for everyone else instead of
   // showing a button that always 403s (matches ReferencesPage/ProposalDetailPage).
   const canWrite = useHasAdminPermission('companies:write');
+  // `?new=1` is the floating "New account" action. The form opens on top of
+  // the list. A reader keeps the param from becoming a form the server rejects.
+  const showNew = canWrite && params.get('new') === '1';
+  const setShowNew = (open: boolean) => {
+    const next = new URLSearchParams(params);
+    if (open) next.set('new', '1');
+    else next.delete('new');
+    setParams(next, { replace: !open });
+  };
 
   const rawItems = useMemo(() => companies.data?.items ?? [], [companies.data?.items]);
 
