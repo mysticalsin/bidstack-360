@@ -3373,6 +3373,8 @@
 .acct-keys .acct-key-label { font-size: 13px; color: var(--fg-tertiary); font-weight: 400; }
 .acct-keys .acct-key-value { margin: 0; font-size: 24px; font-weight: 500; color: var(--fg-primary); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .acct-keys > div > span:not(.acct-key-label):not(.acct-key-value) { font-size: 13px; color: var(--fg-tertiary); }
+/* Late open deals. Light --danger is 6.38:1 on white; dark #fb7185 is 7.75:1 on #010102. */
+.acct-keys .acct-key-late { color: var(--danger); font-weight: 600; }
 .acct-keys .acct-key-drill { justify-self: start; padding: 0; margin-top: 4px; }
 @media (max-width: 640px) {
   .acct-head { row-gap: 16px; padding-bottom: 24px; }
