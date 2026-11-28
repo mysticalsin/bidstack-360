@@ -5,13 +5,14 @@ import { memo, type DragEvent, type KeyboardEvent } from 'react';
 import { AnimatePresence } from 'framer-motion';
 
 import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
-import { Badge, stageTone } from '@/components/ui/Badge';
+import { Badge } from '@/components/ui/Badge';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { cn } from '@/lib/cn';
 import { springSnap } from '@/lib/motion';
 import type { Opportunity } from '@bidstack/shared';
 
+import { dealBoardStageTone } from './deal-board-stage-tone';
 import { pipelineColumnCaption } from './pipeline-board-caption';
 import { PipelineCard } from './PipelineCard';
 
@@ -20,6 +21,9 @@ interface StageColumnProps {
   stageName: string;
   /** Reserved for future per-stage colour theming. */
   stageColor: string | null;
+  /** Pipeline stage flags. A custom "Won" column is not named Closed Won. */
+  stageWon?: boolean;
+  stageLost?: boolean;
   items: Opportunity[];
   total: number;
   /** % of opps that have advanced past this stage (excludes closed_lost). */
@@ -47,6 +51,8 @@ export const StageColumn = memo(function StageColumn({
   stageId,
   stageName,
   stageColor: _stageColor,
+  stageWon = false,
+  stageLost = false,
   items,
   total,
   conversion,
@@ -82,7 +88,11 @@ export const StageColumn = memo(function StageColumn({
     >
       <div className="flex items-center justify-between mb-2 px-1">
         <div className="flex items-center gap-1.5">
-          <Badge tone={stageTone(stageName)}>{stageName}</Badge>
+          <Badge
+            tone={dealBoardStageTone({ name: stageName, isWon: stageWon, isLost: stageLost })}
+          >
+            {stageName}
+          </Badge>
           {conversion !== null ? (
             <span
               title={`${conversion}% of opps in this stage or later have advanced past it`}
