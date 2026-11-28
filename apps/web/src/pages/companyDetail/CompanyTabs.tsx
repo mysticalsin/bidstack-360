@@ -24,6 +24,23 @@ import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
 
+import { contactDialHref, contactMailHref } from './contact-method-href';
+
+// Fill green fails the text floor in dark mode. The address and the phone
+// are the row's reach actions, so the hit area is 44px (min-h-11).
+const CONTACT_METHOD =
+  'inline-flex min-h-11 items-center rounded text-[var(--brand-primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)] dark:text-[var(--brand-deep)] dark:focus-visible:ring-[var(--brand-deep)]';
+
+function ContactMethod({ value, href }: { value: string | null; href: string | null }) {
+  if (!value) return '—';
+  if (!href) return value;
+  return (
+    <a href={href} className={CONTACT_METHOD}>
+      {value}
+    </a>
+  );
+}
+
 export function ContactTab({
   contacts,
 }: {
@@ -63,8 +80,12 @@ export function ContactTab({
                 </Link>
               </TableCell>
               <TableCell>{c.role ?? '—'}</TableCell>
-              <TableCell>{c.email ?? '—'}</TableCell>
-              <TableCell>{c.phone ?? '—'}</TableCell>
+              <TableCell>
+                <ContactMethod value={c.email} href={contactMailHref(c.email)} />
+              </TableCell>
+              <TableCell>
+                <ContactMethod value={c.phone} href={contactDialHref(c.phone)} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
