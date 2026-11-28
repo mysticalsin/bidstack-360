@@ -73,6 +73,55 @@ const TASK: Task = {
   createdAt: '2026-01-01T00:00:00.000Z',
 };
 
+const PRICING_OPP = '00000000-0000-4000-8000-000000020041';
+
+// The demo follow-up "Submit revised pricing & SoW v2" does not name the bid.
+// A seller scanning the overdue list cannot tell it is CI Financial's
+// modernization, and nothing on the row opens that bid.
+describe('TasksPage — a follow-up names its bid', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    capabilitiesMocks.useHasPermission.mockReturnValue(true);
+    mockTasks({
+      data: {
+        items: [
+          {
+            ...TASK,
+            id: '00000000-0000-4000-8000-000000010001',
+            oppId: PRICING_OPP,
+            title: 'Submit revised pricing & SoW v2',
+            dueDate: '2026-05-15',
+            status: 'in_progress',
+            opportunityName: 'CI Financial — IT Modernization & MSP',
+          },
+        ],
+        nextCursor: null,
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('links the demo pricing follow-up to the CI Financial bid by name', () => {
+    renderPage();
+
+    const bid = screen.getByRole('link', { name: 'CI Financial — IT Modernization & MSP' });
+    expect(bid.getAttribute('href')).toBe(`/opportunities/${PRICING_OPP}`);
+    expect(screen.queryByRole('link', { name: 'Opportunity' })).toBeNull();
+    // axe target-size on /tasks: the title link and this bid link stack. Each
+    // needs a 24px box or the undersized pair fails the tasks route scan.
+    expect(bid.className).toContain('min-h-6');
+    expect(
+      screen.getByRole('link', { name: 'Submit revised pricing & SoW v2' }).className,
+    ).toContain('min-h-6');
+  });
+});
+
 describe('TasksPage — tasks:write gating', () => {
   beforeEach(() => {
     vi.clearAllMocks();

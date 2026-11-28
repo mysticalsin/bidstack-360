@@ -7,6 +7,7 @@ import { Task, TaskCreate, TaskFilter, TaskPage, TaskPatch, TaskSummary } from '
 
 import { fanOutWebhookEvent } from '../queues/webhook-delivery.js';
 import { emitTaskAccountEventSafe } from '../services/account-events.service.js';
+import { taskOpportunityName } from './task-opportunity-title.js';
 
 type TaskSummaryPayload = z.infer<typeof TaskSummary>;
 
@@ -49,7 +50,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           ...(oppId ? { oppId } : {}),
           ...(status ? { status } : {}),
         },
-        include: { assignee: { select: { email: true } } },
+        include: {
+          assignee: { select: { email: true } },
+          opportunity: { select: { name: true, orgId: true } },
+        },
         orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }, { id: 'asc' }],
         take: limit + 1,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
@@ -66,6 +70,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
           status: t.status,
           assignee: t.assignee?.email ?? null,
           createdAt: t.createdAt.toISOString(),
+          opportunityName: taskOpportunityName(t.opportunity, req.auth.orgId),
         })),
         nextCursor,
       };
@@ -100,7 +105,10 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
     async (req) => {
       const task = await prisma.task.findFirst({
         where: { id: req.params.id, orgId: req.auth.orgId, deletedAt: null },
-        include: { assignee: true },
+        include: {
+          assignee: true,
+          opportunity: { select: { name: true, orgId: true } },
+        },
       });
       if (!task) throw server.httpErrors.notFound('Task not found');
       const customFieldValues = await prisma.customFieldValue.findMany({
@@ -117,6 +125,7 @@ export const tasksRoutes: FastifyPluginAsyncZod = async (server) => {
         assignee: task.assignee?.email ?? null,
         createdAt: task.createdAt.toISOString(),
         customFieldValues,
+        opportunityName: taskOpportunityName(task.opportunity, req.auth.orgId),
       };
     },
   );

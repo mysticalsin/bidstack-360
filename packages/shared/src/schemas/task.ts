@@ -13,10 +13,14 @@ export const Task = z.object({
   assignee: z.string().email().nullable(),
   createdAt: z.string().datetime(),
   customFieldValues: z.array(CustomFieldValueLite).optional(),
+  // Read-only label of the bid this follow-up is filed on. Omitted on create
+  // and on older payloads. Null when the follow-up has no bid. A blank string
+  // is rejected so the list cannot render an empty link.
+  opportunityName: z.string().trim().min(1).nullable().optional(),
 });
 export type Task = z.infer<typeof Task>;
 
-export const TaskCreate = Task.omit({ id: true, createdAt: true }).extend({
+export const TaskCreate = Task.omit({ id: true, createdAt: true, opportunityName: true }).extend({
   status: TaskStatus.default('open'),
 });
 export type TaskCreate = z.infer<typeof TaskCreate>;

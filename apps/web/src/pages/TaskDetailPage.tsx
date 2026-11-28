@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { toast } from '@/components/ui/Toast';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useTasks, useUpdateTask } from '@/hooks/useTasks';
+import { TaskBidLink } from '@/components/task/TaskBidLink';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { formatDate } from '@/lib/format';
 
@@ -99,14 +100,11 @@ export function TaskDetailPage() {
             </h1>
           )}
           <div className="mt-2 flex flex-wrap gap-2 text-sm text-[var(--fg-secondary)]">
-            {task.oppId && (
-              <Link
-                to={`/opportunities/${task.oppId}`}
-                className="hover:text-[var(--brand-primary)]"
-              >
-                {t('taskDetail.opportunityLink', 'Opportunity')}
-              </Link>
-            )}
+            <TaskBidLink
+              task={task}
+              fallback={t('taskDetail.opportunityLink', 'Opportunity')}
+              className="text-sm"
+            />
             {task.assignee && (
               <span>
                 {t('taskDetail.assignedTo', 'Assigned to {{assignee}}', {
