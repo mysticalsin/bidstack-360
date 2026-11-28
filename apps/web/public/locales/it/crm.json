@@ -930,6 +930,7 @@
     "tasksTitle": "Attività",
     "tasksActiveCount": "{{count}} attive",
     "taskDue": "Scadenza {{date}}",
+    "openTask": ", apri il seguito",
     "callsErrorTitle": "Impossibile caricare le chiamate",
     "callsEmptyTitle": "Nessuna chiamata",
     "callsEmptyMessage": "Le chiamate pianificate e completate per questa opportunità appaiono qui.",
