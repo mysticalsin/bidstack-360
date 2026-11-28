@@ -3324,7 +3324,9 @@
     "weekdayWed": "Wed",
     "weekdayThu": "Thu",
     "weekdayFri": "Fri",
-    "weekdaySat": "Sat"
+    "weekdaySat": "Sat",
+    "lateMonth": "The latest open follow-up in this list is in this month.",
+    "upcomingMonth": "The next open follow-up in this list is in this month."
   },
   "recentActivity": {
     "heading": "Recent activity",

@@ -3363,7 +3363,9 @@
     "weekdayWed": "Mer",
     "weekdayThu": "Jeu",
     "weekdayFri": "Ven",
-    "weekdaySat": "Sam"
+    "weekdaySat": "Sam",
+    "lateMonth": "Le dernier suivi ouvert de cette liste est dans ce mois.",
+    "upcomingMonth": "Le prochain suivi ouvert de cette liste est dans ce mois."
   },
   "recentActivity": {
     "heading": "Activité récente",
