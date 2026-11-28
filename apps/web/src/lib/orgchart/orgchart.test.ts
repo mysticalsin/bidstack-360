@@ -100,6 +100,7 @@ describe('sample and merge', () => {
   it('places met people into the sample backbone; a matching placeholder takes the real name', () => {
     const c = sampleChart('co', people);
     expect(c.sample).toBe(true);
+    expect(c.nodes.find((x) => x.name === 'Alex Morgan')!.source).toBe('sample');
     const cio = c.nodes.find((x) => x.name === 'Michael Johnson')!;
     expect(cio.title).toBe('Chief Information Officer');
     expect(c.nodes.some((x) => x.name === 'Chief Information Officer')).toBe(false);

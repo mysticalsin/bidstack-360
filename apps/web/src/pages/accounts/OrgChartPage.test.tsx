@@ -66,9 +66,9 @@ function renderPage() {
 const node = async (name: string) => (await screen.findAllByTestId('orgchart-node')).find((n) => n.dataset.name === name)!;
 
 describe('OrgChartPage', () => {
-  it('builds a labelled Sample with real met people and shows their meetings, challenges and owner', async () => {
+  it('builds a labelled reference chart with real met people and shows their meetings, challenges and owner', async () => {
     renderPage();
-    expect(await screen.findByText('Sample')).toBeTruthy();
+    expect(await screen.findByText('Reference')).toBeTruthy();
     const mj = await node('Michael Johnson');
     expect(mj.dataset.met).toBe('true');
     expect((await node('Alex Morgan')).dataset.dim).toBe('true'); // placeholder, not met
@@ -79,10 +79,10 @@ describe('OrgChartPage', () => {
     expect(within(panel).getByText('Jane Smith (from meetings)')).toBeTruthy();
   });
 
-  it('directors count as senior gaps: the account card, the full page and the Sample agree', async () => {
-    // Sample: an unmet Head of (director) is a gap.
+  it('directors count as senior gaps: the account card, the full page and the reference chart agree', async () => {
+    // Uncharted reference chart: an unmet Head of (director) is a gap.
     const sample = renderPage();
-    expect(await screen.findByText('Sample')).toBeTruthy();
+    expect(await screen.findByText('Reference')).toBeTruthy();
     expect((await node('Samuel Reyes')).dataset.gap).toBe('true');
     sample.unmount();
     // Live chart: the API list (c_level, vp, director) drives both the page and the card.
