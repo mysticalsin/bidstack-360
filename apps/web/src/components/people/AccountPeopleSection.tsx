@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import {
@@ -26,6 +27,15 @@ function standingClass(standing: ConnectionStanding): string {
   if (standing === 'evidenced') return 'text-[var(--brand-primary)]';
   if (standing === 'conflicted') return 'text-[var(--danger)]';
   return 'text-[var(--fg-secondary)]';
+}
+
+const OPEN_TASK_STATUSES = new Set(['open', 'in_progress', 'blocked']);
+
+/** Days past the UTC due day for an unfinished follow-up. Today and a future day are not late. */
+function openTaskDaysLate(status: string, dueDate: string | null): number | null {
+  if (!OPEN_TASK_STATUSES.has(status) || !dueDate) return null;
+  const days = daysUntilDueUtc(dueDate);
+  return days < 0 ? Math.abs(days) : null;
 }
 
 function actionClass(primary = false): string {
@@ -725,18 +735,26 @@ function CommitmentLists({
                 </p>
               ) : (
                 <ul className="mt-3 divide-y divide-[var(--border-subtle)]">
-                  {work?.internalTasks.map((task) => (
-                    <li key={task.id} className="py-3">
-                      <p className="text-sm text-[var(--fg-primary)]">{task.title}</p>
-                      <p className="mt-1 text-sm text-[var(--fg-secondary)]">
-                        {t('commitments.taskMeta', 'Internal task · {{status}} · due {{due}}', {
-                          status: task.status,
-                          due: task.dueDate ?? t('commitments.noDate', 'not set'),
-                        })}
-                        {task.assigneeEmail ? ` · ${task.assigneeEmail}` : ''}
-                      </p>
-                    </li>
-                  ))}
+                  {work?.internalTasks.map((task) => {
+                    const late = openTaskDaysLate(task.status, task.dueDate);
+                    return (
+                      <li key={task.id} className="py-3">
+                        <p className="text-sm text-[var(--fg-primary)]">{task.title}</p>
+                        <p className="mt-1 text-sm text-[var(--fg-secondary)]">
+                          {t('commitments.taskMeta', 'Internal task · {{status}} · due {{due}}', {
+                            status: task.status,
+                            due: task.dueDate ?? t('commitments.noDate', 'not set'),
+                          })}
+                          {late !== null ? (
+                            <span className="ml-2 font-semibold text-[var(--danger)]">
+                              {t('taskRow.overdue', 'Overdue: {{count}}d late', { count: late })}
+                            </span>
+                          ) : null}
+                          {task.assigneeEmail ? ` · ${task.assigneeEmail}` : ''}
+                        </p>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
