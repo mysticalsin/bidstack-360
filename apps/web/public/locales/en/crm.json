@@ -834,6 +834,7 @@
     "colName": "Name",
     "colRole": "Role",
     "colCustomer": "Customer",
+    "openAccount": "Open account {{customer}}",
     "colContact": "Contact",
     "colInfluence": "Influence",
     "colSentiment": "Sentiment",

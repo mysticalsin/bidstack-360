@@ -896,6 +896,7 @@
     "colName": "Nombre",
     "colRole": "Cargo",
     "colCustomer": "Cliente",
+    "openAccount": "Abrir la cuenta {{customer}}",
     "colContact": "Contacto",
     "colInfluence": "Influencia",
     "colSentiment": "Sentimiento",
