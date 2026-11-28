@@ -247,6 +247,8 @@
   "tasks": {
     "title": "Attività",
     "subtitle": "{{count}} follow-up attivi.",
+    "subtitlePending": "Conteggio dei follow-up.",
+    "subtitleError": "Impossibile contare i follow-up.",
     "actions": {
       "exportCsv": "Esporta CSV"
     },

@@ -247,6 +247,8 @@
   },
   "tasks": {
     "title": "Tâches",
+    "subtitlePending": "Comptage des suivis.",
+    "subtitleError": "Impossible de compter les suivis.",
     "new": "Nouvelle tâche",
     "dueToday": "À faire aujourd'hui",
     "overdue": "En retard",
