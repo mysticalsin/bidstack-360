@@ -183,7 +183,8 @@ describe('AccountWatchdogSection', () => {
     render(<MemoryRouter><AccountWatchdogSection companyId="c1" /></MemoryRouter>);
     const rows = screen.getAllByRole('button', { name: /^Potential project:/ });
     // The "Sample: " prefix becomes a badge.
-    expect(screen.getAllByText('Sample', { selector: '.wd-sample-badge' }).length).toBe(rows.length);
+    expect(screen.getAllByText('Reference', { selector: '.wd-sample-badge' }).length).toBe(rows.length);
+    expect(screen.queryByText('Sample', { selector: '.wd-sample-badge' })).toBeNull();
     expect(rows.length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Hiring signals ·/).length).toBe(rows.length);
     fireEvent.click(rows[0]!);
@@ -205,7 +206,7 @@ describe('AccountWatchdogSection', () => {
     const titles = () => screen.getAllByRole('button', { expanded: false }).map((b) => b.querySelector('.wd-row-title')?.textContent ?? '').filter(Boolean);
     expect(titles()).toEqual(['ImportantOlder funding', 'Middle filing, restated', 'Newer hiring note']);
     expect(screen.getByText(/Funding · News · 4 outlets ·/)).toBeTruthy();
-    expect(screen.getByText('Sample', { selector: '.wd-sample-badge' })).toBeTruthy();
+    expect(screen.getByText('Reference', { selector: '.wd-sample-badge' })).toBeTruthy();
     expect(screen.getByText(/1 important/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Latest' }));
     expect(titles()).toEqual(['Newer hiring note', 'Middle filing, restated', 'ImportantOlder funding']);

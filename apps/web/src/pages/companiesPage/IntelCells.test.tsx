@@ -43,11 +43,43 @@ describe('intel cells', () => {
     expect(screen.getByText('\u2013').getAttribute('aria-label')).toMatch(/No public data/);
   });
 
-  it('never renders an em dash', () => {
+  it('names a missing source as a fact, without sandbox wording', () => {
     const { container } = render(
-      <EmptyIntel gap={{ reason: 'not_connected', detail: 'Apollo not connected' }} />,
+      <EmptyIntel
+        gap={{ reason: 'not_connected', detail: 'No revenue on file. Reconnect filings or Apollo to fill it.' }}
+      />,
     );
+    const label = screen.getByText('\u2013').getAttribute('aria-label') ?? '';
+    expect(label).toBe('No source on file: No revenue on file. Reconnect filings or Apollo to fill it.');
+    expect(label).not.toMatch(/not connected|sample|demo|fixture/i);
     expect(container.textContent).not.toContain('\u2014');
+  });
+
+  it('marks a fixture metric as a reference record once, and does not call it sample data', () => {
+    render(
+      <IntelCellFor
+        column="revenue"
+        summary={intelSummary({
+          revenue: {
+            value: 10,
+            source: 'fixture',
+            sourceLabel: 'Reference record',
+            asOf: '2026-11-06T10:00:00.000Z',
+            method: 'Reference figures FY2025',
+            inferred: false,
+            sample: true,
+            currency: 'EUR',
+            fiscalYear: 2025,
+            range: null,
+            approxUsd: null,
+          },
+        })}
+      />,
+    );
+    const label = screen.getByText('10 EUR').closest('[aria-label]')?.getAttribute('aria-label') ?? '';
+    expect(label).toMatch(/Reference record/);
+    expect(label.match(/reference record/gi)).toHaveLength(1);
+    expect(label).not.toMatch(/sample data|demo/i);
   });
 
   it('shows new roles with the 30 day delta and the hiring proxy method', () => {

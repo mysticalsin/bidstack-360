@@ -142,12 +142,14 @@ describe('CompanyTechStackSection', () => {
     expect(stackHook).toHaveBeenCalledWith('c0000000-0000-4000-8000-0000000000aa');
   });
 
-  it('shows a plain empty state with no helper paragraphs', () => {
+  it('shows a production empty state when the account has no technologies', () => {
     stackHook.mockReturnValue({ data: { effectiveStack: [] }, isLoading: false });
 
     render(<CompanyTechStackSection companyId="c0000000-0000-4000-8000-0000000000aa" />);
 
-    expect(screen.getByText('No technology detected yet')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'No technologies on file' })).toBeTruthy();
+    expect(screen.getByText('Reconnect a technology source to refresh this account.')).toBeTruthy();
+    expect(screen.queryByText(/detected yet|sample|demo|sandbox|fixture/i)).toBeNull();
     expect(screen.queryByText(/Detected and curated tools/)).toBeNull();
     expect(screen.queryByText(/Tools appear here/)).toBeNull();
   });

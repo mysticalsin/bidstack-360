@@ -8,7 +8,7 @@ import './positioning.css';
 import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react';
 import { useId } from 'react';
 
-import type { KeyNumber } from '@bidstack/shared';
+import { REFERENCE_BADGE, type KeyNumber } from '@bidstack/shared';
 
 import { FigureActions, SourceChip } from '@/components/figures/SourcedFigure';
 import { useAccountKeyNumbers } from '@/hooks/useAccountPositioning';
@@ -53,7 +53,7 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
     <li className="kn-tile" data-missing={missing} data-testid={`kn-${n.id}`} tabIndex={0} aria-describedby={hasTip ? tipId : undefined}>
       <span className="kn-label">
         {n.label}
-        {n.sample ? <span className="sg-sample">Sample</span> : null}
+        {n.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
       </span>
       <span className="kn-value" title={missing ? undefined : formatValue(n, fmtMicros)}>
         {missing && n.editKey ? 'Not found yet' : formatValue(n, fmtMicros)}

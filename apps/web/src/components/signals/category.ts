@@ -1,6 +1,6 @@
 // Signal categories: label, colour and lane. Colours follow polo-DESIGN.md:
 // one accent, status colours always paired with a text label.
-import type { SignalCategory } from '@bidstack/shared';
+import { REFERENCE_RECORD, type SignalCategory } from '@bidstack/shared';
 
 export const CATEGORY_LABEL: Record<SignalCategory, string> = {
   funding: 'Funding',
@@ -59,7 +59,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   enrichment: 'Hiring signals',
   meeting_intel: 'Meeting intel',
   financials: 'Filed financials',
-  sample: 'Sample data',
+  sample: REFERENCE_RECORD,
 };
 
 export const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s;

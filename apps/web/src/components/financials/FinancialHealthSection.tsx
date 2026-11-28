@@ -3,13 +3,13 @@
 // with its period and source, then the top early-warning cards. Strategic and
 // Top accounts are pulled automatically; General accounts show why not and,
 // for Admin / AE, a Track financials toggle. Never invents a number: missing
-// lines read "Not filed", and the built-in example is labelled Sample.
+// lines read "Not filed", and a non-live filing is labelled Reference.
 import '@/components/watchdog/watchdog.css';
 import './financials.css';
 
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
-import type { AccountFinancials } from '@bidstack/shared';
+import { REFERENCE_BADGE, type AccountFinancials } from '@bidstack/shared';
 
 import { Spark } from '@/components/viz/charts';
 import { noDash } from '@/components/signals/category';
@@ -35,7 +35,7 @@ function MetricTile({ t, sample }: { t: Tile; sample: boolean }) {
       </div>
     );
   }
-  const source = sample ? 'Sample' : last.p.source;
+  const source = sample ? REFERENCE_BADGE : last.p.source;
   return (
     <div className="fh-tile" data-testid={`fh-tile-${t.key}`}>
       <span className="wd-row-meta">{t.label}</span>
@@ -70,7 +70,7 @@ function SignalCard({ s }: { s: Signal }) {
           <span className="wd-row-title" title={noDash(s.title)}>{noDash(s.title)}</span>
           <span className="wd-row-meta">
             {CONF[s.confidence]} · period to {periodFmt.format(new Date(`${s.periodEnd}T00:00:00Z`))}
-            {s.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            {s.sample ? <span className="wd-sample-badge">{REFERENCE_BADGE}</span> : null}
           </span>
         </span>
         <span className="wd-pill" data-kind={s.implication}>{PILL[s.implication]}</span>
@@ -117,7 +117,7 @@ export function FinancialHealthSection({ companyId }: { companyId: string }) {
       <section className="wd-surface" aria-labelledby="fh-h">
         <header className="wd-head">
           <h2 id="fh-h" className="wd-h">
-            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">Sample</span> : null}
+            Public financials watchdog {d?.sample ? <span className="wd-sample-badge">{REFERENCE_BADGE}</span> : null}
           </h2>
           {d ? (
             <span className="wd-row-meta">

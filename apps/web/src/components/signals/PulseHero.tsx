@@ -10,7 +10,7 @@ import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 
-import type { AccountPulse } from '@bidstack/shared';
+import { REFERENCE_BADGE, type AccountPulse } from '@bidstack/shared';
 
 import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
@@ -90,7 +90,7 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
             {TREND_WORD[pulse.trend]} {fmtPts(pulse.delta)}
             <span className="sg-meta">in 4 weeks</span>
           </span>
-          {pulse.sample ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
+          {pulse.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
         </div>
         <p className="sg-verdict">{pulse.verdict}</p>
         <div className="sg-drivers" role="group" aria-label="Top drivers">

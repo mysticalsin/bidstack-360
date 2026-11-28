@@ -257,7 +257,7 @@ export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
   const days = feed?.days ?? 30;
   return (
     <ChartCard title="Account signals" meta="Last 8 weeks, and results due soon" interactive testId="dashboard-signals"
-      sample={sample ? 'Local demo signals (titles start with "Sample:")' : undefined}
+      sample={sample || undefined}
       summary={`${rows.map((r) => `${r.name}: ${r.cells.reduce((n, c) => n + c.count, 0)} signals`).join('; ') || 'No signals in the last 8 weeks'}. ${results.map((i) => `${i.label} results on ${dayFmt.format(new Date(i.date))}`).join('; ') || 'No results expected'}.`}
       table={{ columns: ['Account', 'Signals (8 weeks)', 'Results due'], rows: [...new Set([...rows.map((r) => r.name), ...results.map((r) => r.label)])].map((name) => [
         name,

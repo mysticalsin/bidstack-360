@@ -689,7 +689,7 @@ One section on the account page, after "What to position": where the company is 
 - Financials: one row per fiscal year with source and year on every row; registry facts below; the Apollo range only as a labelled fallback.
 - News and posts: one list, newest first, each item with a kind label (Product, Partnership, Acquisition, Leadership, Results, Layoffs, Expansion) and origin (company or press).
 - Sources strip at the foot of every tab: Job boards, Company posts, Filings, Registries. Each row shows status as text plus icon, last fetched time, the result (new, updated, failed) and a Refresh button (lucide `RefreshCw`) for users with `account-intel:write`. Not configured rows name the env var to set.
-- Sample data carries the "Sample" tag. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.
+- A row that is not a live provider fetch carries the "Reference" badge and the source name "Reference record". The stored `sample` flag stays true. No taglines or helper text. Tokens: signals `.sg` variables, accent `--brand-primary` (#006b4f), both themes, 12px card radius, tabular numbers.
 
 ### 9.8 Slice 1 as built (2026-11-06)
 

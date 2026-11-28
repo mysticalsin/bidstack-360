@@ -46,7 +46,9 @@ describe('PulseView', () => {
     const drivers = within(screen.getByRole('group', { name: 'Top drivers' })).getAllByRole('button');
     expect(drivers.map((d) => d.textContent)).toEqual(['Pipeline+9', 'Meetings+7', 'News-4']);
     expect(screen.getByRole('img', { name: /Momentum over 13 weeks: from 60 to 72/ })).toBeTruthy();
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByTitle(/seeded for the demo/)).toBeNull();
     expect(screen.queryByText(/\(off\)/)).toBeNull();
     expect(screen.queryByText('Watching')).toBeNull();
     expect(document.body.textContent).not.toMatch(/[\u2014\u2013]/);
@@ -92,7 +94,8 @@ describe('TimelineView', () => {
     wrap(<TimelineView items={items} from="2025-11-01T00:00:00Z" to="2026-10-31T00:00:00Z" />);
     fireEvent.click(screen.getByRole('button', { name: /^Funding,/ }));
     expect(screen.getByRole('heading', { name: 'Series C, 150M' })).toBeTruthy();
-    expect(screen.getByText(/Sample data, no live source/)).toBeTruthy();
+    expect(screen.getByText('Reference record')).toBeTruthy();
+    expect(screen.queryByText(/Sample data, no live source/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^Launch,/ }));
     expect(screen.getByRole('link', { name: /Open source/ }).getAttribute('href')).toBe('https://news.example/x');
     fireEvent.click(screen.getByRole('button', { name: /^Meeting,/ }));
@@ -155,11 +158,12 @@ describe('Portfolio momentum', () => {
     expect(screen.getByRole('link', { name: 'Example Corp' }).getAttribute('href')).toBe('/accounts/c');
   });
 
-  it('lists top alerts with category and Sample, linking to the account watchdog', () => {
+  it('lists top alerts with category and a reference badge, linking to the account watchdog', () => {
     wrap(<AlertsList alerts={port.alerts} />);
     const link = screen.getByRole('link', { name: 'Example Corp announces job cuts' });
     expect(link.getAttribute('href')).toBe('/accounts/c#watchdog');
     expect(screen.getByText('Risk')).toBeTruthy();
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
   });
 });

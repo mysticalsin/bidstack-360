@@ -169,6 +169,21 @@ describe('direction', () => {
     expect(d.bidRelevance[0]!.evidenceIds.length).toBeGreaterThan(1);
   });
 
+  it('marks a fixture filing as a reference record inside the claim', () => {
+    const years = [year(2025, { revenue: 1100, sample: true, source: 'fixture' })];
+    const d = buildDirection({
+      companyName: 'Acme',
+      years,
+      hiring: null,
+      posts: [],
+      plan: { investing: [], cutting: [], next12: [] },
+    });
+    const text = d.claims.find((c) => c.area === 'financials')?.text ?? '';
+    expect(text).toMatch(/reference record$/);
+    expect(text).not.toMatch(/sample|demo/i);
+    expect(years[0]?.source).toBe('fixture');
+  });
+
   it('says nothing rather than guessing when there are no inputs', () => {
     const d = buildDirection({ companyName: 'Empty', years: [], hiring: null, posts: [], plan: { investing: [], cutting: [], next12: [] } });
     expect(d).toEqual({ headline: null, claims: [], bidRelevance: [] });

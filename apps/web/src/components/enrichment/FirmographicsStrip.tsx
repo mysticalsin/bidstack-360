@@ -124,7 +124,7 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
           {d.sample ? <SampleBadge show /> : null}
           {polling
             ? 'Enrichment queued. Results appear here when the run finishes.'
-            : d.notice ?? (d.sample ? 'Illustrative firmographics until company enrichment is connected.' : null)}
+            : d.notice ?? (d.sample ? 'No enrichment source on file. Reconnect a provider to fill these fields.' : null)}
           {!d.sample && d.fetchedAt && !polling ? (
             <span>
               Enriched <time dateTime={d.fetchedAt}>{fmtAsOf(d.fetchedAt)}</time>{d.stale ? ' · due for refresh' : ''}

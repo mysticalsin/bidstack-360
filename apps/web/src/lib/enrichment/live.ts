@@ -2,6 +2,7 @@
 // /workspace/fleet/polo-enrichment-api.md) onto the account-page shape.
 import {
   industryLabel,
+  REFERENCE_RECORD,
   type Firmographics,
   type HiringBreakdown,
   type PotentialProject as ApiProject,
@@ -38,7 +39,7 @@ export interface ApiProjects {
 export const PROVIDER_LABEL: Record<string, string> = {
   apollo: 'Apollo',
   seamless: 'Seamless.AI',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 export const FUNCTION_LABEL: Record<string, string> = {
   data: 'Data',
@@ -88,8 +89,8 @@ export function isSampleStatus(f: Pick<Firmographics, 'status' | 'providers'>): 
 }
 
 const NOTICE: Record<string, string> = {
-  not_configured: 'Company enrichment is not configured (no provider key), so this is sample data.',
-  not_enriched: 'This account has not been enriched yet, so this is sample data.',
+  not_configured: 'No enrichment source on file. Reconnect a provider to fill these fields.',
+  not_enriched: 'This account has not been enriched. Reconnect a provider to fill these fields.',
   pending: 'Enrichment is still running; some fields may fill in on the next run.',
   partial: 'Some fields were not returned by the providers.',
   budget_exceeded:

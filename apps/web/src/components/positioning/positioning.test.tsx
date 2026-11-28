@@ -81,7 +81,8 @@ describe('KeyNumbersStrip', () => {
     expect(rev.getAttribute('aria-describedby')).toBe(tip.id);
     expect(within(screen.getByTestId('kn-open_jobs')).getByText('No job postings tracked yet')).toBeTruthy();
     const mom = screen.getByTestId('kn-momentum');
-    expect(within(mom).getByText('Sample')).toBeTruthy();
+    expect(within(mom).getByText('Reference')).toBeTruthy();
+    expect(within(mom).queryByText('Sample')).toBeNull();
     const md = mom.querySelector('.kn-delta')!;
     expect(md.textContent).toContain('-4.0 pts');
     expect(md.getAttribute('data-tone')).toBe('neg');

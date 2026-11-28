@@ -52,7 +52,7 @@ export function InfoSearchLeadsCard({ account }: { account: string }) {
           preview
             ? t(
                 'infoSearchLeads.captionPreview',
-                'Sample lead intel — connect InfoSearch (INFOSEARCH_ENABLED) for live call lists',
+                'No InfoSearch source on file. Reconnect InfoSearch to fill call lists.',
               )
             : t(
                 'infoSearchLeads.captionLive',

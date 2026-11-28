@@ -6,7 +6,7 @@ import './positioning.css';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import { composeBrief, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
+import { composeBrief, REFERENCE_BADGE, type AccountGap, type EvidenceChip, type PositioningPlay } from '@bidstack/shared';
 
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
 import { fmtMoney } from '@/components/financials/financials-format';
@@ -42,7 +42,7 @@ function Chip({ e }: { e: EvidenceChip }) {
     >
       <span className="wp-chip-kind">{KIND_LABEL[e.kind]}</span>
       <span className="wp-chip-text">{e.label}</span>
-      {e.sample ? <span className="sg-sample">Sample</span> : null}
+      {e.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
       {ext ? <ExternalLink size={12} aria-hidden /> : null}
       {ext ? <span className="sr-only"> (opens in a new tab)</span> : null}
     </a>
@@ -86,7 +86,7 @@ function PlayCard({ play, micros }: { play: PositioningPlay; micros: (m: string)
           <p className="wp-offering">
             {play.offering}
             {play.alreadySold ? <span className="wp-tag">Already a client here</span> : null}
-            {play.sample ? <span className="sg-sample">Sample</span> : null}
+            {play.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
           </p>
           <h3 className="wp-headline">{play.headline}</h3>
         </div>

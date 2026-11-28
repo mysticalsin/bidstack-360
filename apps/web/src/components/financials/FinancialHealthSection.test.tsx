@@ -86,10 +86,11 @@ describe('FinancialHealthSection', () => {
     expect(document.body.textContent).not.toMatch(/[\u2014]/);
   });
 
-  it('sample state is labelled Sample everywhere', () => {
+  it('a non-live filing is labelled Reference and is not called a sample', () => {
     state.data = { ...real, status: 'pending', statusCopy: 'Queued: the next financials pull will fill this in.', entity: null, periods: SAMPLE_FINANCIAL_PERIODS, signals: SAMPLE_FINANCIAL_SIGNALS, sample: true };
     render(<FinancialHealthSection companyId="c1" />);
-    expect(screen.getAllByText('Sample').length).toBeGreaterThan(2);
+    expect(screen.getAllByText('Reference').length).toBeGreaterThan(2);
+    expect(screen.queryByText('Sample')).toBeNull();
     expect(screen.getByTestId('fh-tile-revenue').querySelector('a')).toBeNull();
   });
 

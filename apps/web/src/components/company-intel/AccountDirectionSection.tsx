@@ -6,7 +6,7 @@ import './company-intel.css';
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, Loader2, RefreshCw, Settings2, XCircle } from 'lucide-react';
 import { useRef, useState, type KeyboardEvent } from 'react';
 
-import type { IntelSourceKey, IntelSourceStatus } from '@bidstack/shared';
+import { REFERENCE_BADGE, type IntelSourceKey, type IntelSourceStatus } from '@bidstack/shared';
 
 import { useHasPermission } from '@/hooks/useCapabilities';
 import {
@@ -112,7 +112,7 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
     <section className="sg ci sg-surface" aria-labelledby="ci-h" data-testid="account-direction">
       <header className="sg-head">
         <h2 id="ci-h" className="sg-h">
-          Where they&apos;re heading {sample ? <span className="sg-sample">Sample</span> : null}
+          Where they&apos;re heading {sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
         </h2>
       </header>
       <div ref={tabStrip} role="tablist" aria-label="Account intelligence" className="ci-tabs tab-scroll">

@@ -7,7 +7,7 @@ import './signals.css';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useState } from 'react';
 
-import type { Initiative } from '@bidstack/shared';
+import { REFERENCE_BADGE, type Initiative } from '@bidstack/shared';
 
 import { useAccountInitiatives } from '@/hooks/useAccountSignals';
 
@@ -58,7 +58,7 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
           return <span key={k}>{n} {n === 1 ? one : many}</span>;
         })}
         {it.lastSeen ? <span>Last seen {dateFmt.format(new Date(it.lastSeen))}</span> : null}
-        {it.sample ? <span className="sg-sample">Sample</span> : null}
+        {it.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
       </div>
       <div className="sg-hook">
         {it.hook.alreadySold ? (
@@ -79,7 +79,7 @@ function InitiativeCard({ it, i }: { it: Initiative; i: number }) {
             ) : (
               <span>{noDash(e.title)}</span>
             )}
-            <span className="sg-meta"> · {e.sample ? 'Sample' : sourceLabel(e.source)}{e.at ? ` · ${dateFmt.format(new Date(e.at))}` : ''}</span>
+            <span className="sg-meta"> · {e.sample ? REFERENCE_BADGE : sourceLabel(e.source)}{e.at ? ` · ${dateFmt.format(new Date(e.at))}` : ''}</span>
           </li>
         ))}
       </ul>

@@ -13,7 +13,9 @@ describe('ChartCard', () => {
       </ChartCard>,
     );
     expect(screen.getByRole('img', { name: 'Open 2, won 1' })).toBeDefined();
-    expect(screen.getByText('Sample')).toBeDefined();
+    expect(screen.getByText('Reference')).toBeDefined();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(screen.queryByTitle(/illustrative|demo|sample/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Table' }));
     expect(screen.getByRole('table')).toBeDefined();
     expect(screen.getByRole('rowheader', { name: 'Open' })).toBeDefined();

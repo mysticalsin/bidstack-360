@@ -148,12 +148,32 @@ describe('buildIntelSummary: hiring', () => {
 });
 
 describe('buildIntelSummary: empty values carry a reason', () => {
-  it('says not connected when neither public sources nor Apollo are configured', () => {
+  it('names the missing fact and the provider that would fill it when no source is configured', () => {
+    // The reason code stays not_connected so stored gaps keep their shape.
+    // The sentence a seller reads must not sound like a sandbox that was never finished.
     const s = buildIntelSummary(input({ connections: { publicSources: false, apollo: false } }));
     expect(s.revenue).toBeNull();
-    expect(s.gaps.revenue?.reason).toBe('not_connected');
-    expect(s.gaps.openRoles?.reason).toBe('not_connected');
-    expect(s.gaps.funding?.reason).toBe('not_connected');
+    expect(s.gaps.revenue).toEqual({
+      reason: 'not_connected',
+      detail: 'No revenue on file. Reconnect filings or Apollo to fill it.',
+    });
+    expect(s.gaps.openRoles).toEqual({
+      reason: 'not_connected',
+      detail: 'No open roles on file. Reconnect job boards to fill them.',
+    });
+    expect(s.gaps.funding).toEqual({
+      reason: 'not_connected',
+      detail: 'No funding on file. Reconnect Apollo to fill it.',
+    });
+    expect(s.gaps.headcount).toEqual({
+      reason: 'not_connected',
+      detail: 'No headcount on file. Reconnect Apollo or filings to fill it.',
+    });
+    expect(s.gaps.signal).toEqual({
+      reason: 'not_connected',
+      detail: 'No recent posts on file. Reconnect a public source to fill them.',
+    });
+    expect(JSON.stringify(s.gaps)).not.toMatch(/not connected|sample|fixture|demo/i);
   });
 
   it('says private company when filings and registries ran and found no accounts', () => {
@@ -161,6 +181,7 @@ describe('buildIntelSummary: empty values carry a reason', () => {
       input({ connections: { publicSources: true, apollo: false }, runs: { financials: { status: 'ok', lastFetchedAt: daysAgo(1) }, registry: { status: 'partial', lastFetchedAt: daysAgo(1) } } }),
     );
     expect(s.gaps.revenue?.reason).toBe('private_company');
+    expect(s.gaps.revenue?.detail).toBe('No published accounts. Reconnect Apollo for an estimate.');
   });
 
   it('says no public data when the job boards ran and found nothing', () => {
@@ -211,7 +232,34 @@ describe('buildIntelSummary: direction and signal', () => {
     const s = buildIntelSummary(input({ postings: [posting(1, 2, 'data', { source: 'fixture', sample: true })] }));
     expect(s.sample).toBe(true);
     expect(s.openRoles?.sample).toBe(true);
-    expect(s.openRoles?.sourceLabel).toBe('Sample data');
+    expect(s.openRoles?.source).toBe('fixture');
+    expect(s.openRoles?.sourceLabel).toBe('Reference record');
+    expect(s.openRoles?.sourceLabel).not.toMatch(/sample|demo|fixture/i);
+  });
+
+  it('labels a fixture filing as a reference record and does not present it as a live filing', () => {
+    const s = buildIntelSummary(
+      input({
+        years: [
+          {
+            fiscalYear: 2025,
+            periodEnd: '2025-12-31',
+            currency: 'EUR',
+            source: 'fixture',
+            revenue: 10,
+            headcount: null,
+            fetchedAt: null,
+          },
+        ],
+      }),
+    );
+    expect(s.revenue).toMatchObject({
+      source: 'fixture',
+      sourceLabel: 'Reference record',
+      sample: true,
+      method: 'Reference figures FY2025',
+    });
+    expect(s.sample).toBe(true);
   });
 
   it('parses with the published contract', () => {

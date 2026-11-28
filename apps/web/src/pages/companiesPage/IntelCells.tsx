@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import {
   compactAmount,
   INTEL_EMPTY_REASON_LABEL,
+  referenceClause,
   type CompanyIntelSummary,
   type IntelGap,
   type IntelMetric,
@@ -59,7 +60,7 @@ export function provenance(
     m.method,
     day(m.asOf) ? `as of ${day(m.asOf)}` : null,
     m.inferred ? 'inferred' : null,
-    m.sample ? 'sample data' : null,
+    referenceClause(m.sourceLabel, m.sample),
   ]
     .filter(Boolean)
     .join(', ');
@@ -244,16 +245,11 @@ export function IntelCellFor({
         return <EmptyIntel gap={gapFor(s, 'hiringTrend')} />;
       const trend = s?.newRoles30d?.trend30Pct ?? null;
       const tone = trend === null || trend === 0 ? 'neutral' : trend > 0 ? 'positive' : 'negative';
+      const mark = referenceClause(t.sourceLabel, t.sample);
+      const label = `New postings per month, last 6 months: ${t.monthly.join(', ')}. ${t.sourceLabel}${mark ? `, ${mark}` : ''}`;
       return (
-        <span
-          title={`New postings per month, last 6 months: ${t.monthly.join(', ')}. ${t.sourceLabel}`}
-          className="inline-flex"
-        >
-          <Sparkline
-            values={t.monthly}
-            tone={tone}
-            label={`New postings per month, last 6 months: ${t.monthly.join(', ')}. ${t.sourceLabel}${t.sample ? ', sample data' : ''}`}
-          />
+        <span title={label} className="inline-flex">
+          <Sparkline values={t.monthly} tone={tone} label={label} />
         </span>
       );
     }
@@ -272,7 +268,8 @@ export function IntelCellFor({
     case 'signal': {
       const g = s?.signal;
       if (!g) return <EmptyIntel gap={gapFor(s, 'signal')} />;
-      const label = `${g.label}: ${g.title}. ${g.sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${g.sample ? ', sample data' : ''}`;
+      const mark = referenceClause(g.sourceLabel, g.sample);
+      const label = `${g.label}: ${g.title}. ${g.sourceLabel}${g.publishedAt ? `, ${day(g.publishedAt)}` : ''}${mark ? `, ${mark}` : ''}`;
       return (
         <span aria-label={label} title={label} className="inline-flex">
           <StatusPill

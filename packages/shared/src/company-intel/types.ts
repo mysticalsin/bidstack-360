@@ -9,6 +9,7 @@
 import { z } from 'zod';
 
 import { InitiativeTheme } from '../schemas/account-signals.js';
+import { REFERENCE_RECORD } from './presentation.js';
 
 const Iso = z.string();
 
@@ -31,7 +32,7 @@ export const FINANCIAL_SOURCE_LABEL: Record<string, string> = {
   esef: 'ESEF (filings.xbrl.org)',
   brreg: 'Brønnøysund Register Centre',
   fr_rne: 'Recherche d\u2019entreprises (RNE)',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 
 /** How a line was obtained: read from a source, stated by the company, or inferred by Polo. */
