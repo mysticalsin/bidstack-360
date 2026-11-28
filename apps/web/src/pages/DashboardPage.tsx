@@ -272,6 +272,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
               <RecentOpportunitiesCard
                 opps={opps}
                 accountName={cockpit.company.name}
+                companyId={cockpit.company.id}
                 items={accountOpps}
               />
             </Reveal>

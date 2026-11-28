@@ -24,6 +24,7 @@ import { useCursorPagination } from '@/hooks/useCursorPagination';
 import { CursorPager } from '@/components/ui/CursorPager';
 import { useStageMutation } from '@/hooks/useStageMutation';
 import { useTableSort } from '@/hooks/useTableSort';
+import { opportunityCompanyIdParam } from '@/lib/account-pipeline-href';
 import { api, downloadFromApi } from '@/lib/api';
 import {
   getPipelineStages,
@@ -50,6 +51,9 @@ export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get('search') ?? undefined;
+  // From the account cockpit "Open pipeline" link. A non-uuid is ignored so
+  // the list route does not 400 and the strip does not pretend to be scoped.
+  const companyId = opportunityCompanyIdParam(searchParams.get('companyId'));
   const qc = useQueryClient();
   // useTransition: typing in the search box (URL state) is urgent; the
   // table re-render is non-urgent.
@@ -83,10 +87,11 @@ export function OpportunitiesPage() {
   };
 
   // Cursor pagination — reset to page 1 whenever the search/stage/due filter changes.
-  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}`);
+  const pager = useCursorPagination(`${search}|${stageFilter}|${dueFilter}|${companyId ?? ''}`);
   const { data, isLoading, isError, error } = useOpportunities({
     limit: 50,
     ...(pager.cursor ? { cursor: pager.cursor } : {}),
+    ...(companyId ? { companyId } : {}),
     ...(search ? { search } : {}),
     ...(stageFilter
       ? isPipelineStageIdUuid(stageFilter)
@@ -322,6 +327,7 @@ export function OpportunitiesPage() {
                 ? { stage: stageFilter }
                 : {}
             : {}),
+          ...(companyId ? { companyId } : {}),
           ...(search ? { search } : {}),
           ...(dueFilter === 'within7' ? { dueWithinDays: '7' } : {}),
           ...(dueFilter === 'overdue' ? { overdue: 'true' } : {}),
@@ -352,7 +358,11 @@ export function OpportunitiesPage() {
           ))}
         </div>
       ) : data && data.items.length > 0 ? (
-        <OppKpiBar opps={data.items} summary={orgSummary.data} />
+        <OppKpiBar
+          opps={data.items}
+          summary={companyId ? undefined : orgSummary.data}
+          scoped={Boolean(companyId)}
+        />
       ) : null}
 
       {/* sr-only live region — announces filter/search result count to AT */}
@@ -370,7 +380,9 @@ export function OpportunitiesPage() {
                   '{{count}} opportunities matching "{{search}}"',
                   { count: data.items.length, search },
                 )
-            : stageFilter
+            : companyId
+              ? t('opportunities.caption.account', "This account's bids")
+              : stageFilter
               ? data.items.length === 1
                 ? t(
                     'opportunities.liveRegion.inStageOne',
@@ -396,11 +408,17 @@ export function OpportunitiesPage() {
         search={search}
         stageFilter={stageFilter}
         stageOptions={stageOptions}
+        accountScoped={Boolean(companyId)}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
+        onClearAccount={() => {
+          const next = new URLSearchParams(searchParams);
+          next.delete('companyId');
+          setSearchParams(next, { replace: true });
+        }}
         onExportCsv={() => void exportCsv()}
       />
 
@@ -455,6 +473,29 @@ export function OpportunitiesPage() {
             }
           />
         ) : data?.items.length === 0 ? (
+          companyId ? (
+            <EmptyState
+              icon="target"
+              title={t('opportunities.empty.accountTitle', 'No bids for this account')}
+              message={t(
+                'opportunities.empty.accountMessage',
+                'Nothing linked to this account is on the bid list.',
+              )}
+              action={
+                <button
+                  type="button"
+                  className="btn btn-secondary min-h-11"
+                  onClick={() => {
+                    const next = new URLSearchParams(searchParams);
+                    next.delete('companyId');
+                    setSearchParams(next, { replace: true });
+                  }}
+                >
+                  {t('oppToolbar.showEveryAccount', 'Show every account')}
+                </button>
+              }
+            />
+          ) : (
           <EmptyState
             icon="target"
             title={t('opportunities.empty.headline', 'No open bids yet')}
@@ -469,11 +510,14 @@ export function OpportunitiesPage() {
               </EmptyStateLink>
             }
           />
+          )
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-left text-sm">
               <caption className="sr-only">
-                {search
+                {companyId
+                  ? t('opportunities.caption.account', "This account's bids")
+                  : search
                   ? t('opportunities.caption.matching', 'Opportunities matching "{{search}}"', {
                       search,
                     })
