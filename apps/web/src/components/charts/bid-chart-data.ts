@@ -2,7 +2,7 @@
 // here invents data: every bar, dot and spoke is a sum or count of real rows.
 import { BID_CRITERIA, BID_THRESHOLDS } from '@bidstack/shared';
 
-import { closeDate, oppStatus, type OppRow } from '@/components/viz/viz-data';
+import { closeDate, isPastDueDate, oppStatus, type OppRow } from '@/components/viz/viz-data';
 
 /** A closed bid that took longer than this from opening to outcome is flagged. */
 export const SALES_CYCLE_OVERDUE_DAYS = 90;
@@ -41,7 +41,7 @@ export function pipelineByCloseMonth(rows: OppRow[], now = Date.now()) {
     else if (status === 'lost') b.lost += v;
     else {
       b.open += v;
-      if (o.dueDate && new Date(o.dueDate).getTime() < now) b.overdue += v;
+      if (isPastDueDate(o.dueDate, now)) b.overdue += v;
     }
     buckets.set(idx, b);
   }
@@ -159,7 +159,7 @@ export function sectorPipeline(rows: readonly (OppRow & { industry?: string | nu
     const b = by.get(label) ?? { open: 0, overdue: 0 };
     const v = o.value ?? 0;
     b.open += v;
-    if (o.dueDate && new Date(o.dueDate).getTime() < now) b.overdue += v;
+    if (isPastDueDate(o.dueDate, now)) b.overdue += v;
     by.set(label, b);
   }
   const sorted = [...by.entries()].sort((a, b) => b[1].open - a[1].open || a[0].localeCompare(b[0])).slice(0, top);

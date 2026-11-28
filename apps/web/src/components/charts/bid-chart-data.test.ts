@@ -59,6 +59,23 @@ describe('pipelineByCloseMonth', () => {
   it('is deterministic across calls', () => {
     expect(pipelineByCloseMonth(rows, NOW)).toEqual(pipelineByCloseMonth(rows, NOW));
   });
+
+  it('does not hang a bid due today below the line', () => {
+    // WHY: NOW is noon on 7 Nov. A close date of that same UTC day is still
+    // today. Hanging it below the axis would call a bid late while the card
+    // says "Due today".
+    const dueToday: OppRow = {
+      id: 'today',
+      stage: 's2_sent',
+      value: 250,
+      dueDate: '2026-11-07',
+      customer: 'Today',
+    };
+    const out = pipelineByCloseMonth([...rows, dueToday], NOW);
+    const at = out.keys.indexOf('2026-11');
+    expect(out.open[at]).toBe(250);
+    expect(out.overdue[at]).toBe(0);
+  });
 });
 
 describe('activityByHour', () => {
@@ -156,6 +173,23 @@ describe('sectorPipeline', () => {
 
   it('caps the number of sectors', () => {
     expect(sectorPipeline(sectorRows, NOW, 2).labels).toHaveLength(2);
+  });
+
+  it('keeps a bid due today out of the overdue front row', () => {
+    // WHY: the sector chart and the close-month chart share one overdue rule.
+    // A bid due on the same UTC day as NOW is open, not late.
+    const dueToday = {
+      id: 'today',
+      stage: 's1_lead',
+      value: 50,
+      dueDate: '2026-11-07',
+      customer: 'Today',
+      industry: 'healthcare',
+    };
+    const out = sectorPipeline([...sectorRows, dueToday], NOW);
+    const i = out.labels.indexOf('Healthcare');
+    expect(out.open[i]).toBe(750);
+    expect(out.overdue[i]).toBe(700);
   });
 });
 
