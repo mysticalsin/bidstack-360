@@ -38,7 +38,7 @@ export interface ApiProjects {
 export const PROVIDER_LABEL: Record<string, string> = {
   apollo: 'Apollo',
   seamless: 'Seamless.AI',
-  fixture: 'Sample data',
+  fixture: 'Reference records',
 };
 export const FUNCTION_LABEL: Record<string, string> = {
   data: 'Data',
@@ -88,8 +88,8 @@ export function isSampleStatus(f: Pick<Firmographics, 'status' | 'providers'>): 
 }
 
 const NOTICE: Record<string, string> = {
-  not_configured: 'Company enrichment is not configured (no provider key), so this is sample data.',
-  not_enriched: 'This account has not been enriched yet, so this is sample data.',
+  not_configured: 'Company enrichment is not configured (no provider key), so these are reference records.',
+  not_enriched: 'This account has not been enriched yet, so these are reference records.',
   pending: 'Enrichment is still running; some fields may fill in on the next run.',
   partial: 'Some fields were not returned by the providers.',
   budget_exceeded:

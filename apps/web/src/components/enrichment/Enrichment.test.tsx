@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// No provider configured locally: the API says so, and the cards show Sample data.
+// No provider configured locally: the API says so, and the cards show reference records.
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
   api: vi.fn(async () => ({ companyId: 'acct-1', status: 'not_configured', stale: false, providers: {}, provenance: {} })),
@@ -24,12 +24,13 @@ function wrap(ui: ReactNode, path = '/accounts/acct-1') {
 
 describe('enrichment cards', () => {
   afterEach(cleanup);
-  it('firmographics strip shows four facts, each with source and date, labelled Sample', async () => {
+  it('firmographics strip shows four facts, each with source and date, labelled Reference', async () => {
     wrap(<FirmographicsStrip companyId="acct-1" />);
     const strip = await screen.findByTestId('account-firmographics');
     for (const t of ['Revenue', 'Headcount', 'Industry', 'Locations']) expect(within(strip).getByText(t)).toBeTruthy();
     expect(strip.querySelectorAll('.en-src time').length).toBe(4);
-    expect(within(strip).getByText('Sample')).toBeTruthy();
+    expect(within(strip).getByText('Reference')).toBeTruthy();
+    expect(within(strip).queryByText('Sample')).toBeNull();
     expect(within(strip).getByText(/not configured/)).toBeTruthy();
     // No provider: nothing to refresh.
     expect(within(strip).queryByTestId('enrichment-refresh')).toBeNull();
