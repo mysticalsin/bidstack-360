@@ -34,6 +34,10 @@ interface Props {
 
 const UNREAD_HEALTH: CompanyHealth = { score: 0, band: 'critical', counts: {} };
 
+// 44px target. The ring is the focus state. The label stays the primary foreground.
+const DEAL_RETRY =
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]';
+
 export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }: Props) {
   const { t } = useTranslation('crm');
   const [briefOpen, setBriefOpen] = useState(false);
@@ -77,6 +81,11 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
   const accountOpps = (opps.data?.items ?? []).filter(
     (o) => o.customer.toLowerCase() === cockpit.company.name.toLowerCase(),
   );
+  // A read with no payload is not zero deals. A later failure keeps the rows
+  // already on screen. Empty is a result only after the read succeeds.
+  const hasDealPayload = opps.data != null;
+  const dealsFailed = opps.isError && !hasDealPayload;
+  const dealsLoading = !hasDealPayload && !dealsFailed;
   const openOpps = accountOpps.filter((o) => o.stage !== 'closed_won' && o.stage !== 'closed_lost');
   const openValue = openOpps.reduce((sum, o) => sum + o.value, 0);
   const openRisks = cockpit.risks.filter((r) => r.status !== 'mitigated');
@@ -203,7 +212,7 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
             <Icon name="sparkle" size={14} />
             {t('pageHead.generateBrief', 'Generate brief')}
           </CommandButton>
-        ) : accountView ? (
+        ) : accountView && !dealsLoading && !dealsFailed ? (
           <CreateOpportunityDialog
             defaultCustomer={cockpit.company.name}
             trigger={
@@ -224,16 +233,37 @@ export const PageHead = memo(function PageHead({ cockpit, accountView, onDrill }
 
       {accountView ? (
         <div className="acct-keys" role="group" aria-label={t('pageHead.keyNumbers', 'Key numbers')}>
-          <div>
+          <div aria-busy={dealsLoading ? true : undefined}>
             <span className="acct-key-label">{t('pageHead.keyOpenPipeline', 'Open pipeline')}</span>
-            <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
-            <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
-            <span>
-              {openOpps.length === 1
-                ? t('pageHead.keyOpenDeal', '1 open deal')
-                : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
-            </span>
-            {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
+            {dealsLoading ? (
+              <p
+                role="status"
+                aria-label={t('pageHead.dealsLoading', 'Loading deals for this account')}
+                className="m-0 text-sm font-medium text-[var(--fg-primary)]"
+              >
+                {t('pageHead.dealsLoading', 'Loading deals for this account')}
+              </p>
+            ) : dealsFailed ? (
+              <div role="alert" className="grid justify-items-start gap-2">
+                <p className="m-0 text-sm font-medium text-[var(--fg-primary)]">
+                  {t('pageHead.dealsError', "Couldn't load deals for this account")}
+                </p>
+                <button type="button" className={DEAL_RETRY} onClick={() => void opps.refetch()}>
+                  {t('pageHead.dealsRetry', 'Retry')}
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="acct-key-value"><AnimatedNumber value={openValue} format={formatMoney} /></span>
+                <MetricSpark values={openSpark} label={t('pageHead.sparkOpen', 'Open value building up by due date')} />
+                <span>
+                  {openOpps.length === 1
+                    ? t('pageHead.keyOpenDeal', '1 open deal')
+                    : t('pageHead.keyOpenDeals', '{{count}} open deals', { count: openOpps.length })}
+                </span>
+                {onDrill ? <button type="button" className="drill-more acct-key-drill" onClick={() => onDrill('open')}>{t('pageHead.showOpenBids', 'Show open bids')}</button> : null}
+              </>
+            )}
           </div>
           <div>
             <span className="acct-key-label">{t('pageHead.keyWinRate', 'Win rate')}</span>
