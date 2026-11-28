@@ -384,7 +384,7 @@
       "body": "Body (HTML allowed)"
     },
     "availablePlaceholders": "Available placeholders",
-    "placeholderTitle": "{{label}} — sample: {{sample}}",
+    "placeholderTitle": "{{label}} — reference: {{sample}}",
     "action": {
       "delete": "Delete",
       "cancel": "Cancel",
