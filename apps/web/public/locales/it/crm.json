@@ -2365,7 +2365,10 @@
       "colName": "Nome",
       "colStage": "Fase",
       "colValue": "Valore",
-      "colProbability": "Probabilità"
+      "colProbability": "Probabilità",
+      "colDue": "Scadenza",
+      "dueClosed": "Chiusa",
+      "dueClosedAria": "Il conto alla scadenza è fermo. Questa offerta è chiusa."
     },
     "cases": {
       "emptyTitle": "Nessun caso aperto",

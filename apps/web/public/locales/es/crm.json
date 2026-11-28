@@ -2398,7 +2398,10 @@
       "colName": "Nombre",
       "colStage": "Etapa",
       "colValue": "Valor",
-      "colProbability": "Probabilidad"
+      "colProbability": "Probabilidad",
+      "colDue": "Vencimiento",
+      "dueClosed": "Cerrada",
+      "dueClosedAria": "El reloj de vencimiento se detuvo. Esta oferta está cerrada."
     },
     "cases": {
       "emptyTitle": "No hay casos abiertos",

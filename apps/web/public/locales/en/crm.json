@@ -2377,7 +2377,10 @@
       "colName": "Name",
       "colStage": "Stage",
       "colValue": "Value",
-      "colProbability": "Probability"
+      "colProbability": "Probability",
+      "colDue": "Due",
+      "dueClosed": "Closed",
+      "dueClosedAria": "Due clock stopped. This bid is closed."
     },
     "cases": {
       "emptyTitle": "No open cases",

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { DueDateChip } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
 import { EmptyState, ErrorState } from '@/components/ui/StateMessages';
 import {
@@ -23,6 +24,11 @@ import { AccountHierarchyTree } from '@/components/AccountHierarchyTree';
 import type { useCompanyHierarchy } from '@/hooks/useCompanies';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { formatStage } from '@/lib/format';
+
+/** Won and lost bids are decided. A past due date on them is history, not a late open bid. */
+function dueClockStopped(stage: string): boolean {
+  return stage === 'closed_won' || stage === 'closed_lost';
+}
 
 export function ContactTab({
   contacts,
@@ -112,6 +118,7 @@ export function OpportunityTab({
             <TableHead>{t('companyTabs.opportunities.colStage', 'Stage')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colValue', 'Value')}</TableHead>
             <TableHead>{t('companyTabs.opportunities.colProbability', 'Probability')}</TableHead>
+            <TableHead>{t('companyTabs.opportunities.colDue', 'Due')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -136,6 +143,21 @@ export function OpportunityTab({
                 {formatMoneyMicros(o.valueMicros)}
               </TableCell>
               <TableCell>{o.probability}%</TableCell>
+              <TableCell>
+                {dueClockStopped(o.stage) ? (
+                  <Badge
+                    tone="gray"
+                    aria-label={t(
+                      'companyTabs.opportunities.dueClosedAria',
+                      'Due clock stopped. This bid is closed.',
+                    )}
+                  >
+                    {t('companyTabs.opportunities.dueClosed', 'Closed')}
+                  </Badge>
+                ) : (
+                  <DueDateChip dueDate={o.dueDate} />
+                )}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

@@ -2420,7 +2420,10 @@
       "colName": "Nom",
       "colStage": "Étape",
       "colValue": "Valeur",
-      "colProbability": "Probabilité"
+      "colProbability": "Probabilité",
+      "colDue": "Échéance",
+      "dueClosed": "Close",
+      "dueClosedAria": "L'horloge d'échéance est arrêtée. Cette offre est close."
     },
     "cases": {
       "emptyTitle": "Aucun ticket ouvert",
