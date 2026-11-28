@@ -186,6 +186,53 @@ describe('buildCockpit technical stack overrides', () => {
   });
 });
 
+describe('buildCockpit technical stack does not invent a vendor catalog', () => {
+  // WHY: demo accounts often have no detected stack. Filling every cockpit
+  // with the same Microsoft / AWS / Google catalog made funding eligibility
+  // recommend ECIF, MAP, and PSF for accounts that are not those shops.
+  const base = {
+    companies: [],
+    opportunities: [],
+    contacts: [],
+    tasks: [],
+    risks: [],
+    compliance: [],
+    fieldOverrides: [],
+  };
+
+  it('leaves an account with no stack on file empty', () => {
+    const cockpit = buildCockpit({
+      ...base,
+      company: company({ name: 'Northwind Pharma' }),
+    });
+    expect(cockpit.technicalStack).toEqual([]);
+    expect(JSON.stringify(cockpit.technicalStack)).not.toMatch(
+      /Microsoft 365|CrowdStrike|verified_tech_profile/,
+    );
+  });
+
+  it('keeps a detected vendor and does not add the canned catalog beside it', () => {
+    const cockpit = buildCockpit({
+      ...base,
+      company: company({
+        name: 'Northwind Pharma',
+        technicalStack: [
+          {
+            label: 'Clinical',
+            items: [{ name: 'Veeva', source: 'fixture', confidence: 0.9 }],
+          },
+        ],
+      }),
+    });
+    expect(cockpit.technicalStack).toEqual([
+      {
+        label: 'Clinical',
+        items: [{ name: 'Veeva', source: 'fixture', confidence: 0.9 }],
+      },
+    ]);
+  });
+});
+
 describe('buildCockpit win/loss + revenue derivation', () => {
   const baseArgs = (opps: unknown[]) => ({
     company: company({ name: 'Acme' }),

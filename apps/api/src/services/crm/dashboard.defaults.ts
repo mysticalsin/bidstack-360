@@ -100,43 +100,6 @@ export const DEFAULT_WIDGETS: Array<z.infer<typeof DashboardWidget>> = [
   },
 ];
 
-// ─── Technical stack defaults ─────────────────────────────────────────────────
-
-function stackItems(names: string[]) {
-  return names.map((name) => ({ name, source: 'verified_tech_profile', confidence: 0.74 }));
-}
-
-export function defaultTechnicalStack(): Array<
-  z.infer<typeof AccountCockpitSnapshot>['technicalStack'][number]
-> {
-  return [
-    {
-      label: 'IT Infrastructure',
-      items: stackItems(['Microsoft 365', 'Azure', 'AWS', 'Google Cloud', 'VMware']),
-    },
-    {
-      label: 'Identity & Access',
-      items: stackItems(['Microsoft Entra ID', 'Okta', 'Duo', 'Active Directory']),
-    },
-    {
-      label: 'Security',
-      items: stackItems(['CrowdStrike', 'Microsoft Defender', 'Proofpoint', 'SentinelOne']),
-    },
-    {
-      label: 'Endpoints',
-      items: stackItems(['Microsoft Intune', 'Jamf Pro', 'Windows', 'macOS', 'iOS']),
-    },
-    {
-      label: 'Network',
-      items: stackItems(['Cisco Meraki', 'Palo Alto Networks', 'Cloudflare', 'Zscaler']),
-    },
-    {
-      label: 'Applications',
-      items: stackItems(['Salesforce', 'ServiceNow', 'Workday', 'Slack', 'Jira']),
-    },
-  ];
-}
-
 // ─── Bid opportunity fallbacks ────────────────────────────────────────────────
 
 export function defaultBidOpportunities(): Array<z.infer<typeof BidOpportunity>> {
