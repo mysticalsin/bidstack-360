@@ -47,6 +47,8 @@
 .viz-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--viz-muted); list-style: none; margin: 0; padding: 0; }
 .viz-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .viz-empty { font-size: 13px; color: var(--viz-muted); padding: 16px 0; }
+.viz-empty a { color: var(--viz-ink); text-decoration: underline; text-underline-offset: 2px; }
+.viz-empty a:focus-visible { outline: 2px solid var(--viz-brand); outline-offset: 2px; }
 
 /* recharts hairlines */
 .viz .recharts-cartesian-axis-line, .viz .recharts-cartesian-axis-tick-line { stroke: var(--viz-line); }
