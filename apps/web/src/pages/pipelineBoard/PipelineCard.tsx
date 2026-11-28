@@ -6,14 +6,15 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { formatUnspecifiedAmount } from '@/components/dashboard/unspecified-currency';
 import { Badge } from '@/components/ui/Badge';
 import { DueDateChip, dueDateUrgency } from '@/components/ui/DueDateChip';
 import { Icon } from '@/components/ui/Icon';
-import { useFormatMoney } from '@/hooks/useFormatMoney';
 import { springLayout } from '@/lib/motion';
 import { cn } from '@/lib/cn';
 import type { Opportunity } from '@bidstack/shared';
 
+import { dealBoardAmount, DealBoardAmount } from './deal-board-amount';
 import { getStageName } from './pipelineUtils';
 
 interface PipelineCardProps {
@@ -47,7 +48,7 @@ export const PipelineCard = memo(function PipelineCard({
 }: PipelineCardProps) {
   const { t } = useTranslation('crm');
   const reduced = useReducedMotion();
-  const { formatMoney } = useFormatMoney();
+  const amountLabel = dealBoardAmount(opp.value);
   const stageName = getStageName(opp);
   // Derived from the chip's UTC-day-bucketed urgency — NOT a raw datetime
   // compare, which flagged "due today" as overdue for the whole day while the
@@ -99,14 +100,14 @@ export const PipelineCard = memo(function PipelineCard({
                   code: opp.code,
                   name: opp.name,
                   stage: stageName,
-                  value: formatMoney(opp.value, 'EUR'),
+                  value: amountLabel,
                 },
               )
             : t('crm.pipelineCardAriaLabelReadOnly', '{{code}}: {{name}}, {{stage}}, {{value}}.', {
                 code: opp.code,
                 name: opp.name,
                 stage: stageName,
-                value: formatMoney(opp.value, 'EUR'),
+                value: amountLabel,
               })) + (isStalled ? t('crm.pipelineCardOverdueSuffix', ', overdue') : '')
         }
         className={cn(
@@ -122,9 +123,9 @@ export const PipelineCard = memo(function PipelineCard({
           <span className="text-xs font-semibold text-[var(--fg-primary)] truncate">
             {opp.customer}
           </span>
-          <span className="tabular-nums text-xs font-bold text-[var(--fg-primary)] shrink-0">
-            {formatMoney(opp.value, 'EUR')}
-          </span>
+          <DealBoardAmount className="tabular-nums text-xs font-bold text-[var(--fg-primary)] shrink-0">
+            {formatUnspecifiedAmount(opp.value)}
+          </DealBoardAmount>
         </div>
 
         {/* Opportunity title */}
