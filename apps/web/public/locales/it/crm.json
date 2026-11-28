@@ -118,7 +118,13 @@
       "inStageOne": "{{count}} opportunità nella fase selezionata",
       "inStageMany": "{{count}} opportunità nella fase selezionata",
       "totalOne": "{{count}} opportunità",
-      "totalMany": "{{count}} opportunità"
+      "totalMany": "{{count}} opportunità",
+      "dueWithin7One": "{{count}} offerta in scadenza entro 7 giorni",
+      "dueWithin7Many": "{{count}} offerte in scadenza entro 7 giorni",
+      "overdueOne": "{{count}} offerta in ritardo",
+      "overdueMany": "{{count}} offerte in ritardo",
+      "inViewOne": "{{count}} opportunità in questa vista",
+      "inViewMany": "{{count}} opportunità in questa vista"
     },
     "error": {
       "title": "Impossibile caricare le opportunità",
@@ -126,7 +132,19 @@
     },
     "empty": {
       "title": "Ancora nessuna opportunità",
-      "message": "Crea la tua prima opportunità per iniziare a tracciare le gare."
+      "message": "Crea la tua prima opportunità per iniziare a tracciare le gare.",
+      "dueWithin7Title": "Niente in scadenza nei prossimi 7 giorni",
+      "dueWithin7Message": "Il resto del portafoglio è ancora qui. Cancella il filtro per vederlo.",
+      "overdueTitle": "Nessuna offerta in ritardo",
+      "overdueMessage": "Niente in questo elenco ha superato la data. Cancella il filtro per vedere il resto del portafoglio.",
+      "stageTitle": "Nessuna opportunità in questa fase",
+      "stageMessage": "Cancella il filtro per vedere il resto del portafoglio.",
+      "searchTitle": "Nessuna opportunità corrisponde alla ricerca",
+      "searchMessage": "Nessun risultato per \"{{search}}\".",
+      "viewTitle": "Nessuna opportunità corrisponde a questa vista",
+      "viewMessage": "Cancella i filtri per vedere il resto del portafoglio.",
+      "clearFilter": "Cancella filtro",
+      "clearFilters": "Cancella filtri"
     },
     "caption": {
       "matching": "Opportunità corrispondenti a \"{{search}}\"",
@@ -2135,6 +2153,13 @@
     "stageOpportunities": "opportunità {{stage}}",
     "clearFilter": "cancella filtro",
     "bidsInFlight": "{{count}} offerte in corso · fai clic su una cella per modificare in linea.",
+    "bidDueWithin7": "offerta in scadenza entro 7 giorni",
+    "bidsDueWithin7": "offerte in scadenza entro 7 giorni",
+    "bidOverdue": "offerta in ritardo",
+    "bidsOverdue": "offerte in ritardo",
+    "dueWordWithin7": "in scadenza entro 7 giorni",
+    "dueWordOverdue": "in ritardo",
+    "dueStageOpportunities": "opportunità {{stage}} {{due}}",
     "exportingLabel": "Esportazione delle opportunità…",
     "exportLabel": "Esporta le opportunità visibili come CSV",
     "exporting": "Esportazione…",

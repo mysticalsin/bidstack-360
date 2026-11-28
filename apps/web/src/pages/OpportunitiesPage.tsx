@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CreateOpportunityDialog } from '@/components/opportunity/CreateOpportunityDialog';
 import { TableSkeleton } from '@/components/skeletons/PageSkeletons';
 import { SavedViewsBar } from '@/components/ui/SavedViewsBar';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { confirm } from '@/components/ui/ConfirmDialog';
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
@@ -45,6 +46,7 @@ import {
   type DueQuickFilter,
 } from './opportunities/OppToolbar';
 import { OppIndustryBreakdown } from './opportunities/OppIndustryBreakdown';
+import { opportunityEmpty, type OpportunityView } from './opportunities/opportunity-view-copy';
 
 export function OpportunitiesPage() {
   const { t } = useTranslation('crm');
@@ -301,6 +303,22 @@ export function OpportunitiesPage() {
     });
   };
 
+  // A due, stage, or search miss is not an empty book. Clearing puts the
+  // unfiltered list back, including bids the forward 7-day window skipped.
+  const clearViewFilters = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('search');
+    next.delete('pipelineStageId');
+    next.delete('due');
+    setSearchParams(next, { replace: true });
+  };
+  const clearStageAndDue = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('pipelineStageId');
+    next.delete('due');
+    setSearchParams(next, { replace: true });
+  };
+
   // WHY backend streaming: the previous client-side export was capped at the
   // in-memory page (100 rows). The backend streams all matching opportunities
   // cursor-paginated from Postgres — no row limit, flat heap.
@@ -357,50 +375,28 @@ export function OpportunitiesPage() {
 
       {/* sr-only live region — announces filter/search result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!isLoading && data
-          ? search
-            ? data.items.length === 1
-              ? t(
-                  'opportunities.liveRegion.matchingOne',
-                  '{{count}} opportunity matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-              : t(
-                  'opportunities.liveRegion.matchingMany',
-                  '{{count}} opportunities matching "{{search}}"',
-                  { count: data.items.length, search },
-                )
-            : stageFilter
-              ? data.items.length === 1
-                ? t(
-                    'opportunities.liveRegion.inStageOne',
-                    '{{count}} opportunity in selected stage',
-                    { count: data.items.length },
-                  )
-                : t(
-                    'opportunities.liveRegion.inStageMany',
-                    '{{count}} opportunities in selected stage',
-                    { count: data.items.length },
-                  )
-              : data.items.length === 1
-                ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', {
-                    count: data.items.length,
-                  })
-                : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', {
-                    count: data.items.length,
-                  })
+          {!isLoading && data
+          ? opportunityLiveCount(t, {
+              search,
+              stageFilter,
+              dueFilter,
+              count: data.items.length,
+            })
           : ''}
       </p>
 
       <OppPageHeader
         search={search}
         stageFilter={stageFilter}
+        dueFilter={dueFilter}
         stageOptions={stageOptions}
         itemCount={data?.items.length ?? 0}
         hasData={Boolean(data && data.items.length > 0)}
         isExporting={isExporting}
         onClearSearch={clearSearch}
         onClearStageFilter={() => setStageFilter(null)}
+        onClearDueFilter={() => setDueFilter(null)}
+        onClearStageAndDue={clearStageAndDue}
         onExportCsv={() => void exportCsv()}
       />
 
@@ -455,19 +451,17 @@ export function OpportunitiesPage() {
             }
           />
         ) : data?.items.length === 0 ? (
-          <EmptyState
-            icon="target"
-            title={t('opportunities.empty.headline', 'No open bids yet')}
-            message={t(
-              'opportunities.empty.body',
-              "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
-            )}
-            action={<CreateOpportunityDialog />}
-            secondary={
-              <EmptyStateLink to="/settings?tab=data-import">
-                {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
-              </EmptyStateLink>
+          <OpportunityEmpty
+            search={search}
+            stageFilter={stageFilter}
+            stageLabel={
+              stageFilter
+                ? (stageOptions.find((s) => s.id === stageFilter)?.name ?? stageFilter)
+                : ''
             }
+            dueFilter={dueFilter}
+            count={0}
+            onClear={clearViewFilters}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -517,5 +511,100 @@ export function OpportunitiesPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+function opportunityLiveCount(
+  t: (key: string, fallback: string, vars?: Record<string, string | number>) => string,
+  input: {
+    search: string | undefined;
+    stageFilter: string | null;
+    dueFilter: DueQuickFilter;
+    count: number;
+  },
+): string {
+  const { search, stageFilter, dueFilter, count } = input;
+  if (search) {
+    return count === 1
+      ? t(
+          'opportunities.liveRegion.matchingOne',
+          '{{count}} opportunity matching "{{search}}"',
+          { count, search },
+        )
+      : t(
+          'opportunities.liveRegion.matchingMany',
+          '{{count}} opportunities matching "{{search}}"',
+          { count, search },
+        );
+  }
+  // A due filter is its own sentence. "0 opportunities" would sound like the
+  // book is empty when the 7-day window simply missed.
+  if (dueFilter === 'within7' && !stageFilter) {
+    return count === 1
+      ? t('opportunities.liveRegion.dueWithin7One', '{{count}} bid due within 7 days', { count })
+      : t('opportunities.liveRegion.dueWithin7Many', '{{count}} bids due within 7 days', { count });
+  }
+  if (dueFilter === 'overdue' && !stageFilter) {
+    return count === 1
+      ? t('opportunities.liveRegion.overdueOne', '{{count}} overdue bid', { count })
+      : t('opportunities.liveRegion.overdueMany', '{{count}} overdue bids', { count });
+  }
+  if (stageFilter || dueFilter) {
+    return count === 1
+      ? t('opportunities.liveRegion.inViewOne', '{{count}} opportunity in this view', { count })
+      : t('opportunities.liveRegion.inViewMany', '{{count}} opportunities in this view', { count });
+  }
+  return count === 1
+    ? t('opportunities.liveRegion.totalOne', '{{count}} opportunity', { count })
+    : t('opportunities.liveRegion.totalMany', '{{count}} opportunities', { count });
+}
+
+function OpportunityEmpty({
+  search,
+  stageFilter,
+  stageLabel,
+  dueFilter,
+  count,
+  onClear,
+}: OpportunityView & { onClear: () => void }) {
+  const { t } = useTranslation('crm');
+  const empty = opportunityEmpty({ search, stageFilter, stageLabel, dueFilter, count });
+  if (empty.kind === 'book') {
+    return (
+      <EmptyState
+        icon="target"
+        title={t('opportunities.empty.headline', 'No open bids yet')}
+        message={t(
+          'opportunities.empty.body',
+          "Convert a qualified lead or log the RFP you're chasing — stage, value, and win probability start tracking from day one.",
+        )}
+        action={<CreateOpportunityDialog />}
+        secondary={
+          <EmptyStateLink to="/settings?tab=data-import">
+            {t('opportunities.empty.importCsv', 'Or import your deal book (CSV)')}
+          </EmptyStateLink>
+        }
+      />
+    );
+  }
+  return (
+    <EmptyState
+      icon="search"
+      title={t(empty.title.key, empty.title.fallback, empty.title.vars)}
+      message={t(empty.message.key, empty.message.fallback, empty.message.vars)}
+      action={
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="min-h-11"
+          onClick={onClear}
+        >
+          {empty.clear === 'filters'
+            ? t('opportunities.empty.clearFilters', 'Clear filters')
+            : t('opportunities.empty.clearFilter', 'Clear filter')}
+        </Button>
+      }
+    />
   );
 }
