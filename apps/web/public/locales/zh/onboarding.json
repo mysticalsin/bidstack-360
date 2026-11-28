@@ -113,9 +113,9 @@
     "blankDesc": "从头开始"
   },
   "sampleData": {
-    "banner": "您正在查看演示数据。",
-    "clear": "清除演示数据",
-    "confirmClear": "删除所有演示数据？此操作无法撤销。"
+    "banner": "您正在查看参考记录。",
+    "clear": "清除参考记录",
+    "confirmClear": "删除所有参考记录？此操作无法撤销。"
   },
   "tourStep": {
     "dialogAriaLabel": "导览步骤 {{current}}/{{total}}：{{title}}",
@@ -127,7 +127,7 @@
   },
   "templatePicker": {
     "title": "选择一个入门管道",
-    "subtitle": "每个模板都会创建一个包含阶段和若干示例记录的管道，让你可以立即开始探索。你可以随时删除示例数据。",
+    "subtitle": "每个模板都会创建一个包含阶段和若干参考记录的管道，让你可以立即开始探索。你可以随时删除参考记录。",
     "loadErrorTitle": "无法加载模板",
     "tryAgain": "请重试。",
     "stageCount": "{{count}} 个阶段",
@@ -135,18 +135,18 @@
     "installing": "正在安装…",
     "install": "安装管道",
     "toastInstalledTitle": "管道已安装",
-    "toastInstalledDescription": "{{stages}} 个阶段、{{deals}} 个示例交易、{{leads}} 个潜在客户。",
+    "toastInstalledDescription": "{{stages}} 个阶段、{{deals}} 条参考记录、{{leads}} 个潜在客户。",
     "toastConflictTitle": "已安装一个管道",
-    "toastConflictDescription": "请先删除现有的示例数据，或从你的实时管道开始。",
+    "toastConflictDescription": "请先删除现有的参考记录，或从本工作区里已有的管道开始。",
     "toastErrorTitle": "无法安装模板"
   },
   "sampleDataBanner": {
-    "title": "示例数据已启用",
-    "description": "演示记录在此工作区中可见。在向高管或客户演示之前，请隐藏此提示或完全删除示例记录。",
+    "title": "参考",
+    "description": "此工作区中有参考记录。隐藏此提示，或在准备使用自己的管道时删除这些参考记录。",
     "hide": "隐藏",
-    "remove": "删除示例数据",
+    "remove": "删除参考记录",
     "removing": "正在删除…",
-    "removedToast": "示例数据已删除",
-    "removeErrorToast": "无法删除示例数据"
+    "removedToast": "参考记录已删除",
+    "removeErrorToast": "无法删除参考记录"
   }
 }

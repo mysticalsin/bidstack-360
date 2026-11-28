@@ -58,7 +58,7 @@ describe('SampleDataBanner', () => {
   it('asks before deleting all demonstration data and does nothing on cancel', async () => {
     mocks.confirm.mockResolvedValue(false);
     render(<SampleDataBanner />);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove sample data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove reference records' }));
     await waitFor(() =>
       expect(mocks.confirm).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -73,7 +73,7 @@ describe('SampleDataBanner', () => {
   it('deletes after the user confirms', async () => {
     mocks.confirm.mockResolvedValue(true);
     render(<SampleDataBanner />);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove sample data' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove reference records' }));
     await waitFor(() => expect(mocks.mutate).toHaveBeenCalledTimes(1));
   });
 });

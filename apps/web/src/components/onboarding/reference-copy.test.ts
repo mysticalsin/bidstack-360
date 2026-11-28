@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { ONBOARDING_SELLER_COPY } from './reference-copy';
+
 const BANNED =
   /sample|demo|démo|démonstr|dimostr|demostr|sandbox|illustrative|ejemplo|exemple|esempio|exemplo|muestra|not live|演示|示例|实时/iu;
 const LIVE_WORD = /\blive\b|\bvivo\b|实时/iu;
@@ -159,5 +161,9 @@ describe('onboarding reference copy', () => {
 
   it('keeps an empty Arabic catalog on the English fallback', () => {
     expect(readLocale('ar')).toEqual({});
+  });
+
+  it('uses the English catalog as the component fallback', () => {
+    expect({ ...ONBOARDING_SELLER_COPY }).toEqual(ENGLISH);
   });
 });
