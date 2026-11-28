@@ -110,9 +110,10 @@ describe('AccountDirectionSection', () => {
     expect(refresh).toHaveBeenCalledWith('posts');
   });
 
-  it('labels fixture data as Sample', () => {
+  it('labels fixture data as a reference record and does not call it a sample', () => {
     state.direction = { ...direction, sample: true };
     render(<AccountDirectionSection companyId="c1" />);
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
   });
 });

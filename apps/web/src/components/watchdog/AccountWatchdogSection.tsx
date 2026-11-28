@@ -12,6 +12,8 @@ import { ChevronDown, ExternalLink } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+import { REFERENCE_BADGE } from '@bidstack/shared';
+
 import { formatUnspecifiedAmount, UNSPECIFIED_CURRENCY_BASIS } from '@/components/dashboard/unspecified-currency';
 import { MiniCalendar, YearBars } from '@/components/viz/charts';
 import { CATEGORY_LABEL, noDash, sourceLabel } from '@/components/signals/category';
@@ -109,7 +111,7 @@ function SignalRow({ e, i, onDismiss }: { e: WatchEvent; i: number; onDismiss?: 
             {sourceName(e.source)}
             {!e.group && e.mentions && e.mentions > 1 ? ` · ${e.mentions} outlets` : ''} · <time dateTime={e.occurredAt}>{dateFmt.format(new Date(e.occurredAt))}</time>
             {e.status === 'NEW' ? <span className="wd-new"> · New</span> : null}
-            {isSample(e) ? <span className="wd-sample-badge">Sample</span> : null}
+            {isSample(e) ? <span className="wd-sample-badge">{REFERENCE_BADGE}</span> : null}
           </span>
         </span>
         <Pill kind={e.implication}>{PILL[e.implication]}</Pill>

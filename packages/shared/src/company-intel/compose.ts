@@ -1,4 +1,5 @@
 import { buildDirection } from './direction.js';
+import { REFERENCE_RECORD } from './presentation.js';
 import { OPEN_ROLE_WINDOW_DAYS, summarizeHiring, type HiringPostingInput } from './hiring.js';
 import { buildInvestmentPlan } from './investment.js';
 import type { StatementInput } from './statements.js';
@@ -84,7 +85,7 @@ const ATS_LABEL: Record<string, string> = {
   adzuna: 'Adzuna',
   apollo: 'Apollo',
   seamless: 'Seamless',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 
 /** Display label for a posting source. */

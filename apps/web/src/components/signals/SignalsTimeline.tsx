@@ -10,7 +10,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { scaleTime } from 'd3-scale';
 
-import type { SignalCategory, TimelineItem } from '@bidstack/shared';
+import { REFERENCE_BADGE, REFERENCE_RECORD, type SignalCategory, type TimelineItem } from '@bidstack/shared';
 
 import { TransitionPanel } from '@/components/motion-primitives/transition-panel';
 import { useAccountTimeline } from '@/hooks/useAccountSignals';
@@ -57,12 +57,12 @@ function Detail({ item }: { item: TimelineItem }) {
         <i className="sg-dot-key" aria-hidden />
         {CATEGORY_LABEL[item.category]} · <time dateTime={item.at}>{dateFmt.format(new Date(item.at))}</time>
         {item.upcoming ? ' · Upcoming' : ''}
-        {item.sample ? <span className="sg-sample">Sample</span> : null}
+        {item.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
       </span>
       <h3>{noDash(item.title)}</h3>
       {item.summary ? <p>{noDash(item.summary)}</p> : null}
       <p className="sg-meta">
-        {item.sample ? 'Sample data, no live source' : sourceLabel(item.source)}
+        {item.sample ? REFERENCE_RECORD : sourceLabel(item.source)}
         {item.href ? (
           <>
             {' · '}
@@ -173,7 +173,7 @@ export function TimelineView({
                       </button>
                       <div className="sg-meta">
                         {CATEGORY_LABEL[i.category]} · {dateFmt.format(new Date(i.at))}
-                        {i.sample ? ' · Sample' : ''}
+                        {i.sample ? ` · ${REFERENCE_BADGE}` : ''}
                       </div>
                       {selected === i.id ? <div className="sg-detail" style={{ minHeight: 0 }}><Detail item={i} /></div> : null}
                     </div>
@@ -278,7 +278,7 @@ export function SignalsTimeline({ companyId }: { companyId: string }) {
       <header className="sg-head">
         <h2 id="sg-tl-h" className="sg-h">Signals timeline</h2>
         <span className="sg-meta">
-          Our activity and their news, last 12 months {sample ? <span className="sg-sample">Sample</span> : null}
+          Our activity and their news, last 12 months {sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
         </span>
       </header>
       {q.isLoading ? (

@@ -1,4 +1,5 @@
 import { OFFERING_HOOKS, type InitiativeTheme } from '../schemas/account-signals.js';
+import { REFERENCE_RECORD } from './presentation.js';
 import { hiringThemes, type HiringInput } from './hiring.js';
 import { compactAmount, type FinancialYearInput, type InvestmentPlan } from './investment.js';
 import { classifyPost, POST_KIND_LABEL } from './posts.js';
@@ -39,7 +40,7 @@ function financialClaim(years: FinancialYearInput[]): IntelClaim | null {
     const was = prev?.operatingMargin != null ? ` (FY${prev.fiscalYear}: ${prev.operatingMargin.toFixed(1)}%)` : '';
     text += `, operating margin ${latest.operatingMargin.toFixed(1)}%${was}`;
   }
-  if (latest.sample) text += ', sample data';
+  if (latest.sample) text += `, ${REFERENCE_RECORD.toLowerCase()}`;
   return { id: 'claim-financials', area: 'financials', text, basis: 'observed', theme: null, evidenceIds: ids };
 }
 

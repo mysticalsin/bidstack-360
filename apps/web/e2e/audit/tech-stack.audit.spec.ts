@@ -81,7 +81,7 @@ test('click audit company detail: every evidence chip opens and closes its popov
   const wall = page.getByTestId('tech-stack-wall');
   await expect(wall).toBeVisible();
   await expect(page.getByTestId('tech-coverage-line').first()).toContainText('Coverage:');
-  await expect(page.getByTestId('tech-coverage-line').first()).toContainText('Sample');
+  await expect(page.getByTestId('tech-coverage-line').first()).toContainText('Reference');
   const chips = wall.getByRole('button', { name: /evidence,/ });
   const count = await chips.count();
   expect(count).toBeGreaterThan(3);
@@ -89,7 +89,7 @@ test('click audit company detail: every evidence chip opens and closes its popov
     const chip = chips.nth(i);
     await chip.click();
     await expect(chip).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByText(/^Sample/).last()).toBeVisible();
+    await expect(page.getByText(/reference record/i).last()).toBeVisible();
     await page.keyboard.press('Escape');
     await page.mouse.move(0, 0);
     await expect(chip).toHaveAttribute('aria-expanded', 'false');

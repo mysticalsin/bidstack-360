@@ -8,7 +8,7 @@ import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useReducedMotion } from 'motion/react';
 
-import type { PortfolioMomentum as PortfolioData } from '@bidstack/shared';
+import { REFERENCE_BADGE, type PortfolioMomentum as PortfolioData } from '@bidstack/shared';
 
 import { AreaSparkline } from '@/components/charts/bklit-sparkline';
 import { usePortfolioMomentum } from '@/hooks/useAccountSignals';
@@ -55,7 +55,7 @@ export function MomentumList({ data }: { data: PortfolioData }) {
             </button>
           ))}
         </div>
-        {accountPage.items.some((a) => a.sample) ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
+        {accountPage.items.some((a) => a.sample) ? <span className="sg-sample">{REFERENCE_BADGE}</span> : null}
       </div>
       <p className="sr-only">
         {`${data.counts.gaining} accounts gaining, ${data.counts.steady} steady, ${data.counts.declining} declining. `}
@@ -117,7 +117,7 @@ export function AlertsList({ alerts }: { alerts: PortfolioData['alerts'] }) {
               </span>
               <span>{a.companyName}</span>
               <time dateTime={a.occurredAt}>{shortFmt.format(new Date(a.occurredAt))}</time>
-              {a.sample ? <span className="sg-sample">Sample</span> : <span>{sourceLabel(a.source)}</span>}
+              {a.sample ? <span className="sg-sample">{REFERENCE_BADGE}</span> : <span>{sourceLabel(a.source)}</span>}
             </span>
             <Link id={`al-${a.id}`} to={`/accounts/${encodeURIComponent(a.companyId)}#watchdog`}>{noDash(a.title)}</Link>
           </article>

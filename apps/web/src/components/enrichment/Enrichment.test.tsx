@@ -29,8 +29,11 @@ describe('enrichment cards', () => {
     const strip = await screen.findByTestId('account-firmographics');
     for (const t of ['Revenue', 'Headcount', 'Industry', 'Locations']) expect(within(strip).getByText(t)).toBeTruthy();
     expect(strip.querySelectorAll('.en-src time').length).toBe(4);
-    expect(within(strip).getByText('Sample')).toBeTruthy();
-    expect(within(strip).getByText(/not configured/)).toBeTruthy();
+    expect(within(strip).getByText('Reference')).toBeTruthy();
+    expect(within(strip).queryByText('Sample')).toBeNull();
+    expect(
+      within(strip).getByText('No enrichment source on file. Reconnect a provider to fill these fields.'),
+    ).toBeTruthy();
     // No provider: nothing to refresh.
     expect(within(strip).queryByTestId('enrichment-refresh')).toBeNull();
     fireEvent.click(within(strip).getByRole('button', { name: /more/ }));

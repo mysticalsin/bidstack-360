@@ -8,7 +8,9 @@ import { useState } from 'react';
 
 import {
   OPEN_TECH_LANE_LABELS,
+  REFERENCE_BADGE,
   techSourceLabel,
+  withoutFixturePrefix,
   type TechnicalStackCoverage,
   type TechnicalStackItemType,
 } from '@bidstack/shared';
@@ -39,7 +41,7 @@ export function TechCoverageLine({ coverage }: { coverage: TechnicalStackCoverag
       {checked ? <span className="text-[var(--fg-tertiary)]">Checked {checked}</span> : null}
       {coverage.sample ? (
         <span className="rounded-full border border-[var(--border-subtle)] bg-[var(--surface-sunken)] px-2 text-xs font-semibold text-[var(--fg-tertiary)]">
-          Sample
+          {REFERENCE_BADGE}
         </span>
       ) : null}
     </p>
@@ -87,9 +89,13 @@ export function TechEvidenceChip({ item }: { item: TechnicalStackItemType }) {
         >
           <p className="text-sm font-semibold text-[var(--fg-primary)]">{item.name}</p>
           <p className="mt-0.5">
-            {source}, {confidence}% confidence{item.sample ? ', sample data' : ''}
+            {source}, {confidence}% confidence{item.sample ? ', reference record' : ''}
           </p>
-          {item.evidence?.record ? <p className="mt-2 break-words text-[var(--fg-primary)]">{item.evidence.record}</p> : null}
+          {item.evidence?.record ? (
+            <p className="mt-2 break-words text-[var(--fg-primary)]">
+              {item.sample ? withoutFixturePrefix(item.evidence.record) : item.evidence.record}
+            </p>
+          ) : null}
           {!item.evidence ? <p className="mt-2 text-[var(--fg-tertiary)]">No stored evidence for this source.</p> : null}
           {seen ? <p className="mt-1 text-[var(--fg-tertiary)]">Seen {seen}</p> : null}
           {item.evidence?.url ? (

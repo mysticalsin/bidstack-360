@@ -9,6 +9,7 @@ import {
   buildIntelSummary,
   classifyPost,
   CompanyIntelSummary,
+  REFERENCE_RECORD,
   IntelImportBatchView,
   IntelPostKind,
   type IntelSummaryInput,
@@ -36,7 +37,7 @@ const POST_LABEL: Record<string, string> = {
   newsroom: 'Company newsroom',
   sitemap: 'Company news sitemap',
   ir_feed: 'Investor relations feed',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 const NEWS_LABEL: Record<string, string> = {
   gdelt: 'GDELT news',
@@ -46,7 +47,7 @@ const NEWS_LABEL: Record<string, string> = {
   sec_edgar: 'SEC EDGAR',
   companies_house: 'Companies House',
   apollo: 'Apollo',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 const NEWS_EXCLUDED = ['financials', 'apify_linkedin'];
 

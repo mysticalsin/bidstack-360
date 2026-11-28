@@ -100,7 +100,10 @@ export function CompanyTechStackSection({ companyId }: { companyId: string }) {
             }
           />
         ) : categories.length === 0 ? (
-          <EmptyState title="No technology detected yet" />
+          <EmptyState
+            title="No technologies on file"
+            message="Reconnect a technology source to refresh this account."
+          />
         ) : (
           <div className="space-y-5" data-testid="tech-stack-wall">
             {groups.map((group) => (

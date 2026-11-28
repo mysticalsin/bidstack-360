@@ -12,6 +12,7 @@ import { z } from 'zod';
 
 import { FUNCTION_LABEL, summarizeHiring, type HiringPostingInput } from './hiring.js';
 import { POST_KIND_LABEL } from './posts.js';
+import { REFERENCE_RECORD } from './presentation.js';
 import { FINANCIAL_SOURCE_LABEL, IntelPostKind } from './types.js';
 
 const Iso = z.string();
@@ -23,7 +24,7 @@ export type IntelEmptyReason = z.infer<typeof IntelEmptyReason>;
 
 /** Short label per empty reason. */
 export const INTEL_EMPTY_REASON_LABEL: Record<IntelEmptyReason, string> = {
-  not_connected: 'Not connected',
+  not_connected: 'No source on file',
   private_company: 'Private company',
   no_public_data: 'No public data',
 };
@@ -288,12 +289,12 @@ const POSTING_LABEL: Record<string, string> = {
   adzuna: 'Adzuna',
   apollo: 'Apollo',
   seamless: 'Seamless',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 const PROVIDER_LABEL: Record<string, string> = {
   apollo: 'Apollo',
   seamless: 'Seamless',
-  fixture: 'Sample data',
+  fixture: REFERENCE_RECORD,
 };
 const SIGNAL_WINDOW_DAYS = 180;
 
@@ -303,7 +304,8 @@ function periodMethod(source: string, fy: number): string {
   if (FILED.has(source)) return `Filed annual accounts FY${fy}`;
   if (REGISTRY.has(source)) return `Registry accounts FY${fy}`;
   if (source === 'manual_import') return `Imported financials FY${fy}`;
-  return `Sample figures FY${fy}`;
+  if (source === 'fixture') return `Reference figures FY${fy}`;
+  return `Figures FY${fy}`;
 }
 
 /** Lower bound of a provider range such as "$1B-$10B" or "$10B+", in USD. */
@@ -419,16 +421,16 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
   }
   if (!revenue) {
     if (!connections.publicSources && !connections.apollo)
-      gap('revenue', 'not_connected', 'Public sources and Apollo are not connected');
+      gap('revenue', 'not_connected', 'No revenue on file. Reconnect filings or Apollo to fill it.');
     else if (ran('financials') || ran('registry'))
       gap(
         'revenue',
         'private_company',
         connections.apollo
           ? 'No published accounts and no provider estimate'
-          : 'No published accounts; Apollo not connected',
+          : 'No published accounts. Reconnect Apollo for an estimate.',
       );
-    else gap('revenue', 'no_public_data', 'No filings or provider estimate yet');
+    else gap('revenue', 'no_public_data', 'No filings or provider estimate on file.');
   }
   if (!revenueGrowth)
     gaps.revenueGrowth = revenue
@@ -475,7 +477,9 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     gap(
       'headcount',
       connections.apollo || connections.publicSources ? 'no_public_data' : 'not_connected',
-      connections.apollo ? 'No employee count found' : 'Apollo not connected; no filed headcount',
+      connections.apollo
+        ? 'No employee count found'
+        : 'No headcount on file. Reconnect Apollo or filings to fill it.',
     );
 
   let headcountGrowth: CompanyIntelSummary['headcountGrowth'] = null;
@@ -517,7 +521,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       connections.apollo ? 'no_public_data' : 'not_connected',
       connections.apollo
         ? 'No headcount trend from Apollo or filings'
-        : 'Apollo not connected; filings show no headcount trend',
+        : 'No headcount trend on file. Reconnect Apollo to fill it.',
     );
 
   // Hiring: public job boards. New postings in 30 days is the hiring proxy, never a hire count.
@@ -574,8 +578,8 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     const detail = connections.publicSources
       ? ran('hiring')
         ? 'No public job board found'
-        : 'Job boards not read yet'
-      : 'Public job boards are not connected';
+        : 'Job boards have not been read.'
+      : 'No open roles on file. Reconnect job boards to fill them.';
     for (const k of ['openRoles', 'newRoles30d', 'hiringTrend'] as const) gap(k, reason, detail);
   }
 
@@ -597,7 +601,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
     gap(
       'funding',
       connections.apollo ? 'no_public_data' : 'not_connected',
-      connections.apollo ? 'No funding rounds reported' : 'Apollo not connected',
+      connections.apollo ? 'No funding rounds reported' : 'No funding on file. Reconnect Apollo to fill it.',
     );
 
   const recent = input.posts
@@ -623,7 +627,7 @@ export function buildIntelSummary(input: IntelSummaryInput): CompanyIntelSummary
       connections.publicSources ? 'no_public_data' : 'not_connected',
       connections.publicSources
         ? 'No company posts or news in 6 months'
-        : 'Public sources are not connected',
+        : 'No recent posts on file. Reconnect a public source to fill them.',
     );
 
   // Direction: Polo's read of the signals above, always inferred.

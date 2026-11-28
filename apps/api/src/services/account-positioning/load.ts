@@ -10,6 +10,7 @@ import {
   seniorityFromTitle,
   SENIOR,
   FINANCIAL_SOURCE_LABEL,
+  REFERENCE_RECORD,
   stripSamplePrefix,
   themeForText,
   tierLabel,
@@ -54,7 +55,7 @@ const SOURCE_LABEL: Record<string, string> = {
   financials: 'Filed financials',
   sec_edgar: 'SEC EDGAR',
   companies_house: 'Companies House',
-  sample: 'Sample',
+  sample: REFERENCE_RECORD,
 };
 const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s.replace(/_/g, ' ');
 

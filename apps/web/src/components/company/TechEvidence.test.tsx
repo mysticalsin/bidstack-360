@@ -58,10 +58,12 @@ describe('TechCoverageLine', () => {
     expect(line.textContent).not.toContain('\u2014');
   });
 
-  it('marks sample data and says when Apollo was asked to fill a thin stack', () => {
+  it('marks a non-live stack as a reference record and says when Apollo was asked to fill a thin stack', () => {
     render(<TechCoverageLine coverage={coverage({ sample: true, apolloFallback: 'queued', openItems: 2 })} />);
-    expect(screen.getByText('Sample')).toBeTruthy();
+    expect(screen.getByText('Reference')).toBeTruthy();
+    expect(screen.queryByText('Sample')).toBeNull();
     expect(screen.getByTestId('tech-coverage-line').textContent).toContain('Apollo asked to fill gaps.');
+    expect(screen.getByTestId('tech-coverage-line').textContent).not.toMatch(/sample|demo|fixture/i);
   });
 
   it('renders nothing before the first check', () => {
@@ -71,6 +73,22 @@ describe('TechCoverageLine', () => {
 });
 
 describe('TechEvidenceChip', () => {
+  it('shows a fixture record without the sample prefix and still says it is a reference record', () => {
+    render(
+      <TechEvidenceChip
+        item={{
+          ...dnsItem,
+          sample: true,
+          evidence: { url: null, record: 'Sample: MX points to Microsoft 365', observedAt: CHECKED },
+        }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ }));
+    expect(screen.getByText(/reference record/)).toBeTruthy();
+    expect(screen.getByText('MX points to Microsoft 365')).toBeTruthy();
+    expect(screen.queryByText(/^Sample/)).toBeNull();
+  });
+
   it('labels the source plainly and opens the evidence on click', () => {
     render(<TechEvidenceChip item={dnsItem} />);
     const chip = screen.getByRole('button', { name: /Microsoft 365 evidence, DNS, 95% confidence/ });

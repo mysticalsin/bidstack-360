@@ -2,6 +2,7 @@
  * Account intelligence (slice 12). Pure logic and contracts shared by the
  * API, the worker, the MCP server and the web app.
  */
+export * from './presentation.js';
 export * from './types.js';
 export * from './skills.js';
 export * from './hiring.js';

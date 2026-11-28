@@ -1,8 +1,10 @@
-// Shared frame for every visual: title, meta, an optional "Sample" badge,
+// Shared frame for every visual: title, meta, an optional reference badge,
 // and a chart/table toggle so each chart has a text alternative.
 import './viz.css';
 
 import { useId, useState, type ReactNode } from 'react';
+
+import { REFERENCE_BADGE, REFERENCE_RECORD } from '@bidstack/shared';
 
 import { KIND_LABEL } from './viz-kinds';
 
@@ -43,8 +45,8 @@ export function ChartCard({
         <div className="viz-tools">
           {actions}
           {sample ? (
-            <span className="viz-sample" title={typeof sample === 'string' ? sample : 'Illustrative data, not from your records'}>
-              Sample
+            <span className="viz-sample" title={typeof sample === 'string' ? sample : REFERENCE_RECORD}>
+              {REFERENCE_BADGE}
             </span>
           ) : null}
           {table ? (
