@@ -137,15 +137,18 @@ export const OrgDashboard = memo(function OrgDashboard() {
         ],
       },
       {
-        label: t('orgDashboard.kpiOpenPipelineLabel', 'Open Pipeline'),
+        // The hero and the subtitle already call the money "pipeline" (11.89m
+        // on the demo book). This cell is the open-deal count, so it uses the
+        // same words as the subtitle's "open deals".
+        label: t('orgDashboard.signalOpenDeals', 'Open deals'),
         value: openOpportunities,
         detail: t('orgDashboard.kpiOpenPipelineDetail', 'active deals'),
         tone: 'teal',
         icon: 'dollar',
         href: '/opportunities',
         signal: stageSignals,
-        // The strip's single accent: open pipeline is the number a sales lead
-        // actually steers by — everything else stays neutral ink (KpiRow).
+        // The strip's single accent: the open-deal count. The money stays on
+        // the hero. Everything else stays neutral ink (KpiRow).
         emphasis: true,
       },
       {

@@ -7,8 +7,8 @@
  * meaning, and the sparkbars mixed unrelated entities inside one tile. These
  * are entity COUNTS, not analytical series — so they read as one quiet row of
  * numbers: hairline-divided, neutral ink, tabular numerals, with a single
- * accent reserved for the one metric flagged `emphasis` (open pipeline — the
- * number a sales lead actually steers by). Identity comes from the label,
+ * accent reserved for the one metric flagged `emphasis` (open deals — the
+ * count, not the pipeline money on the hero). Identity comes from the label,
  * hierarchy from the accent, and the whole strip stays scannable in a glance.
  */
 import { Link } from 'react-router-dom';
