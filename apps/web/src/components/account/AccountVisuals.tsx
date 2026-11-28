@@ -7,11 +7,20 @@ import { Link } from 'react-router-dom';
 import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { fmtCompact, OPEN_STAGES, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
 
+import { contactRecordHref } from './contactRecordHref';
 import { layoutOrg, type MapPerson } from './org-layout';
+
+// Link text uses the measured brand foreground. The row target is 44px tall.
+const MANAGER_LINK =
+  'inline-flex min-h-11 items-center text-[var(--brand-primary)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--viz-brand)] dark:text-[var(--brand-deep)]';
+
+const RETRY =
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]';
 
 // Standing is evidence quality; map it to the shared colour + shape language.
 const STANDING: Record<string, { kind: string; label: string }> = {
@@ -66,6 +75,17 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
   );
 }
 
+function reportsToCell(person: MapPerson, people: MapPerson[]) {
+  const manager = people.find((q) => q.id === person.reportsToContactId);
+  const href = contactRecordHref(person.reportsToContactId);
+  if (!href) return manager?.name ?? '–';
+  return (
+    <Link className={MANAGER_LINK} to={href}>
+      {manager?.name ?? 'View manager'}
+    </Link>
+  );
+}
+
 export function AccountVisuals({ companyId, companyName, onDrill }: { companyId: string; companyName: string; onDrill?: (f: OppDrillFilter) => void }) {
   const opps = useOpportunityRows();
   const people = usePeopleMap({ companyId });
@@ -73,9 +93,17 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
   const stages = stageFunnel(rows);
   const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const mix = statusMix(rows);
+  const peopleFailed = people.isError;
+  // Empty is a result only after the read succeeds. Pending and paused stay on the skeleton.
+  const peopleLoading = !peopleFailed && !people.isSuccess;
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
+  const relationshipSummary = peopleLoading
+    ? 'Loading contacts'
+    : peopleFailed
+      ? "Couldn't load contacts"
+      : ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet';
 
   return (
     <div className="acct-visuals" data-testid="account-visuals">
@@ -104,11 +132,24 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
       </ChartCard>
       <ChartCard
         title="Relationship map"
-        meta={ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
-        summary={ppl.map((p) => `${p.name}${p.title ? `, ${p.title}` : ''}`).join('; ') || 'No contacts yet'}
-        table={{ columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', ppl.find((q) => q.id === p.reportsToContactId)?.name ?? '–', (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
+        interactive={peopleFailed}
+        meta={!peopleLoading && !peopleFailed && ppl.length ? `${ppl.length} people · ${edges} reporting line${edges === 1 ? '' : 's'}` : undefined}
+        summary={relationshipSummary}
+        table={peopleLoading || peopleFailed ? undefined : { columns: ['Person', 'Title', 'Reports to', 'Evidence'], rows: ppl.map((p) => [p.name, p.title ?? '', reportsToCell(p, ppl), (STANDING[p.standing] ?? STANDING.unknown!).label]) }}
       >
-        {ppl.length ? (
+        {peopleLoading ? (
+          <LoadingSkeleton rows={3} />
+        ) : peopleFailed ? (
+          <ErrorState
+            title="Couldn't load contacts"
+            message="Please try again."
+            action={
+              <button type="button" className={RETRY} onClick={() => void people.refetch()}>
+                Retry
+              </button>
+            }
+          />
+        ) : ppl.length ? (
           <>
             <RelationshipMap company={companyName} people={ppl} />
             <ul className="viz-legend" aria-hidden>
