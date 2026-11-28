@@ -2219,6 +2219,8 @@
     "periodQuarterly": "季度",
     "periodYearly": "年度",
     "totalsLabel": "所选周期的预测总额",
+    "totalsLoading": "预测合计仍在加载。",
+    "totalsUnavailable": "在列表加载完成前，预测合计保持隐藏。",
     "totalCommit": "承诺",
     "totalBestCase": "最佳情况",
     "totalPipeline": "管道",

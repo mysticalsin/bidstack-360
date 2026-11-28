@@ -2231,6 +2231,8 @@
     "periodQuarterly": "Quarterly",
     "periodYearly": "Yearly",
     "totalsLabel": "Forecast totals for the selected period",
+    "totalsLoading": "Forecast totals are still loading.",
+    "totalsUnavailable": "Forecast totals stay hidden until the list loads.",
     "totalCommit": "Commit",
     "totalBestCase": "Best case",
     "totalPipeline": "Pipeline",

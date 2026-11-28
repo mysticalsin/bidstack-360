@@ -2219,6 +2219,8 @@
     "periodQuarterly": "Trimestrale",
     "periodYearly": "Annuale",
     "totalsLabel": "Totali di previsione per il periodo selezionato",
+    "totalsLoading": "I totali della previsione sono ancora in caricamento.",
+    "totalsUnavailable": "I totali della previsione restano nascosti finché l'elenco non è caricato.",
     "totalCommit": "Impegnato",
     "totalBestCase": "Caso migliore",
     "totalPipeline": "Pipeline",
