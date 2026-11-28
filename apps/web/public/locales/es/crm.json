@@ -291,7 +291,10 @@
     "empty": {
       "title": "Aún no hay tareas",
       "filteredTitle": "Ninguna tarea coincide con este filtro",
-      "message": "Crea un seguimiento para empezar."
+      "message": "Crea un seguimiento para empezar.",
+      "todayTitle": "Nada vence hoy",
+      "todayButLate": "Ya van tarde en esta lista: {{count}}.",
+      "showOverdue": "Ver vencidas"
     },
     "reorder": {
       "announce": "Se movió {{title}} a la posición {{position}} de {{total}}."
