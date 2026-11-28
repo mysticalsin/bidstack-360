@@ -869,6 +869,7 @@
     "resultsCountOne": "{{count}} resultado para \"{{term}}\"",
     "resultsCountMany": "{{count}} resultados para \"{{term}}\"",
     "showingLatest": "Mostrando as últimas 50 empresas",
+    "showingFilter": "Mostrando {{filters}}",
     "clear": "Limpar",
     "error": {
       "title": "Falha ao carregar as empresas",
@@ -880,7 +881,11 @@
       "searchMessage": "Nada correspondeu a \"{{term}}\". Tente um nome de empresa ou domínio.",
       "message": "Crie a primeira empresa para começar a montar sua lista de contas.",
       "clearSearch": "Limpar pesquisa",
-      "addCompany": "Adicionar empresa"
+      "addCompany": "Adicionar empresa",
+      "filteredTitle": "Nenhuma empresa corresponde a estes filtros",
+      "filteredMessage": "{{filters}} não corresponde a nenhuma empresa.",
+      "filteredSearchMessage": "Nada correspondeu a \"{{term}}\" em {{filters}}.",
+      "clearFilters": "Limpar filtros"
     },
     "toast": {
       "nothingToExport": "Nada para exportar",
