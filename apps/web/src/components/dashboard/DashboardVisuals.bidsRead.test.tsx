@@ -157,6 +157,71 @@ describe('workspace dashboard before the bid read settles', () => {
     fireEvent.click(within(card).getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(within(card).queryByRole('button', { name: /show the open bids/i })).toBeNull();
+    // WHY: the close-month chart can say the bid read failed while the
+    // open-pipeline and weighted figures still come from the pipeline report.
+    // Those amounts must not be announced as a healthy total.
+    expect(within(card).queryByText(/^Weighted /)).toBeNull();
+    expect(within(card).queryByText('2 open bids')).toBeNull();
+    expect(card.textContent).not.toMatch(/1m|500k/i);
+    const figure = card.querySelector('.viz-figure');
+    expect(figure?.getAttribute('aria-label') ?? '').not.toMatch(/1m|500k|weighted/i);
+    expect(figure?.getAttribute('aria-label') ?? '').toMatch(/Couldn't load bids/i);
+  });
+
+  it('does not paint a pipeline total while the bid read is loading', () => {
+    // WHY: the report can arrive before the bid rows. A number in that gap
+    // is not a settled book.
+    render(
+      <DashboardHero
+        rows={[]}
+        openValue={1_000_000}
+        weighted={500_000}
+        openCount={2}
+        rowsPending
+      />,
+    );
+
+    const card = screen.getByTestId('dashboard-hero');
+    expect(within(card).queryByText(/^Weighted /)).toBeNull();
+    expect(within(card).queryByText('2 open bids')).toBeNull();
+    expect(card.textContent).not.toMatch(/1m|500k/i);
+    expect(within(card).queryByText('No dated bids yet.')).toBeNull();
+    expect(screen.getByTestId('dashboard-hero-figs-placeholder')).toBeTruthy();
+    expect(card.querySelector('.viz-figure')?.getAttribute('aria-label') ?? '').toMatch(/Loading bids/i);
+  });
+
+  it('shows an empty pipeline only after the bid read succeeds with no rows', () => {
+    // WHY: a successful empty read is zero, not the pipeline-report total
+    // that was passed in beside it.
+    render(<DashboardHero rows={[]} openValue={1_000_000} weighted={500_000} openCount={2} />);
+
+    const card = screen.getByTestId('dashboard-hero');
+    expect(within(card).getByText('No dated bids yet.')).toBeTruthy();
+    expect(within(card).getByText(/^Weighted 0$/i)).toBeTruthy();
+    expect(within(card).queryByText(/500k/i)).toBeNull();
+    expect(within(card).queryByText(/1m/i)).toBeNull();
+    expect(within(card).getByText('0 open bids')).toBeTruthy();
+    expect(within(card).queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the pipeline total when a later refresh fails but rows remain', () => {
+    // WHY: a failed refresh is not a new empty book. The figures stay with
+    // the rows already on screen.
+    render(
+      <DashboardHero
+        rows={[bid()]}
+        openValue={2_500_000}
+        weighted={1_000_000}
+        openCount={1}
+        rowsFailed
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByTestId('dashboard-hero');
+    expect(within(card).queryByRole('alert')).toBeNull();
+    expect(within(card).getByText(/^Weighted 1m$/i)).toBeTruthy();
+    expect(within(card).getByText('1 open bid')).toBeTruthy();
   });
 
   it('does not draw an empty performance book while bids are unread', () => {

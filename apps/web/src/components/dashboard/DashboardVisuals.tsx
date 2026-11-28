@@ -84,12 +84,23 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const fullLabels = months.keys.map(closeMonthLabel);
   const hold = bidHold(rows, rowsPending, rowsFailed);
   const drill = hold ? undefined : onDrill;
+  // A settled empty bid read is zero. The pipeline-report totals stay hidden
+  // until that read succeeds with rows, so a failure is not a healthy book.
+  const bookEmpty = !hold && rows.length === 0;
+  const shownOpen = bookEmpty ? 0 : openValue;
+  const shownWeighted = bookEmpty ? 0 : weighted;
+  const shownCount = bookEmpty ? 0 : openCount;
+  const summary = hold === 'error'
+    ? "Couldn't load bids. Please try again."
+    : hold === 'loading'
+      ? 'Loading bids'
+      : `Open pipeline ${fmtCompact(shownOpen)}, weighted ${fmtCompact(shownWeighted)}. Won so far this year ${fmtCompact(wonTotal)}.`;
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
-      meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
+      meta={hold ? undefined : `${shownCount} open bid${shownCount === 1 ? '' : 's'}`}
+      summary={summary}
       table={hold ? undefined : {
         columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
         rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
@@ -98,14 +109,20 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       interactive
     >
       <div className="dash-hero-figs">
-        <HeroFig onClick={drill ? () => drill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
-          <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
-          <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
-        </HeroFig>
-        <HeroFig onClick={drill ? () => drill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
-          <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
-          <div className="viz-meta">Won this year</div>
-        </HeroFig>
+        {hold === 'loading' ? (
+          <div className="dash-hero-figs-skel" aria-hidden="true" data-testid="dashboard-hero-figs-placeholder" />
+        ) : hold === 'error' ? null : (
+          <>
+            <HeroFig onClick={drill ? () => drill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(shownOpen)}: show the open bids`}>
+              <AnimatedNumber className="dash-hero-num" value={shownOpen} format={fmtCompact} />
+              <div className="viz-meta">Weighted {fmtCompact(shownWeighted)}</div>
+            </HeroFig>
+            <HeroFig onClick={drill ? () => drill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
+              <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
+              <div className="viz-meta">Won this year</div>
+            </HeroFig>
+          </>
+        )}
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
             <PulseOrb tone={pulse} size={96} bold />
