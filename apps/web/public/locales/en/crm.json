@@ -3412,6 +3412,7 @@
     "emptyMessage": "No risks or compliance checks are recorded for this account yet.",
     "unassigned": "Unassigned",
     "dueSuffix": " - due {{dueDate}}",
+    "overdue": "Overdue: {{count}}d late",
     "noOwner": "No owner"
   },
   "deliveryHistory": {

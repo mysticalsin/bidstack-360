@@ -3396,6 +3396,7 @@
     "emptyMessage": "Qui è tutto a posto.",
     "unassigned": "Non assegnato",
     "dueSuffix": " - scadenza {{dueDate}}",
+    "overdue": "In ritardo: {{count}} g di ritardo",
     "noOwner": "Nessun responsabile"
   },
   "deliveryHistory": {
