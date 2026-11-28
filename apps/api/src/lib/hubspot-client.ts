@@ -1,3 +1,5 @@
+import { oauthFailureMessage } from './oauth-failure.js';
+
 // HubSpot API v3 client for the migration connector.
 //
 // Why a thin wrapper instead of the official @hubspot/api-client SDK:
@@ -81,7 +83,7 @@ export async function exchangeHubSpotCode(
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`HubSpot token exchange failed (${res.status}): ${body}`);
+    throw new Error(oauthFailureMessage('HubSpot', res.status, body));
   }
 
   const data = (await res.json()) as {
