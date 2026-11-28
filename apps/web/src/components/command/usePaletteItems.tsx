@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import { CompanyLogo } from '@/components/company/CompanyLogo';
+import { taskRecordPath } from '@/components/task/task-record-path';
 import { NAV_SECTIONS } from '@/components/layout/navConfig';
 import { buildQuickAddOptions, chooseQuickAdd } from '@/components/quickadd/quickAddOptions';
 import { useAppModules } from '@/hooks/useAppModules';
@@ -334,7 +335,7 @@ export function usePaletteItems(query: string, onClose: () => void): UsePaletteI
       pushNavigable(
         score,
         { id: `task:${task.id}`, group: 'task', label: task.title, hint: taskSubtitle(task) },
-        `/tasks?search=${encodeURIComponent(task.title)}`,
+        taskRecordPath(task.id),
         true,
       );
     }
