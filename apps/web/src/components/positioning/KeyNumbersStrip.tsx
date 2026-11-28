@@ -39,6 +39,29 @@ const real = (text: string | null | undefined): string | null => {
   return t && !/^(n\/a|none)$/i.test(t) ? t : null;
 };
 
+/**
+ * Sections that exist on the account cockpit. The key-number payload names one
+ * of these so the tile can jump there. Anything else, including a script or
+ * off-page URL, is not a link.
+ */
+const COCKPIT_SECTIONS: Record<string, string> = {
+  'financial-health': 'financial health',
+  'firmographics': 'firmographics',
+  'hiring-now': 'hiring',
+  'pulse': 'account pulse',
+  'who-we-met': 'who we met',
+  'deals': 'deals',
+  'watchdog': 'news',
+  'initiatives': 'initiatives',
+};
+
+function sectionHref(anchor: string | null | undefined): { href: string; label: string } | null {
+  if (!anchor) return null;
+  const label = COCKPIT_SECTIONS[anchor];
+  if (!label) return null;
+  return { href: `#${anchor}`, label };
+}
+
 function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormatter; company: TileCompany }) {
   const tipId = useId();
   const dir = directionOf(n);
@@ -49,10 +72,12 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
   const tipSource = real(n.source);
   const tipPeriod = real(n.period);
   const hasTip = Boolean(tipSource || tipPeriod);
-  return (
-    <li className="kn-tile" data-missing={missing} data-testid={`kn-${n.id}`} tabIndex={0} aria-describedby={hasTip ? tipId : undefined}>
+  const section = sectionHref(n.anchor);
+  const stats = (
+    <>
       <span className="kn-label">
         {n.label}
+        {section ? <span className="sr-only">{`, open ${section.label}`}</span> : null}
         {n.sample ? <span className="sg-sample">Sample</span> : null}
       </span>
       <span className="kn-value" title={missing ? undefined : formatValue(n, fmtMicros)}>
@@ -68,6 +93,23 @@ function Tile({ n, fmtMicros, company }: { n: KeyNumber; fmtMicros: MicrosFormat
         ) : null}
         <Spark series={n.series} tone={tone} />
       </span>
+    </>
+  );
+  return (
+    <li
+      className="kn-tile"
+      data-missing={missing}
+      data-testid={`kn-${n.id}`}
+      tabIndex={section ? undefined : 0}
+      aria-describedby={hasTip ? tipId : undefined}
+    >
+      {section ? (
+        <a className="kn-jump" href={section.href}>
+          {stats}
+        </a>
+      ) : (
+        stats
+      )}
       {n.editKey ? (
         missing ? (
           <FigureActions companyId={company.id} companyName={company.name} fieldKey={n.editKey} label={n.label} currency={n.currency} missing={n.missing ?? `No ${n.label.toLowerCase()} on record`} />

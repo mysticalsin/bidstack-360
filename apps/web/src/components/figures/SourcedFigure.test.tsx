@@ -148,6 +148,32 @@ describe('FigureActions', () => {
 });
 
 describe('KeyNumbersStrip with sourced figures', () => {
+  it('jumps to the section without putting Edit or the source chip inside that link', async () => {
+    // Correcting a figure and opening its section are different jobs. The jump
+    // must not swallow the Edit button or the external source link.
+    state.kn = {
+      companyId: ID,
+      companyName: 'Acme',
+      computedAt: '2026-11-08T00:00:00Z',
+      items: [
+        kn({
+          id: 'employees',
+          label: 'Employees',
+          value: 12000,
+          editKey: 'employeeCount',
+          anchor: 'firmographics',
+          provenance: { origin: 'wikidata', label: 'Wikidata', year: '2024', url: 'https://www.wikidata.org/wiki/Q1#P1128' },
+        }),
+      ],
+    };
+    wrap(<KeyNumbersStrip companyId={ID} />);
+    const emp = await screen.findByTestId('kn-employees');
+    const jump = within(emp).getByRole('link', { name: /Employees/ });
+    expect(jump.getAttribute('href')).toBe('#firmographics');
+    expect(jump.contains(within(emp).getByRole('button', { name: 'Edit Employees' }))).toBe(false);
+    expect(jump.contains(within(emp).getByTestId('kn-chip-employees'))).toBe(false);
+  });
+
   it('shows the source chip under a value and actions instead of No data', async () => {
     state.kn = {
       companyId: ID,
