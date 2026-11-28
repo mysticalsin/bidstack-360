@@ -1222,7 +1222,7 @@
     "map": {
       "summary": "{{rows}} lignes. Associez chaque colonne à un champ, ou laissez Ne pas importer.",
       "colCsvColumn": "Colonne CSV",
-      "colSample": "Exemple",
+      "colSample": "Référence",
       "colMapsTo": "Correspond à",
       "mapColumnAria": "Associer la colonne {{header}}",
       "dontImport": "Ne pas importer",

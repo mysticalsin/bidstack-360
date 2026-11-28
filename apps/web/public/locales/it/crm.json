@@ -1137,7 +1137,7 @@
     "map": {
       "summary": "{{rows}} righe. Associa ogni colonna a un campo o lasciala su Non importare.",
       "colCsvColumn": "Colonna CSV",
-      "colSample": "Esempio",
+      "colSample": "Riferimento",
       "colMapsTo": "Associa a",
       "mapColumnAria": "Associa colonna {{header}}",
       "dontImport": "Non importare",

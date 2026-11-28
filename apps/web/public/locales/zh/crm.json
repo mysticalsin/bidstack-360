@@ -1137,7 +1137,7 @@
     "map": {
       "summary": "{{rows}} 行。将每列匹配到一个字段，或保留为“不导入”。",
       "colCsvColumn": "CSV 列",
-      "colSample": "示例",
+      "colSample": "参考",
       "colMapsTo": "映射到",
       "mapColumnAria": "映射列 {{header}}",
       "dontImport": "不导入",
