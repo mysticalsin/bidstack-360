@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { LiquidQuickActions } from './LiquidQuickActions';
 import { MobileNav } from './MobileNav';
@@ -9,8 +10,14 @@ import { DataModeBanner } from '@/components/identity/DataModeBanner';
 import { Topbar } from './Topbar';
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation('common');
   return (
     <div className="app-shell">
+      {/* First in the DOM, before the rail. A skip link inside the top bar
+          is reached only after every sidebar control. */}
+      <a href="#main" className="skip-link">
+        {t('topbar.skipToContent', 'Skip to content')}
+      </a>
       <Sidebar />
       <div className="main">
         <DataModeBanner />

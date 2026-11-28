@@ -97,10 +97,6 @@ export function Topbar() {
 
   return (
     <header className="topbar" role="banner">
-      <a href="#main" className="skip-link">
-        {t('topbar.skipToContent', 'Skip to content')}
-      </a>
-
       {/* Hamburger: visible only below 56rem, where the sidebar is hidden */}
       <button
         type="button"
