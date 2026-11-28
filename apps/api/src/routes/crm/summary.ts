@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
+import { microsToUnits } from '@bidstack/shared';
 
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
@@ -14,6 +15,7 @@ type SummaryCounts = {
   opportunities: number;
   openOpportunities: number;
   pipelineValueMicros: bigint | number | string | null;
+  wonThisYearMicros: bigint | number | string | null;
   tasks: number;
   overdueTasks: number;
   serviceCases: number;
@@ -27,6 +29,8 @@ type CrmSummaryPayload = {
   opportunities: number;
   openOpportunities: number;
   pipelineValue: number;
+  /** Won value whose close falls in the current UTC year. Units, not micros. */
+  wonThisYear: number;
   tasks: number;
   overdueTasks: number;
   serviceCases: number;
@@ -47,6 +51,19 @@ type CrmSummaryCacheEntry = {
 
 const CRM_SUMMARY_CACHE_TTL_MS = 10_000;
 const crmSummaryCache = new Map<string, CrmSummaryCacheEntry>();
+
+/**
+ * A SQL SUM(bigint) comes back as bigint or as a numeric string. Convert in
+ * integer micros, then to units once. Number(sum) / 1e6 rounds before the
+ * division and moves a total past ~$9.007B.
+ */
+export function unitsFromMicrosSum(raw: bigint | number | string | null | undefined): number {
+  if (raw === null || raw === undefined) return 0;
+  const text = typeof raw === 'bigint' ? raw.toString() : String(raw).trim();
+  const whole = text.split('.')[0] ?? '0';
+  if (!/^-?\d+$/.test(whole)) return 0;
+  return microsToUnits(BigInt(whole));
+}
 
 function crmSummaryCacheKey(orgId: string, limit: number): string {
   return `${orgId}:${limit}`;
@@ -86,6 +103,25 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
             AND stage NOT IN ('closed_won', 'closed_lost')
             AND deleted_at IS NULL
         ) AS "pipelineValueMicros",
+        (
+          SELECT COALESCE(SUM(value_micros), 0)
+          FROM opportunities
+          WHERE org_id = ${orgId}::uuid
+            AND stage = 'closed_won'
+            AND deleted_at IS NULL
+            AND (
+              (
+                closed_at IS NOT NULL
+                AND closed_at >= (date_trunc('year', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                AND closed_at < ((date_trunc('year', now() AT TIME ZONE 'UTC') + interval '1 year') AT TIME ZONE 'UTC')
+              )
+              OR (
+                closed_at IS NULL
+                AND due_date >= (date_trunc('year', now() AT TIME ZONE 'UTC'))::date
+                AND due_date < (date_trunc('year', now() AT TIME ZONE 'UTC') + interval '1 year')::date
+              )
+            )
+        ) AS "wonThisYearMicros",
         (SELECT COUNT(*)::int FROM tasks WHERE org_id = ${orgId}::uuid AND deleted_at IS NULL) AS tasks,
         (
           SELECT COUNT(*)::int
@@ -162,12 +198,12 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     opportunities: 0,
     openOpportunities: 0,
     pipelineValueMicros: 0,
+    wonThisYearMicros: 0,
     tasks: 0,
     overdueTasks: 0,
     serviceCases: 0,
     openServiceCases: 0,
   };
-  const pipelineValueMicros = Number(counts.pipelineValueMicros ?? 0);
 
   const recentActivity = [
     ...recentOpportunities.map((o) => ({
@@ -208,7 +244,8 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
     leads: counts.leads,
     opportunities: counts.opportunities,
     openOpportunities: counts.openOpportunities,
-    pipelineValue: pipelineValueMicros / 1_000_000,
+    pipelineValue: unitsFromMicrosSum(counts.pipelineValueMicros),
+    wonThisYear: unitsFromMicrosSum(counts.wonThisYearMicros),
     tasks: counts.tasks,
     overdueTasks: counts.overdueTasks,
     serviceCases: counts.serviceCases,
@@ -250,6 +287,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
             opportunities: z.number(),
             openOpportunities: z.number(),
             pipelineValue: z.number(),
+            wonThisYear: z.number(),
             tasks: z.number(),
             overdueTasks: z.number(),
             serviceCases: z.number(),
