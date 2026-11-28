@@ -25,6 +25,15 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   const [q, setQ] = useState('');
   const f = useMemo<OppDrillFilter>(() => filter ?? {}, [filter]);
   const status = f.status ?? 'all';
+  // A chart book is the set that chart draws. "All bids" would put a lost bid
+  // on the revenue sheet, or an open bid on the win-rate sheet.
+  const bookTitle =
+    (!f.status || f.status === 'all') && f.book === 'closed'
+      ? 'Closed bids'
+      : (!f.status || f.status === 'all') && (f.book === 'forecast' || f.book === 'accounts')
+        ? 'Won and open'
+        : null;
+  const statusLabel = bookTitle ?? STATUS_LABEL[status];
   const shown = useMemo(() => filterOpps(rows, f, q).sort((a, b) => (b.value ?? 0) - (a.value ?? 0)), [rows, f, q]);
   const total = shown.reduce((n, o) => n + (o.value ?? 0), 0);
   const weighted = shown.reduce((n, o) => n + ((o.value ?? 0) * (o.probability ?? 0)) / 100, 0);
@@ -44,10 +53,10 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
   const maxStage = Math.max(1, ...byStage.map((s) => s.value));
 
   const month = f.closeMonth ? closeMonthLabel(f.closeMonth) : null;
-  const title = f.account ?? (f.stage ? stageText(f.stage) : month ? `Closing ${month}` : f.thisYear ? 'Won this year' : STATUS_LABEL[status]);
+  const title = f.account ?? (f.stage ? stageText(f.stage) : month ? `Closing ${month}` : f.thisYear ? 'Won this year' : statusLabel);
   const trail: DrillCrumb[] = [
     { label: rootLabel, onSelect: onClose },
-    { label: STATUS_LABEL[status], onSelect: f.stage || f.account || f.closeMonth ? () => onFilterChange({ status, thisYear: f.thisYear }) : undefined },
+    { label: statusLabel, onSelect: f.stage || f.account || f.closeMonth ? () => onFilterChange({ status: f.status, book: f.book, thisYear: f.thisYear }) : undefined },
     ...(month ? [{ label: month, onSelect: f.stage || f.account ? () => onFilterChange({ status, closeMonth: f.closeMonth }) : undefined }] : []),
     ...(f.stage ? [{ label: stageText(f.stage) }] : []),
     ...(f.account ? [{ label: f.account }] : []),
@@ -71,7 +80,7 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
           <input type="search" aria-label="Search bids" placeholder="Search bid or account" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="drill-seg" role="group" aria-label="Status">
             {(['all', 'open', 'won', 'lost'] as const).map((s) => (
-              <button key={s} type="button" aria-pressed={status === s} onClick={() => onFilterChange({ ...f, status: s })}>
+              <button key={s} type="button" aria-pressed={bookTitle ? false : status === s} onClick={() => onFilterChange({ ...f, status: s, book: undefined })}>
                 {STATUS_LABEL[s]}
               </button>
             ))}

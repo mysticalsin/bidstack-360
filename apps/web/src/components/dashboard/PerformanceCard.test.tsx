@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PerformanceCard } from './DashboardVisuals';
 
@@ -10,6 +10,8 @@ const rows = [
 ];
 
 describe('PerformanceCard', () => {
+  afterEach(cleanup);
+
   it('puts revenue, win rate and top accounts behind one accessible tab list', () => {
     render(<PerformanceCard rows={rows} />);
     expect(screen.getByRole('heading', { name: 'Performance', level: 2 })).toBeTruthy();
@@ -20,5 +22,21 @@ describe('PerformanceCard', () => {
     expect(screen.getByRole('heading', { name: 'Top accounts', level: 3 })).toBeTruthy();
     fireEvent.click(tabs[1]!);
     expect(screen.getAllByRole('tab')[1]!.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('opens Breakdown on the bids that chart draws, not a different slice of the book', () => {
+    const onDrill = vi.fn();
+    render(<PerformanceCard rows={rows} onDrill={onDrill} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
+    // The revenue chart is won plus the open forecast. Won-only hides the open book.
+    expect(onDrill).toHaveBeenLastCalledWith({ book: 'forecast' });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Win rate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
+    expect(onDrill).toHaveBeenLastCalledWith({ book: 'closed' });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Top accounts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Breakdown' }));
+    expect(onDrill).toHaveBeenLastCalledWith({ book: 'accounts' });
   });
 });
