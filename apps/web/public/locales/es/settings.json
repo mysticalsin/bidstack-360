@@ -448,7 +448,7 @@
       "body": "Cuerpo (se permite HTML)"
     },
     "availablePlaceholders": "Marcadores disponibles",
-    "placeholderTitle": "{{label}} — ejemplo: {{sample}}",
+    "placeholderTitle": "{{label}} — referencia: {{sample}}",
     "action": {
       "delete": "Eliminar",
       "cancel": "Cancelar",

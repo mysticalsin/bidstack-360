@@ -247,7 +247,7 @@ export function EmailTemplatesSection() {
                     key={p.token}
                     type="button"
                     onClick={() => insertToken(p.token)}
-                    title={t('emailTemplates.placeholderTitle', '{{label}} — sample: {{sample}}', {
+                    title={t('emailTemplates.placeholderTitle', '{{label}} — reference: {{sample}}', {
                       label: p.label,
                       sample: p.sample,
                     })}

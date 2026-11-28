@@ -445,7 +445,7 @@
       "body": "Corps (HTML autorisé)"
     },
     "availablePlaceholders": "Espaces réservés disponibles",
-    "placeholderTitle": "{{label}} — exemple : {{sample}}",
+    "placeholderTitle": "{{label}} — référence : {{sample}}",
     "action": {
       "delete": "Supprimer",
       "cancel": "Annuler",

@@ -445,7 +445,7 @@
       "body": "Corpo (HTML consentito)"
     },
     "availablePlaceholders": "Segnaposto disponibili",
-    "placeholderTitle": "{{label}} — esempio: {{sample}}",
+    "placeholderTitle": "{{label}} — riferimento: {{sample}}",
     "action": {
       "delete": "Elimina",
       "cancel": "Annulla",

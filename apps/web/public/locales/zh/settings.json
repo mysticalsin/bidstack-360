@@ -445,7 +445,7 @@
       "body": "正文（允许 HTML）"
     },
     "availablePlaceholders": "可用占位符",
-    "placeholderTitle": "{{label}} — 示例：{{sample}}",
+    "placeholderTitle": "{{label}} — 参考：{{sample}}",
     "action": {
       "delete": "删除",
       "cancel": "取消",
