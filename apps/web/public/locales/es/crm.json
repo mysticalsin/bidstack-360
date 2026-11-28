@@ -2350,6 +2350,7 @@
     "relatedCount": "{{count}} relacionados",
     "noOpportunities": "No hay oportunidades para {{customer}}.",
     "tasksTitle": "Tareas",
+    "openTask": ", abrir el seguimiento",
     "noTasks": "No hay tareas relacionadas.",
     "dueDate": "Vence {{date}}",
     "noDueDate": "Sin fecha de vencimiento",

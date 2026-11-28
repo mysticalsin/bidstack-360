@@ -16,6 +16,27 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
+import { contactTaskHref } from './contact-task-href';
+
+function ContactTaskTitle({ id, title }: { id: string; title: string }) {
+  const { t } = useTranslation('crm');
+  // A title search can match a different follow-up. Only a task uuid opens
+  // the record.
+  const href = contactTaskHref(id);
+  if (!href) {
+    return <div className="text-sm text-[var(--fg-primary)]">{title}</div>;
+  }
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center rounded text-sm text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)] dark:text-[var(--brand-deep)]"
+    >
+      {title}
+      <span className="sr-only">{t('contactDetail.openTask', ', open follow-up')}</span>
+    </Link>
+  );
+}
+
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
@@ -204,7 +225,7 @@ export function ContactDetailPage() {
               {relatedTasks.map((task) => (
                 <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div>
-                    <div className="text-sm text-[var(--fg-primary)]">{task.title}</div>
+                    <ContactTaskTitle id={task.id} title={task.title} />
                     <div className="text-xs text-[var(--fg-tertiary)]">
                       {task.dueDate
                         ? t('contactDetail.dueDate', 'Due {{date}}', {

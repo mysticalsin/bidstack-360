@@ -2329,6 +2329,7 @@
     "relatedCount": "{{count}} related",
     "noOpportunities": "No opportunities for {{customer}}.",
     "tasksTitle": "Tasks",
+    "openTask": ", open follow-up",
     "noTasks": "No related tasks.",
     "dueDate": "Due {{date}}",
     "noDueDate": "No due date",

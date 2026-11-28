@@ -2372,6 +2372,7 @@
     "relatedCount": "{{count}} associés",
     "noOpportunities": "Aucune opportunité pour {{customer}}.",
     "tasksTitle": "Tâches",
+    "openTask": ", ouvrir le suivi",
     "noTasks": "Aucune tâche associée.",
     "dueDate": "Échéance {{date}}",
     "noDueDate": "Aucune échéance",

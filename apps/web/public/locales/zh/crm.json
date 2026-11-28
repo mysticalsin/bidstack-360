@@ -2317,6 +2317,7 @@
     "relatedCount": "{{count}} 个相关",
     "noOpportunities": "{{customer}} 没有商机。",
     "tasksTitle": "任务",
+    "openTask": "，打开跟进",
     "noTasks": "没有相关任务。",
     "dueDate": "截止 {{date}}",
     "noDueDate": "无截止日期",
