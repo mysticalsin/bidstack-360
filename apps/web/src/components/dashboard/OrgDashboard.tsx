@@ -254,6 +254,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
             feed={feed.data}
             onDrill={setDrill}
             rowsPending={opps.isLoading}
+            rowsFailed={opps.isError && !opps.data}
+            onRetry={() => void opps.refetch()}
             feedPending={feed.isLoading}
           />
           <NeedsYou
@@ -275,10 +277,26 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </Suspense>
         <HemaLeverageTile />
         <div className="viz-grid-3">
-          <PipelineCard rows={oppRows} onDrill={setDrill} />
+          <PipelineCard
+            rows={oppRows}
+            onDrill={setDrill}
+            rowsPending={opps.isLoading}
+            rowsFailed={opps.isError && !opps.data}
+            onRetry={() => void opps.refetch()}
+          />
           <ActivityByHourCard />
         </div>
-        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
+        <PerformanceCard
+          rows={oppRows}
+          projection={projection.data}
+          onDrill={setDrill}
+          rowsPending={opps.isLoading}
+          rowsFailed={opps.isError && !opps.data}
+          onRetry={() => void opps.refetch()}
+          projectionPending={projection.isLoading}
+          projectionFailed={projection.isError && !projection.data}
+          onProjectionRetry={() => void projection.refetch()}
+        />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
         <details className="dash-more">

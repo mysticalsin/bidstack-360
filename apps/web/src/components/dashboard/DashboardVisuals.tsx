@@ -25,13 +25,31 @@ import type { OppDrillFilter } from '@/components/drill/OppDrill';
 export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 
+/** A bid list still in flight, or one that failed, is not an empty book. */
+function BidListNotice({ pending, onRetry }: { pending: boolean; onRetry?: () => void }) {
+  if (pending) return <p className="viz-empty" aria-busy="true">Loading the bid list.</p>;
+  return (
+    <p className="viz-empty" role="alert">
+      Couldn&apos;t load the bid list.{' '}
+      {onRetry ? (
+        <button type="button" className="btn btn-secondary" onClick={onRetry}>
+          Retry
+        </button>
+      ) : null}
+    </p>
+  );
+}
+
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, rowsFailed = false, onRetry, feedPending = false }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
   /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
   rowsPending?: boolean;
+  /** The bid list failed and there is no settled snapshot to keep showing. */
+  rowsFailed?: boolean;
+  onRetry?: () => void;
   /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
   feedPending?: boolean;
 }) {
@@ -42,19 +60,23 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
     ? `Watchdog: ${fresh} new signal${fresh === 1 ? '' : 's'}${risks ? ` · ${risks} risk${risks === 1 ? '' : 's'}` : ''}`
     : 'Watchdog: all quiet';
   const [now] = useState(() => Date.now());
-  const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
+  // Won-this-year is counted from the bid rows. Until that read settles, a 0
+  // is a lie next to the open-pipeline figure, which comes from the summary.
+  const rowsKnown = rows.length > 0 || (!rowsPending && !rowsFailed);
+  const wonTotal = rowsKnown ? (cumulativeWon(rows).at(-1)?.y ?? 0) : null;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
+  const wonClause = wonTotal === null ? '' : ` Won so far this year ${fmtCompact(wonTotal)}.`;
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
-      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{
+      summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}.${wonClause}`}
+      table={rowsKnown ? {
         columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
         rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
-      }}
+      } : undefined}
       className="dash-hero"
       interactive
     >
@@ -63,10 +85,17 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
         </HeroFig>
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
-          <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
-          <div className="viz-meta">Won this year</div>
-        </HeroFig>
+        {wonTotal === null ? (
+          <div aria-hidden="true" data-testid="dashboard-won-placeholder">
+            <span className="dash-hero-num dash-hero-num--won">…</span>
+            <div className="viz-meta">{'\u00a0'}</div>
+          </div>
+        ) : (
+          <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
+            <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
+            <div className="viz-meta">Won this year</div>
+          </HeroFig>
+        )}
         {pulse ? (
           <div className="dash-hero-pulse" data-testid="dashboard-pulse">
             <PulseOrb tone={pulse} size={96} bold />
@@ -80,7 +109,12 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
         ) : null}
       </div>
       {rowsPending && !months.keys.length ? (
-        <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
+        <>
+          <p className="viz-empty" aria-busy="true">Loading the bid list.</p>
+          <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
+        </>
+      ) : rowsFailed && !months.keys.length ? (
+        <BidListNotice pending={false} onRetry={onRetry} />
       ) : months.keys.length ? (
         <DivergingBars
           title="Bids by close month"
@@ -97,7 +131,9 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      {rowsKnown ? (
+        <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      ) : null}
     </ChartCard>
   );
 }
@@ -154,7 +190,27 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
 
 /** Pipeline by stage and bids by status, merged (both answered "where are my
  *  bids?"). Each funnel column and each status chip opens the bid drill. */
-export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
+export function PipelineCard({ rows, onDrill, rowsPending = false, rowsFailed = false, onRetry }: {
+  rows: OppRow[];
+  onDrill: OnDrill;
+  /** The bid list has not settled. Do not print "No open bids" or zero chips. */
+  rowsPending?: boolean;
+  rowsFailed?: boolean;
+  onRetry?: () => void;
+}) {
+  if (rowsPending || rowsFailed) {
+    return (
+      <ChartCard
+        title="Pipeline"
+        interactive={rowsFailed}
+        testId="dashboard-pipeline"
+        summary={rowsPending ? 'Loading the bid list' : "Couldn't load the bid list"}
+        meta={rowsPending ? 'Loading the bid list' : undefined}
+      >
+        <BidListNotice pending={rowsPending} onRetry={onRetry} />
+      </ChartCard>
+    );
+  }
   const data = stageFunnel(rows);
   const ids = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const m = statusMix(rows);
@@ -185,10 +241,14 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
   );
 }
 
-export function ForecastCard({ rows, projection, headingLevel }: {
+export function ForecastCard({ rows, projection, headingLevel, projectionPending = false, projectionFailed = false, onProjectionRetry }: {
   rows: OppRow[];
   headingLevel?: 2 | 3;
   projection?: { periods: Array<{ label: string; weightedMicros: number; wonMicros: number; openMicros: number; manualCommitMicros: number | null }> };
+  /** No projection payload yet. Missing is not the same as "no target set". */
+  projectionPending?: boolean;
+  projectionFailed?: boolean;
+  onProjectionRetry?: () => void;
 }) {
   const actuals = wonByQuarter(rows).map((q) => ({ label: q.label, won: q.won, weighted: 0, open: 0 }));
   const future = (projection?.periods ?? [])
@@ -198,8 +258,25 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
   const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
   const target = commits.length ? commits[0]! / 1e6 : null;
+  const projectionKnown = projection !== undefined;
+  const meta = projectionFailed && !projectionKnown ? (
+    <>
+      Couldn&apos;t load the forecast.{' '}
+      {onProjectionRetry ? (
+        <button type="button" className="btn btn-secondary" onClick={onProjectionRetry}>
+          Retry
+        </button>
+      ) : null}
+    </>
+  ) : projectionPending && !projectionKnown ? (
+    'Loading the forecast'
+  ) : target ? (
+    `Commit target ${fmtCompact(target)} per quarter`
+  ) : (
+    'No target set yet · add a commit forecast to compare'
+  );
   return (
-    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
+    <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={meta}
       summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
       table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
       <QuarterBars data={data} format={fmtCompact} />
@@ -285,10 +362,19 @@ export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
 /** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
  *  (MIT): one surface instead of three, each view keeps its own summary and
  *  table toggle. */
-export function PerformanceCard({ rows, projection, onDrill }: {
+export function PerformanceCard({
+  rows, projection, onDrill, rowsPending = false, rowsFailed = false, onRetry,
+  projectionPending = false, projectionFailed = false, onProjectionRetry,
+}: {
   rows: OppRow[];
   projection?: Parameters<typeof ForecastCard>[0]['projection'];
   onDrill?: OnDrill;
+  rowsPending?: boolean;
+  rowsFailed?: boolean;
+  onRetry?: () => void;
+  projectionPending?: boolean;
+  projectionFailed?: boolean;
+  onProjectionRetry?: () => void;
 }) {
   const [tab, setTab] = useState('revenue');
   const headId = useId();
@@ -299,22 +385,39 @@ export function PerformanceCard({ rows, projection, onDrill }: {
           <h2 id={headId} className="viz-title">Performance</h2>
           <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
         </div>
-        {onDrill ? (
+        {onDrill && !rowsPending && !rowsFailed ? (
           <button type="button" className="drill-more" onClick={() => onDrill({ status: tab === 'revenue' ? 'won' : 'all' })}>
             Breakdown
           </button>
         ) : null}
       </header>
-      <SmoothTab
-        label="Performance views"
-        value={tab}
-        onChange={setTab}
-        items={[
-          { id: 'revenue', title: 'Revenue', content: <ForecastCard rows={rows} projection={projection} headingLevel={3} /> },
-          { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
-          { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
-        ]}
-      />
+      {rowsPending || rowsFailed ? (
+        <BidListNotice pending={rowsPending} onRetry={onRetry} />
+      ) : (
+        <SmoothTab
+          label="Performance views"
+          value={tab}
+          onChange={setTab}
+          items={[
+            {
+              id: 'revenue',
+              title: 'Revenue',
+              content: (
+                <ForecastCard
+                  rows={rows}
+                  projection={projection}
+                  headingLevel={3}
+                  projectionPending={projectionPending}
+                  projectionFailed={projectionFailed}
+                  onProjectionRetry={onProjectionRetry}
+                />
+              ),
+            },
+            { id: 'winrate', title: 'Win rate', content: <WinRateTrendCard rows={rows} headingLevel={3} /> },
+            { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
+          ]}
+        />
+      )}
     </section>
   );
 }
