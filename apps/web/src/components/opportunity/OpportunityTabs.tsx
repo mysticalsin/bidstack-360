@@ -11,6 +11,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMe
 import { SendForSignatureModal } from '@/components/signatures/SendForSignatureModal';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalls } from '@/hooks/useCalls';
+import { daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import type { Contact, Task } from '@bidstack/shared';
@@ -230,6 +231,20 @@ function TasksPanel({ oppId }: { oppId: string }) {
   // This deal's page. The route reads one row past the limit and drops it.
   const all = useTasks({ oppId, limit: OPPORTUNITY_TASK_PAGE_LIMIT });
   if (all.isLoading) return <LoadingSkeleton />;
+  // A failed read is not an empty follow-up list. "No tasks yet" is only
+  // true after the read succeeds with no rows.
+  if (all.isError)
+    return (
+      <ErrorState
+        title={translate('opportunityTabs.tasksErrorTitle', "Couldn't load tasks")}
+        message={translate('opportunityTabs.errorMessage', 'Please try again.')}
+        action={
+          <Button size="sm" variant="secondary" onClick={() => void all.refetch()}>
+            {translate('opportunityTabs.retry', 'Retry')}
+          </Button>
+        }
+      />
+    );
   const tasks = all.data?.items.filter((t) => t.oppId === oppId) ?? [];
   const pageContinues = Boolean(all.data?.nextCursor);
   if (tasks.length === 0)
@@ -252,32 +267,46 @@ function TasksPanel({ oppId }: { oppId: string }) {
         )}
       />
       <ul className="divide-y divide-[var(--border-subtle)]">
-        {tasks.map((t: Task) => (
-          <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
-            <div>
-              <div className="text-sm text-[var(--fg-primary)]">{t.title}</div>
-              <div className="text-xs text-[var(--fg-tertiary)]">
-                {translate('opportunityTabs.taskDue', 'Due {{date}}', {
-                  date: formatDate(t.dueDate),
-                })}
-                {t.assignee ? <> · {t.assignee}</> : null}
+        {tasks.map((t: Task) => {
+          // UTC day, same clock as a bid's due chip. Elapsed-ms rounding
+          // marks the due day itself late after noon. A finished task keeps
+          // the date: the work is done, so it is not a late follow-up.
+          const days = t.dueDate ? daysUntilDueUtc(t.dueDate) : null;
+          const late = days !== null && days < 0 && t.status !== 'done';
+          return (
+            <li key={t.id} className="flex items-center justify-between gap-3 px-5 py-3">
+              <div>
+                <div className="text-sm text-[var(--fg-primary)]">{t.title}</div>
+                <div className="text-xs text-[var(--fg-tertiary)]">
+                  {translate('opportunityTabs.taskDue', 'Due {{date}}', {
+                    date: formatDate(t.dueDate),
+                  })}
+                  {late ? (
+                    <span className="ml-2 font-semibold text-[var(--danger)]">
+                      {translate('taskRow.overdue', 'Overdue: {{count}}d late', {
+                        count: Math.abs(days),
+                      })}
+                    </span>
+                  ) : null}
+                  {t.assignee ? <> · {t.assignee}</> : null}
+                </div>
               </div>
-            </div>
-            <Badge
-              tone={
-                t.status === 'done'
-                  ? 'jade'
-                  : t.status === 'in_progress'
-                    ? 'blue'
-                    : t.status === 'blocked'
-                      ? 'tomato'
-                      : 'gray'
-              }
-            >
-              {t.status.replace('_', ' ')}
-            </Badge>
-          </li>
-        ))}
+              <Badge
+                tone={
+                  t.status === 'done'
+                    ? 'jade'
+                    : t.status === 'in_progress'
+                      ? 'blue'
+                      : t.status === 'blocked'
+                        ? 'tomato'
+                        : 'gray'
+                }
+              >
+                {t.status.replace('_', ' ')}
+              </Badge>
+            </li>
+          );
+        })}
       </ul>
     </Card>
   );

@@ -1015,6 +1015,7 @@
     "tasksTitle": "Tâches",
     "tasksActiveCount": "{{count}} actives",
     "taskDue": "Échéance {{date}}",
+    "tasksErrorTitle": "Impossible de charger les tâches",
     "callsErrorTitle": "Impossible de charger les appels",
     "callsEmptyTitle": "Aucun appel pour l'instant",
     "callsEmptyMessage": "Les appels planifiés et terminés pour cette opportunité s'affichent ici.",
