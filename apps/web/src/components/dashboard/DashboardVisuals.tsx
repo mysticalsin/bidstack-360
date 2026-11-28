@@ -244,7 +244,9 @@ export function TopAccountsBarCard({ rows, headingLevel, onDrill }: { rows: OppR
   );
 }
 
-const isSampleTitle = (t: string) => /^sample:/i.test(t);
+/** Fixture rows on this feed still open with "Sample:"; "Reference:" is the
+ *  same mark. The banner a seller reads does not repeat either prefix. */
+const isReferenceTitle = (t: string) => /^(?:reference|sample):/i.test(t);
 
 /** Watchdog heat and upcoming results, merged into one "what changed at my
  *  accounts" card. Account names open the account page (its watchdog section
@@ -252,12 +254,12 @@ const isSampleTitle = (t: string) => /^sample:/i.test(t);
 export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
   const weeks = (feed?.heatWeekStarts ?? []).map((w) => weekFmt.format(new Date(w)));
   const rows = (feed?.heat ?? []).map((h) => ({ id: h.companyId, name: h.companyName, cells: h.weeks.map((w) => ({ kind: w.worst, count: w.count })) }));
-  const sample = (feed?.alerts ?? []).some((a) => isSampleTitle(a.title));
+  const reference = (feed?.alerts ?? []).some((a) => isReferenceTitle(a.title));
   const results = (feed?.earnings ?? []).map((e) => ({ id: e.id, date: e.expectedAt, label: e.companyName, companyId: e.companyId }));
   const days = feed?.days ?? 30;
   return (
     <ChartCard title="Account signals" meta="Last 8 weeks, and results due soon" interactive testId="dashboard-signals"
-      sample={sample ? 'Local demo signals (titles start with "Sample:")' : undefined}
+      sample={reference ? 'Reference records' : undefined}
       summary={`${rows.map((r) => `${r.name}: ${r.cells.reduce((n, c) => n + c.count, 0)} signals`).join('; ') || 'No signals in the last 8 weeks'}. ${results.map((i) => `${i.label} results on ${dayFmt.format(new Date(i.date))}`).join('; ') || 'No results expected'}.`}
       table={{ columns: ['Account', 'Signals (8 weeks)', 'Results due'], rows: [...new Set([...rows.map((r) => r.name), ...results.map((r) => r.label)])].map((name) => [
         name,
