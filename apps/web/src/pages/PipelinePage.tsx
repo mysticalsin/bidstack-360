@@ -34,6 +34,7 @@ import type { Opportunity, PipelineStage } from '@bidstack/shared';
 
 import { PipelineViewSwitch } from '@/components/opportunity/PipelineViewSwitch';
 
+import { pipelineColumnKpis } from './pipelineBoard/pipeline-column-kpis';
 import { getStageId } from './pipelineBoard/pipelineUtils';
 import { PIPELINE_BOARD_LIMIT, pipelineBoardCaption } from './pipelineBoard/pipeline-board-caption';
 import { StageColumn } from './pipelineBoard/StageColumn';
@@ -47,9 +48,10 @@ export function PipelinePage() {
   const pageContinues = Boolean(data?.nextCursor);
   const latest = data?.items.length ?? 0;
   const configuredStages = usePipelineStages();
-  // KPI bar reads the server-side aggregate over the WHOLE pipeline — the
-  // board itself only loads the first 50 cards, so totals/win-rate computed
-  // from `data.items` were silently truncated for any org past 50 deals.
+  // Unfiltered KPI bar reads the server-side aggregate over the WHOLE
+  // pipeline — the board itself only loads the first 50 cards, so totals
+  // computed from `data.items` were silently truncated past 50 deals.
+  // A stage filter does not use this report; that strip is the visible column.
   const report = usePipelineReport();
   const move = useStageMutation();
   // Stage moves POST /api/opportunities/:id/stage, gated server-side behind
@@ -185,6 +187,18 @@ export function PipelinePage() {
   };
 
   const visibleStages = stageFilter ? stages.filter((s) => s.id === stageFilter) : stages;
+  const selectedStage = stageFilter ? (stages.find((s) => s.id === stageFilter) ?? null) : null;
+  // A stage filter follows the column. The portfolio report stays the strip
+  // only when every stage is on screen — a page of 50 is not one column.
+  const column =
+    stageFilter && !isLoading && data
+      ? pipelineColumnKpis({
+          stageName: selectedStage?.name ?? t('pipeline.kpiColumnUnknownStage', 'This stage'),
+          isClosed: Boolean(selectedStage?.isWon || selectedStage?.isLost),
+          values: (selectedStage ? (byStage.get(selectedStage.id) ?? []) : []).map((item) => item.value),
+          pageContinues,
+        })
+      : null;
 
   return (
     <div className="space-y-6">
@@ -254,54 +268,94 @@ export function PipelinePage() {
       {/* Reserve the KPI row while opportunities load: inserting it above
           the still-visible stage skeleton pushes the whole board down. */}
       {(isLoading || data) && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-tour="pipeline-kanban">
-          {(() => {
-            const rep = report.data;
-            const byStage = rep?.byStage ?? [];
-            const totalValue = byStage.reduce((acc, s) => acc + s.valueSum, 0);
-            const closedWon = byStage.find((s) => s.stage === 'closed_won')?.count ?? 0;
-            const closedLost = byStage.find((s) => s.stage === 'closed_lost')?.count ?? 0;
-            const closedTotal = closedWon + closedLost;
-            const winRate =
-              closedTotal > 0
-                ? `${Math.round((closedWon / closedTotal) * 100)}%`
-                : t('pipeline.winRateNoClosedBids', 'No closed bids');
-            const loading = isLoading || report.isLoading;
-            return [
-              {
-                label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
-                value: loading ? '…' : formatMoney(totalValue, 'EUR'),
-                tone: 'blue' as const,
-              },
-              {
-                label: t('pipeline.kpiOpenValue', 'Open value'),
-                value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
-                tone: 'jade' as const,
-              },
-              {
-                label: t('pipeline.kpiWinRate', 'Win rate'),
-                value: loading ? '…' : winRate,
-                tone: 'amber' as const,
-              },
-              {
-                label: t('pipeline.kpiActiveDeals', 'Active deals'),
-                value: loading ? '…' : String(rep?.totalOpen ?? 0),
-                tone: 'purple' as const,
-              },
-            ];
-          })().map((kpi) => (
-            <div
-              key={kpi.label}
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
-            >
-              <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
-                {kpi.label}
+        <div
+          className="space-y-2"
+          data-tour="pipeline-kanban"
+          role="region"
+          aria-label={
+            column
+              ? t('pipeline.kpiColumnRegion', '{{stage}} on this board', { stage: column.stageName })
+              : t('pipeline.kpiRegion', 'Pipeline totals')
+          }
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {(column
+              ? [
+                  {
+                    label: t('pipeline.kpiColumnValue', '{{stage}} value', { stage: column.stageName }),
+                    value: formatMoney(column.value, 'EUR'),
+                  },
+                  {
+                    label: t('pipeline.kpiColumnOpenValue', 'Open value (column)'),
+                    value: formatMoney(column.openValue, 'EUR'),
+                  },
+                  {
+                    label: t('pipeline.kpiColumnDeals', 'Deals (column)'),
+                    value: String(column.dealCount),
+                  },
+                  {
+                    label: t('pipeline.kpiColumnOpenDeals', 'Open deals (column)'),
+                    value: String(column.openCount),
+                  },
+                ]
+              : (() => {
+                  const rep = report.data;
+                  const reportStages = rep?.byStage ?? [];
+                  const totalValue = reportStages.reduce((acc, s) => acc + s.valueSum, 0);
+                  const closedWon = reportStages.find((s) => s.stage === 'closed_won')?.count ?? 0;
+                  const closedLost = reportStages.find((s) => s.stage === 'closed_lost')?.count ?? 0;
+                  const closedTotal = closedWon + closedLost;
+                  const winRate =
+                    closedTotal > 0
+                      ? `${Math.round((closedWon / closedTotal) * 100)}%`
+                      : t('pipeline.winRateNoClosedBids', 'No closed bids');
+                  const loading = isLoading || report.isLoading;
+                  return [
+                    {
+                      label: t('pipeline.kpiTotalPipeline', 'Total pipeline'),
+                      value: loading ? '…' : formatMoney(totalValue, 'EUR'),
+                    },
+                    {
+                      label: t('pipeline.kpiOpenValue', 'Open value'),
+                      value: loading ? '…' : formatMoney(rep?.totalValueOpen ?? 0, 'EUR'),
+                    },
+                    {
+                      label: t('pipeline.kpiWinRate', 'Win rate'),
+                      value: loading ? '…' : winRate,
+                    },
+                    {
+                      label: t('pipeline.kpiActiveDeals', 'Active deals'),
+                      value: loading ? '…' : String(rep?.totalOpen ?? 0),
+                    },
+                  ];
+                })()
+            ).map((kpi) => (
+              <div
+                key={kpi.label}
+                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-card)] px-4 py-3"
+              >
+                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-tertiary)]">
+                  {kpi.label}
+                </div>
+                <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
+                  {kpi.value}
+                </div>
               </div>
-              <div className="mt-1 text-lg font-bold text-[var(--fg-primary)] tabular-nums">
-                {kpi.value}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          {column ? (
+            <p className="text-sm text-[var(--fg-secondary)]">
+              {column.pageContinues
+                ? t(
+                    'pipeline.kpiColumnPartial',
+                    'These figures are the {{stage}} cards on this board, not every bid in that stage.',
+                    { stage: column.stageName },
+                  )
+                : t('pipeline.kpiColumnScope', 'These figures are {{stage}}, not the whole pipeline.', {
+                    stage: column.stageName,
+                  })}
+            </p>
+          ) : null}
         </div>
       )}
 
