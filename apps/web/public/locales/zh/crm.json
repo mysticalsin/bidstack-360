@@ -2203,6 +2203,8 @@
     "totalPipeline": "总管道",
     "won": "已赢",
     "openDeals": "{{count}} 个进行中的交易",
+    "overdueDeals": "逾期 {{count}}",
+    "openCockpitOverdueAria": "打开 {{name}} 的客户驾驶舱，逾期 {{count}}",
     "contacts": "{{count}} 个联系人",
     "sourceCurated": "精选前10名",
     "sourceAuto": "自动排名",
@@ -2347,6 +2349,8 @@
     "emptyMessage": "在公司页面将具有战略重要性的公司标记为关键客户。",
     "metricPipeline": "销售管道",
     "metricOpenDeals": "进行中的交易",
+    "metricOverdue": "逾期 {{count}}",
+    "openCockpitOverdueAria": "打开 {{name}} 的客户驾驶舱，逾期 {{count}}",
     "metricContacts": "联系人"
   },
   "companyTabs": {

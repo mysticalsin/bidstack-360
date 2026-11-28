@@ -25,6 +25,7 @@ const KeyAccountResponse = z.object({
   keyAccountNotes: z.string().nullable(),
   totalValue: z.number(),
   openDeals: z.number(),
+  overdueDeals: z.number(),
   contactCount: z.number(),
   opportunityCount: z.number(),
 });
@@ -115,6 +116,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           keyAccountNotes: c.keyAccountNotes,
           totalValue: o.totalValue,
           openDeals: o.openDeals,
+          overdueDeals: o.overdueDeals,
           contactCount: o.contactCount,
           opportunityCount: o.opportunityCount,
         };
@@ -192,6 +194,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
             totalValue: s.totalValue,
             wonValue: s.wonValue,
             openDeals: s.openDeals,
+            overdueDeals: s.overdueDeals,
             contactCount: s.contactCount,
             opportunityCount: s.opportunityCount,
           };
@@ -261,6 +264,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         totalValue: number;
         wonValue: number;
         openDeals: bigint; // Postgres COUNT → BigInt
+        overdueDeals: bigint;
         opportunityCount: bigint;
       };
 
@@ -283,6 +287,11 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
           COUNT(CASE WHEN o.stage NOT IN ('closed_won'::opportunity_stage,
                                           'closed_lost'::opportunity_stage)
                      THEN 1 ELSE NULL END)                               AS "openDeals",
+          COUNT(CASE WHEN o.stage NOT IN ('closed_won'::opportunity_stage,
+                                          'closed_lost'::opportunity_stage)
+                      AND o.due_date IS NOT NULL
+                      AND o.due_date < (timezone('UTC', now()))::date
+                     THEN 1 ELSE NULL END)                               AS "overdueDeals",
           COUNT(o.id)                                                    AS "opportunityCount"
         FROM companies c
         LEFT JOIN opportunities o
@@ -324,6 +333,7 @@ export const accountsRoutes: FastifyPluginAsync = async (server) => {
         totalValue: row.totalValue,
         wonValue: row.wonValue,
         openDeals: Number(row.openDeals),
+        overdueDeals: Number(row.overdueDeals),
         contactCount: contactMap.get(row.id) ?? 0,
         opportunityCount: Number(row.opportunityCount),
       }));

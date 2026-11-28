@@ -2215,6 +2215,8 @@
     "totalPipeline": "total pipeline",
     "won": "won",
     "openDeals": "{{count}} open deals",
+    "overdueDeals": "{{count}} overdue",
+    "openCockpitOverdueAria": "Open {{name}} customer cockpit, {{count}} overdue",
     "contacts": "{{count}} contacts",
     "sourceCurated": "Curated top 10",
     "sourceAuto": "Auto-ranked",
@@ -2359,6 +2361,8 @@
     "emptyMessage": "Flag strategically important companies as Key Accounts from the Companies page.",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "open deals",
+    "metricOverdue": "{{count}} overdue",
+    "openCockpitOverdueAria": "Open {{name}} customer cockpit, {{count}} overdue",
     "metricContacts": "contacts"
   },
   "companyTabs": {

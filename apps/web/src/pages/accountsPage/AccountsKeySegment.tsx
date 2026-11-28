@@ -70,6 +70,10 @@ export function AccountsKeySegment() {
     [items],
   );
   const openDeals = useMemo(() => items.reduce((sum, account) => sum + account.openDeals, 0), [items]);
+  const overdueDeals = useMemo(
+    () => items.reduce((sum, account) => sum + (account.overdueDeals ?? 0), 0),
+    [items],
+  );
   const contactCount = useMemo(
     () => items.reduce((sum, account) => sum + account.contactCount, 0),
     [items],
@@ -259,6 +263,13 @@ export function AccountsKeySegment() {
             <StatTile
               label={t('keyAccounts.statOpenDeals', 'Open deals')}
               value={openDeals.toLocaleString()}
+              alert={
+                overdueDeals > 0 ? (
+                  <Badge tone="tomato">
+                    {t('keyAccounts.metricOverdue', '{{count}} overdue', { count: overdueDeals })}
+                  </Badge>
+                ) : undefined
+              }
             />
             <StatTile
               label={t('keyAccounts.statContacts', 'Contacts')}
@@ -327,8 +338,18 @@ export function AccountsKeySegment() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             to={`/accounts/${encodeURIComponent(account.id)}`}
-                            aria-label={t('keyAccounts.openCockpitAria', 'Open {{name}} customer cockpit', { name: account.name })}
-                            className="text-base font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] truncate"
+                            aria-label={
+                              (account.overdueDeals ?? 0) > 0
+                                ? t(
+                                    'keyAccounts.openCockpitOverdueAria',
+                                    'Open {{name}} customer cockpit, {{count}} overdue',
+                                    { name: account.name, count: account.overdueDeals },
+                                  )
+                                : t('keyAccounts.openCockpitAria', 'Open {{name}} customer cockpit', {
+                                    name: account.name,
+                                  })
+                            }
+                            className="truncate rounded-sm text-base font-semibold text-[var(--fg-primary)] hover:text-[var(--brand-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2"
                           >
                             {account.name}
                           </Link>
@@ -350,11 +371,20 @@ export function AccountsKeySegment() {
                             </span>{' '}
                             {t('keyAccounts.metricPipeline', 'pipeline')}
                           </span>
-                          <span className="text-[var(--fg-secondary)]">
-                            <span className="font-medium text-[var(--fg-primary)]">
-                              {account.openDeals}
-                            </span>{' '}
-                            {t('keyAccounts.metricOpenDeals', 'open deals')}
+                          <span className="inline-flex flex-wrap items-center gap-2 text-[var(--fg-secondary)]">
+                            <span>
+                              <span className="font-medium text-[var(--fg-primary)]">
+                                {account.openDeals}
+                              </span>{' '}
+                              {t('keyAccounts.metricOpenDeals', 'open deals')}
+                            </span>
+                            {(account.overdueDeals ?? 0) > 0 ? (
+                              <Badge tone="tomato">
+                                {t('keyAccounts.metricOverdue', '{{count}} overdue', {
+                                  count: account.overdueDeals,
+                                })}
+                              </Badge>
+                            ) : null}
                           </span>
                           <span className="text-[var(--fg-secondary)]">
                             <span className="font-medium text-[var(--fg-primary)]">

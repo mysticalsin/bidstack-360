@@ -2203,6 +2203,8 @@
     "totalPipeline": "pipeline total",
     "won": "ganho",
     "openDeals": "{{count}} negócios abertos",
+    "overdueDeals": "{{count}} em atraso",
+    "openCockpitOverdueAria": "Abrir o cockpit de {{name}}, {{count}} em atraso",
     "contacts": "{{count}} contatos",
     "sourceCurated": "Top 10 selecionado",
     "sourceAuto": "Classificação automática",
@@ -2347,6 +2349,8 @@
     "emptyMessage": "Marque as empresas estrategicamente importantes como contas-chave na página de Empresas.",
     "metricPipeline": "pipeline",
     "metricOpenDeals": "negócios abertos",
+    "metricOverdue": "{{count}} em atraso",
+    "openCockpitOverdueAria": "Abrir o cockpit de {{name}}, {{count}} em atraso",
     "metricContacts": "contactos"
   },
   "companyTabs": {
