@@ -24,6 +24,7 @@ import { FilterRow, FilterSelect, InsightPanel, SegmentHeader, StatTile } from '
 import { isSyntheticAccountName } from './testDataFilter';
 
 import { StrategicSignalInsight } from './StrategicSignalInsight';
+import { keyAccountReadPhase } from './key-account-read-phase';
 import { keyAccountSignal } from './strategicSignals';
 
 const KEY_ACCOUNTS_PAGE_SIZE = 50;
@@ -64,6 +65,12 @@ export function AccountsKeySegment() {
   );
   const unclassifiedIndustry = t('keyAccounts.unclassifiedIndustry', 'Unclassified');
   const accountError = accounts.error instanceof Error ? accounts.error.message : undefined;
+  const readPhase = keyAccountReadPhase({
+    hasPayload: accounts.data !== undefined,
+    isLoading: accounts.isLoading,
+    isError: accounts.isError,
+  });
+  const pageSettled = readPhase === 'ready' || readPhase === 'stale';
   const industryError = industries.error instanceof Error ? industries.error.message : undefined;
   const totalPipeline = useMemo(
     () => items.reduce((sum, account) => sum + account.totalValue, 0),
@@ -169,7 +176,7 @@ export function AccountsKeySegment() {
         </FilterRow>
       </motion.div>
 
-      {!accounts.isError && industryBreakdown.length > 0 ? (
+      {pageSettled && industryBreakdown.length > 0 ? (
         <motion.div variants={reducedMotion ? undefined : staggerChild}>
           <InsightPanel
             ariaLabel={t('keyAccounts.industrySignalLabel', 'Key account industry signal')}
@@ -223,7 +230,7 @@ export function AccountsKeySegment() {
 
       {/* sr-only live region — announces filter result count to AT */}
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {!accounts.isLoading && accounts.data
+        {pageSettled && accounts.data
           ? `${
               items.length === 1
                 ? t('keyAccounts.resultCount_one', '{{count}} account', { count: items.length })
@@ -237,8 +244,38 @@ export function AccountsKeySegment() {
           (≤50/page) and returns no org-wide aggregate, so summing `items`
           (this page) and labelling it a portfolio total would silently
           under-report and shift as the user pages. The 'On this page' eyebrow
-          makes the page-scope explicit rather than overclaiming. */}
-      {!accounts.isError ? (
+          makes the page-scope explicit rather than overclaiming. Until that
+          page arrives, the strip is not drawn: an empty array is not a book
+          of zero accounts. A later refresh failure keeps the page. */}
+      {readPhase === 'stale' ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-medium text-[var(--fg-primary)]">
+            {t('keyAccounts.refreshError', "Couldn't refresh key accounts.")}
+          </p>
+          <p className="text-xs text-[var(--fg-secondary)]">
+            {t(
+              'keyAccounts.refreshErrorHint',
+              'The accounts already on screen are unchanged.',
+            )}
+          </p>
+          <button
+            type="button"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-3 text-xs font-semibold text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+            onClick={() => void accounts.refetch()}
+          >
+            {t('keyAccounts.retry', 'Retry')}
+          </button>
+        </div>
+      ) : null}
+      {readPhase === 'loading' ? (
+        <p
+          role="status"
+          aria-busy="true"
+          className="text-sm font-medium text-[var(--fg-primary)]"
+        >
+          {t('keyAccounts.statsLoading', 'Loading key accounts')}
+        </p>
+      ) : pageSettled ? (
         <motion.section
           variants={reducedMotion ? undefined : staggerChild}
           aria-label={t('keyAccounts.statsStripAria', 'Key account totals on this page')}
@@ -273,9 +310,9 @@ export function AccountsKeySegment() {
       ) : null}
 
       {/* Account grid */}
-      {accounts.isLoading ? (
+      {readPhase === 'loading' ? (
         <LoadingSkeleton rows={4} />
-      ) : accounts.isError ? (
+      ) : readPhase === 'error' ? (
         <ErrorState
           title={t('keyAccounts.errorTitle', "Couldn't load key accounts")}
           message={
