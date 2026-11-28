@@ -16,6 +16,8 @@ import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection'
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
 
+import { contactNoteBody, contactNotesRequest, notesVisibleOnContact } from './contact-notes';
+
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
   const { id } = useParams<{ id: string }>();
@@ -27,7 +29,13 @@ export function ContactDetailPage() {
     limit: 200,
   });
   const allTasks = useTasks();
-  const allNotes = useNotes(contact.data?.customer);
+  // Linked contacts read the company file. Demo notes are stored on the
+  // company id, so a display-name query comes back empty.
+  const noteRequest = contact.data ? contactNotesRequest(contact.data) : null;
+  const allNotes = useNotes(
+    noteRequest?.accountId,
+    noteRequest?.companyId ? { companyId: noteRequest.companyId } : undefined,
+  );
 
   if (contact.isLoading) return <DetailPageSkeleton columns={3} cards={3} />;
   if (contact.isError)
@@ -62,7 +70,9 @@ export function ContactDetailPage() {
   const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
-  const relatedNotes = allNotes.data?.items.filter((n) => n.accountId === c.customer) ?? [];
+  const relatedNotes = allNotes.data
+    ? notesVisibleOnContact(allNotes.data.items, c)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -247,15 +257,23 @@ export function ContactDetailPage() {
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
-              {relatedNotes.map((n) => (
-                <li key={n.id} className="px-5 py-3">
-                  <div className="text-sm font-medium text-[var(--fg-primary)]">{n.title}</div>
-                  <div className="text-xs text-[var(--fg-tertiary)]">
-                    {n.authorEmail ?? t('contactDetail.unknownAuthor', 'Unknown')} ·{' '}
-                    {formatDate(n.createdAt)}
-                  </div>
-                </li>
-              ))}
+              {relatedNotes.map((n) => {
+                const body = contactNoteBody(n.bodyMd);
+                return (
+                  <li key={n.id} className="px-5 py-3">
+                    <div className="text-sm font-medium text-[var(--fg-primary)]">{n.title}</div>
+                    {body ? (
+                      <p className="mt-1 whitespace-pre-wrap text-xs text-[var(--fg-secondary)]">
+                        {body}
+                      </p>
+                    ) : null}
+                    <div className="text-xs text-[var(--fg-tertiary)]">
+                      {n.authorEmail ?? t('contactDetail.unknownAuthor', 'Unknown')} ·{' '}
+                      {formatDate(n.createdAt)}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
