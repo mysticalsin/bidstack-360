@@ -5,15 +5,26 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { closeMonthLabel } from '@/components/charts/bid-chart-data';
+import { DueDateChip } from '@/components/ui/DueDateChip';
+import { fmtCompact, OPEN_STAGES, oppStatus, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
+import { formatDate } from '@/lib/format';
 
 import { DrillSheet, type DrillCrumb } from './DrillSheet';
 import { filterOpps, type OppDrillFilter } from './filterOpps';
-import { closeDate, fmtCompact, OPEN_STAGES, stageKey, stageText, type OppRow, type OppStatus } from '@/components/viz/viz-data';
 
 export type { OppDrillFilter } from './filterOpps';
 
 const STATUS_LABEL: Record<OppStatus | 'all', string> = { all: 'All bids', open: 'Open', won: 'Won', lost: 'Lost' };
-const dateFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+/**
+ * The Due column clocks an open bid. A won or lost bid keeps the calendar
+ * date and stops the clock: the deadline no longer moves the book.
+ */
+function DrillDue({ row }: { row: OppRow }) {
+  if (!row.dueDate) return '–';
+  if (oppStatus(row) !== 'open') return formatDate(row.dueDate);
+  return <DueDateChip dueDate={row.dueDate} size="sm" />;
+}
 
 export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'Dashboard' }: {
   rows: OppRow[];
@@ -112,22 +123,19 @@ export function OppDrill({ rows, filter, onFilterChange, onClose, rootLabel = 'D
               <tr><th scope="col">Bid</th><th scope="col">Stage</th><th scope="col" className="num">Value</th><th scope="col" className="num">Due</th></tr>
             </thead>
             <tbody>
-              {shown.slice(0, 100).map((o) => {
-                const d = closeDate(o);
-                return (
-                  <tr key={o.id}>
-                    <td>
-                      <Link to={`/opportunities/${o.id}`}>{o.name ?? o.code ?? 'Untitled bid'}</Link>
-                      {o.customer ? (
-                        <button type="button" className="drill-sub drill-link" onClick={() => onFilterChange({ ...f, account: o.customer })}>{o.customer}</button>
-                      ) : null}
-                    </td>
-                    <td>{stageText(stageKey(o.stage))}</td>
-                    <td className="num">{fmtCompact(o.value ?? 0)}</td>
-                    <td className="num">{d ? dateFmt.format(new Date(d)) : '–'}</td>
-                  </tr>
-                );
-              })}
+              {shown.slice(0, 100).map((o) => (
+                <tr key={o.id}>
+                  <td>
+                    <Link to={`/opportunities/${o.id}`}>{o.name ?? o.code ?? 'Untitled bid'}</Link>
+                    {o.customer ? (
+                      <button type="button" className="drill-sub drill-link" onClick={() => onFilterChange({ ...f, account: o.customer })}>{o.customer}</button>
+                    ) : null}
+                  </td>
+                  <td>{stageText(stageKey(o.stage))}</td>
+                  <td className="num">{fmtCompact(o.value ?? 0)}</td>
+                  <td className="num"><DrillDue row={o} /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
