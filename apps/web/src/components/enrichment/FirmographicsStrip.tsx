@@ -15,6 +15,8 @@ import { beatsProvider, figureText, useSourcedFigures } from '@/hooks/useSourced
 import { trendPct } from '@/lib/enrichment/aggregate';
 import { fmtAsOf, fmtMoney } from '@/lib/enrichment/client';
 
+import { EnrichmentHold } from './EnrichmentHold';
+import { enrichmentGate } from './enrichment-read';
 import { SampleBadge, SourceNote } from './SourceNote';
 
 const NA = <span className="en-fact-sm" style={{ color: 'var(--fg-tertiary)' }}>Not known</span>;
@@ -25,6 +27,21 @@ export function FirmographicsStrip({ companyId }: { companyId: string }) {
   const canRefresh = useHasPermission('companies:write');
   const [allLocations, setAllLocations] = useState(false);
   const sourced = useSourcedFigures(companyId);
+  const gate = enrichmentGate(q);
+  if (gate === 'loading' || gate === 'error') {
+    return (
+      <EnrichmentHold
+        testId="account-firmographics"
+        titleId="en-firmo-h"
+        title="Company facts"
+        titleClassName="sr-only"
+        gate={gate}
+        loading="Loading company facts"
+        error="Couldn't load company facts"
+        onRetry={() => void q.refetch()}
+      />
+    );
+  }
   if (!q.data) return null;
   const d = q.data;
   const f = d.firmographics;

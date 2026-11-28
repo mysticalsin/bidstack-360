@@ -9,6 +9,8 @@ import { DIMENSIONS, hiringRows, recentCount, type Dimension } from '@/lib/enric
 import { fmtAsOf } from '@/lib/enrichment/client';
 
 import { CountBars } from './CountBars';
+import { EnrichmentHold } from './EnrichmentHold';
+import { enrichmentGate } from './enrichment-read';
 import { SampleBadge, SourceNote } from './SourceNote';
 
 const TOP_FUNCTIONS = 3;
@@ -20,6 +22,20 @@ export function HiringNowCard({ companyId }: { companyId: string }) {
   const [dim, setDim] = useState<Dimension>('function');
   const [allRoles, setAllRoles] = useState(false);
   const id = useId();
+  const gate = enrichmentGate(q);
+  if (gate === 'loading' || gate === 'error') {
+    return (
+      <EnrichmentHold
+        testId="account-hiring-now"
+        titleId={`${id}-h`}
+        title="Hiring now"
+        gate={gate}
+        loading="Loading open roles"
+        error="Couldn't load open roles"
+        onRetry={() => void q.refetch()}
+      />
+    );
+  }
   if (!q.data) return null;
   const h = q.data.hiring;
   const { roles, source, asOf, total } = h;
