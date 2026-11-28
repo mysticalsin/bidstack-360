@@ -152,8 +152,12 @@ describe('InitiativesView', () => {
       sample: true,
       evidence: [{ kind: 'news', title: 'Data platform launch', url: null, at: null, source: 'sample', sample: true }],
     })]} />);
-    expect(screen.getAllByText('Reference')).toHaveLength(2);
+    expect(screen.getByText('Reference')).toBeTruthy();
     expect(screen.queryByText('Sample')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'See 1 evidence item' }));
+    const evidence = screen.getByText('Data platform launch').parentElement!;
+    expect(evidence.textContent).toMatch(/Reference/);
+    expect(evidence.textContent).not.toMatch(/Sample/);
     expect(screen.queryByText('Sample data')).toBeNull();
   });
 });

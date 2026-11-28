@@ -1,9 +1,10 @@
 /**
- * Sample watchdog signals for the demo accounts (v21), so the account pulse,
+ * Fixture watchdog signals for the demo accounts (v21), so the account pulse,
  * signals timeline, initiatives board and portfolio view look alive before
- * any news source is configured. Every row is sample=true, source 'sample',
- * title prefixed "Sample: " and carries no source URL; the UI shows a Sample
- * badge. Dates are relative to the run, so re-running refreshes them.
+ * any news source is configured. Every row is sample=true, source 'sample'.
+ * The stored title is the catalog headline (no "Sample:" prefix) and carries
+ * no source URL. The UI shows a Reference badge. Dates are relative to the
+ * run, so re-running refreshes them.
  *
  * Idempotent: upserts on (orgId, 'sample', externalId). Matches accounts by
  * name in every org of the target database. Never touches non-sample rows.
@@ -168,11 +169,11 @@ export async function seedSampleSignals(prisma: PrismaClient, opts: { now?: Date
         const data = {
           kind: cls.kind,
           occurredAt: new Date(now.getTime() - s.daysAgo * DAY),
-          title: `Sample: ${s.title}`,
+          title: s.title,
           sourceUrl: '',
           summary: oneLine(s.summary),
           implication: cls.implication,
-          implicationRationale: `Sample data. Classified by ${cls.rule}.`,
+          implicationRationale: `Reference record. Classified by ${cls.rule}.`,
           severity: severityFromImportance(importance),
           importance,
           sentiment: cls.sentiment,

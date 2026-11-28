@@ -17,6 +17,8 @@ import { AnimatedNumber } from '@/components/motion-primitives/animated-number';
 import { TransitionPanel } from '@/components/motion-primitives/transition-panel';
 import { useAccountPulse } from '@/hooks/useAccountSignals';
 
+import { SIGNAL_REFERENCE_BADGE, SIGNAL_REFERENCE_RECORD } from './reference-copy';
+
 type Driver = AccountPulse['drivers'][number];
 
 const TREND_WORD: Record<AccountPulse['trend'], string> = { gaining: 'Gaining', steady: 'Steady', declining: 'Declining' };
@@ -90,7 +92,7 @@ export function PulseView({ pulse }: { pulse: AccountPulse }) {
             {TREND_WORD[pulse.trend]} {fmtPts(pulse.delta)}
             <span className="sg-meta">in 4 weeks</span>
           </span>
-          {pulse.sample ? <span className="sg-sample" title="Includes sample signals seeded for the demo">Sample</span> : null}
+          {pulse.sample ? <span className="sg-sample" title={SIGNAL_REFERENCE_RECORD}>{SIGNAL_REFERENCE_BADGE}</span> : null}
         </div>
         <p className="sg-verdict">{pulse.verdict}</p>
         <div className="sg-drivers" role="group" aria-label="Top drivers">
