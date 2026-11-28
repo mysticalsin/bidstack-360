@@ -112,7 +112,7 @@ export function AccountDirectionSection({ companyId, initialTab = 'direction' }:
     <section className="sg ci sg-surface" aria-labelledby="ci-h" data-testid="account-direction">
       <header className="sg-head">
         <h2 id="ci-h" className="sg-h">
-          Where they&apos;re heading {sample ? <span className="sg-sample">Sample</span> : null}
+          Where they&apos;re heading {sample ? <span className="sg-sample">Reference</span> : null}
         </h2>
       </header>
       <div ref={tabStrip} role="tablist" aria-label="Account intelligence" className="ci-tabs tab-scroll">
