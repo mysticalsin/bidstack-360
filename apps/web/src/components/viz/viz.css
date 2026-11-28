@@ -40,6 +40,8 @@
 @media (pointer: coarse) { .viz-toggle { min-height: 44px; } }
 .viz-figure { margin: 0; min-width: 0; animation: viz-arrive 420ms var(--viz-ease) both; }
 .viz-caption { font-size: 13px; color: var(--viz-muted); }
+/* --danger is 6.38:1 on the white card and a light rose on the #0c0c0e dark card. */
+.viz-past-close { margin: 0; font-size: 13px; font-weight: 600; color: var(--danger, #b82032); }
 .viz-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .viz-table th { text-align: left; font-weight: 500; color: var(--viz-muted); padding: 4px 8px 8px 0; border-bottom: 1px solid var(--viz-line); }
 .viz-table td { padding: 8px 8px 8px 0; color: var(--viz-ink); border-bottom: 1px solid var(--viz-line); }

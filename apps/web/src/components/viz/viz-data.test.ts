@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
+  accountBars, cumulativeOpen, cumulativeWon, fmtCompact, pastCloseOpenValue, pastDueOpen, quarterOf, runningWinRate, stageFunnel, stageKey,
   stageText, statusMix, winRateByQuarter, wonByQuarter, type OppRow,
 } from './viz-data';
 
@@ -52,6 +52,21 @@ describe('viz-data', () => {
 
   it('flags open bids past their due date', () => {
     expect(pastDueOpen(rows, Date.parse('2026-10-31')).map((o) => o.customer)).toEqual(['B']);
+  });
+
+  it('sums open bids that closed before this quarter and leaves won, undated, and in-quarter bids out', () => {
+    // WHY: the demo book closes between April and September 2026. On 25 Nov 2026
+    // the forecast rolls every one of those open bids into Q4. A won April bid,
+    // a bid with no close date, and a bid due inside Q4 are not that slipped book.
+    const now = Date.parse('2026-11-25T15:00:00.000Z');
+    const demo = [
+      row({ id: '2041', stage: 's3_technical_iteration', value: 1_240_000, dueDate: '2026-07-22' }),
+      row({ id: '2043', stage: 's4_negotiation', value: 4_800_000, dueDate: '2026-06-30' }),
+      row({ id: '2046', stage: 'closed_won', value: 410_000, dueDate: '2026-04-28' }),
+      row({ id: 'blank', stage: 's1_ongoing', value: 900_000, dueDate: null }),
+      row({ id: 'in-quarter', stage: 's2_sent', value: 100_000, dueDate: '2026-10-01' }),
+    ];
+    expect(pastCloseOpenValue(demo, now)).toEqual({ quarter: 'Q4 2026', value: 6_040_000 });
   });
 
   it('keeps two compact digits when they name the same amount', () => {

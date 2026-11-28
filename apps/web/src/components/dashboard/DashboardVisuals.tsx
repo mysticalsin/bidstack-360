@@ -16,7 +16,7 @@ import { QuarterBars, StageFunnel, WinRateLine } from '@/components/viz/lazy-bkl
 import { closeMonthLabel, pipelineByCloseMonth } from '@/components/charts/bid-chart-data';
 import { DivergingBars } from '@/components/charts/tuffui/diverging-bars';
 import {
-  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastDueOpen, stageFunnel, stageKey, statusMix,
+  accountBars, cumulativeWon, fmtCompact, OPEN_STAGES, pastCloseOpenValue, pastDueOpen, stageFunnel, stageKey, statusMix,
   winRateByQuarter, wonByQuarter, type OppRow,
 } from '@/components/viz/viz-data';
 import type { OppDrillFilter } from '@/components/drill/OppDrill';
@@ -198,15 +198,21 @@ export function ForecastCard({ rows, projection, headingLevel }: {
   const data = [...actuals.filter((a) => !seen.has(a.label)), ...future];
   const commits = (projection?.periods ?? []).map((p) => p.manualCommitMicros).filter((v): v is number => v !== null && v > 0);
   const target = commits.length ? commits[0]! / 1e6 : null;
+  const slipped = pastCloseOpenValue(rows);
+  const pastClose = slipped.value > 0
+    ? `${slipped.quarter} open pipeline includes ${fmtCompact(slipped.value)} past its close date.`
+    : '';
+  const bars = data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ');
   return (
     <ChartCard headingLevel={headingLevel} title="Revenue and forecast" meta={target ? `Commit target ${fmtCompact(target)} per quarter` : 'No target set yet · add a commit forecast to compare'}
-      summary={data.map((d) => `${d.label}: won ${fmtCompact(d.won)}${d.weighted ? `, weighted ${fmtCompact(d.weighted)}` : ''}`).join('; ')}
+      summary={[bars, pastClose].filter(Boolean).join(' ')}
       table={{ columns: ['Quarter', 'Won', 'Weighted', 'Open'], rows: data.map((d) => [d.label, fmtCompact(d.won), fmtCompact(d.weighted), fmtCompact(d.open)]) }}>
       <QuarterBars data={data} format={fmtCompact} />
       <ul className="viz-legend" aria-hidden>
         <li><i className="dash-key" style={{ background: 'var(--success, #177048)' }} />Won</li>
         <li><i className="dash-key" style={{ background: 'color-mix(in srgb, var(--brand-primary, #006b4f) 70%, transparent)' }} />Weighted forecast</li>
       </ul>
+      {pastClose ? <p className="viz-past-close">{pastClose}</p> : null}
     </ChartCard>
   );
 }

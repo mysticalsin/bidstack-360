@@ -128,6 +128,26 @@ export function pastDueOpen(rows: OppRow[], now = Date.now()) {
   return rows.filter((o) => !isClosed(o) && o.dueDate && new Date(o.dueDate).getTime() < now);
 }
 
+/**
+ * Open value whose close date is before the quarter that contains `now`.
+ * A blank close date is unscheduled, not slipped. A won or lost bid stays
+ * an actual. The forecast rolls this value into the current quarter.
+ */
+export function pastCloseOpenValue(rows: OppRow[], now = Date.now()): { quarter: string; value: number } {
+  const today = new Date(now);
+  const year = today.getUTCFullYear();
+  const quarterIndex = Math.floor(today.getUTCMonth() / 3);
+  const start = Date.UTC(year, quarterIndex * 3, 1);
+  let value = 0;
+  for (const o of rows) {
+    if (isClosed(o) || !o.dueDate) continue;
+    const due = new Date(o.dueDate).getTime();
+    if (Number.isNaN(due) || due >= start) continue;
+    value += o.value ?? 0;
+  }
+  return { quarter: `Q${quarterIndex + 1} ${year}`, value };
+}
+
 /** Running win rate after each closed bid, in close order (sparkline). */
 export function runningWinRate(rows: OppRow[]) {
   const closed = rows.filter((o) => isClosed(o) && closeDate(o)).sort((a, b) => new Date(closeDate(a)!).getTime() - new Date(closeDate(b)!).getTime());
