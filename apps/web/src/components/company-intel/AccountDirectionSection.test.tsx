@@ -110,9 +110,20 @@ describe('AccountDirectionSection', () => {
     expect(refresh).toHaveBeenCalledWith('posts');
   });
 
-  it('labels fixture data as Sample', () => {
+  it('labels fixture direction as Reference on the heading badge', () => {
     state.direction = { ...direction, sample: true };
     render(<AccountDirectionSection companyId="c1" />);
-    expect(screen.getByText('Sample')).toBeTruthy();
+    const heading = screen.getByRole('heading', { name: /Where they're heading/ });
+    const badge = within(heading).getByText('Reference');
+    expect(badge.className).toBe('sg-sample');
+    expect(within(heading).queryByText('Sample')).toBeNull();
+  });
+
+  it('omits the heading badge when the direction is not fixture data', () => {
+    render(<AccountDirectionSection companyId="c1" />);
+    const heading = screen.getByRole('heading', { name: /Where they're heading/ });
+    expect(heading.querySelector('.sg-sample')).toBeNull();
+    expect(within(heading).queryByText('Sample')).toBeNull();
+    expect(within(heading).queryByText('Reference')).toBeNull();
   });
 });
