@@ -132,6 +132,11 @@
     "clearAll": "Limpar tudo ({{count}})",
     "dismiss": "Dispensar"
   },
+  "errors": {
+    "validation": "Alguns campos precisam de atenção. Verifique-os e tente de novo.",
+    "sessionExpired": "A sua sessão expirou. Inicie sessão para continuar.",
+    "tooLarge": "Esse ficheiro é demasiado grande para enviar."
+  },
   "validation": {
     "required": "Este campo é obrigatório",
     "invalidEmail": "Insira um e-mail válido",

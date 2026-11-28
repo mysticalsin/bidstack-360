@@ -132,6 +132,11 @@
     "clearAll": "Clear all ({{count}})",
     "dismiss": "Dismiss"
   },
+  "errors": {
+    "validation": "Some fields need attention. Check them and try again.",
+    "sessionExpired": "Your session expired. Sign in to continue.",
+    "tooLarge": "That file is too large to upload."
+  },
   "validation": {
     "required": "This field is required",
     "invalidEmail": "Enter a valid email address",

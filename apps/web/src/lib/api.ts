@@ -1,6 +1,10 @@
 // Thin fetch wrapper. Routes are proxied to the API by Vite dev server,
 // so we use relative paths.
 
+import { i18n } from '@/i18n';
+
+import { presentApiFailure } from './api-error-message';
+
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -138,6 +142,20 @@ function getErrorMessage(data: unknown): string | null {
   return null;
 }
 
+function getErrorCode(data: unknown): string | null {
+  if (data === null || typeof data !== 'object') return null;
+  const code = (data as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
+
+function translateApiError(key: string, fallback: string): string {
+  return i18n.t(key, { defaultValue: fallback });
+}
+
+function failureMessage(status: number, data: unknown): string {
+  return presentApiFailure(status, getErrorMessage(data), getErrorCode(data), translateApiError);
+}
+
 /**
  * Trigger a browser file download from a backend endpoint that returns a
  * non-JSON response (e.g. text/csv). Fetches with the auth token and creates
@@ -210,17 +228,22 @@ export async function api<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     });
   };
 
-  let res = await requestJson();
-  if (!res.ok && apiTokenProvider && shouldRefreshAuth(res.status)) {
-    res = await requestJson(true);
+  let res: Response;
+  try {
+    res = await requestJson();
+    if (!res.ok && apiTokenProvider && shouldRefreshAuth(res.status)) {
+      res = await requestJson(true);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw err;
+    throw new ApiError(failureMessage(0, null), 0, null);
   }
   if (!res.ok) await handleTerminal401(res.status);
 
   const data = await parseJsonResponse(res);
 
   if (!res.ok) {
-    const message = getErrorMessage(data) ?? `Request failed (${res.status})`;
-    throw new ApiError(message, res.status, data);
+    throw new ApiError(failureMessage(res.status, data), res.status, data);
   }
   return data as T;
 }
