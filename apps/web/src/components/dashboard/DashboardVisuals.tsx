@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { useId, useState } from 'react';
 
 import { ChartCard, SignalLegend, SignalShape } from '@/components/viz/ChartCard';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { KIND_LABEL } from '@/components/viz/viz-kinds';
 import { EarningsStrip, HBars, HeatStrip } from '@/components/viz/charts';
 import SmoothTab from '@/components/kokonutui/smooth-tab';
@@ -25,13 +26,49 @@ import type { OppDrillFilter } from '@/components/drill/OppDrill';
 export type OnDrill = (f: OppDrillFilter) => void;
 import type { WatchdogFeed } from '@/hooks/useWatchdogFeed';
 
+// 44px target. The ring is the focus state. Text stays the primary foreground.
+const RETRY =
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]';
+
+/** Empty is a result only after the bid read succeeds. Rows from the last success stay. */
+function bidHold(rows: readonly unknown[], rowsPending: boolean, rowsFailed: boolean): 'loading' | 'error' | null {
+  if (rows.length > 0) return null;
+  if (rowsFailed) return 'error';
+  if (rowsPending) return 'loading';
+  return null;
+}
+
+function BidReadHold({ mode, onRetry }: { mode: 'loading' | 'error'; onRetry?: () => void }) {
+  if (mode === 'loading') {
+    return (
+      <div role="img" aria-label="Loading bids">
+        <LoadingSkeleton rows={3} />
+      </div>
+    );
+  }
+  return (
+    <ErrorState
+      title="Couldn't load bids"
+      message="Please try again."
+      action={
+        <button type="button" className={RETRY} onClick={() => onRetry?.()}>
+          Retry
+        </button>
+      }
+    />
+  );
+}
+
 const dayFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 const weekFmt = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
-export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, feedPending = false }: {
+export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDrill, rowsPending = false, rowsFailed = false, onRetry, feedPending = false }: {
   rows: OppRow[]; openValue: number; weighted: number; openCount: number; feed?: WatchdogFeed; onDrill?: OnDrill;
   /** Opportunities still loading: hold the chart's height so the cockpit below does not jump. */
   rowsPending?: boolean;
+  /** The bid read failed and there are no rows to keep. */
+  rowsFailed?: boolean;
+  onRetry?: () => void;
   /** Watchdog feed still loading: hold the pulse slot so the figures row does not grow. */
   feedPending?: boolean;
 }) {
@@ -45,13 +82,15 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
   const wonTotal = cumulativeWon(rows).at(-1)?.y ?? 0;
   const months = pipelineByCloseMonth(rows, now);
   const fullLabels = months.keys.map(closeMonthLabel);
+  const hold = bidHold(rows, rowsPending, rowsFailed);
+  const drill = hold ? undefined : onDrill;
   return (
     <ChartCard
       testId="dashboard-hero"
       title="Open pipeline"
       meta={`${openCount} open bid${openCount === 1 ? '' : 's'}`}
       summary={`Open pipeline ${fmtCompact(openValue)}, weighted ${fmtCompact(weighted)}. Won so far this year ${fmtCompact(wonTotal)}.`}
-      table={{
+      table={hold ? undefined : {
         columns: ['Month', 'Won', 'Lost', 'Open', 'Overdue'],
         rows: fullLabels.map((m, i) => [m, fmtCompact(months.won[i]!), fmtCompact(months.lost[i]!), fmtCompact(months.open[i]!), fmtCompact(months.overdue[i]!)]),
       }}
@@ -59,11 +98,11 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       interactive
     >
       <div className="dash-hero-figs">
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
+        <HeroFig onClick={drill ? () => drill({ status: 'open' }) : undefined} label={`Open pipeline ${fmtCompact(openValue)}: show the open bids`}>
           <AnimatedNumber className="dash-hero-num" value={openValue} format={fmtCompact} />
           <div className="viz-meta">Weighted {fmtCompact(weighted)}</div>
         </HeroFig>
-        <HeroFig onClick={onDrill ? () => onDrill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
+        <HeroFig onClick={drill ? () => drill({ status: 'won', thisYear: true }) : undefined} label={`Won this year ${fmtCompact(wonTotal)}: show the won bids`}>
           <AnimatedNumber className="dash-hero-num dash-hero-num--won" value={wonTotal} format={fmtCompact} />
           <div className="viz-meta">Won this year</div>
         </HeroFig>
@@ -79,7 +118,9 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
           </div>
         ) : null}
       </div>
-      {rowsPending && !months.keys.length ? (
+      {hold === 'error' ? (
+        <BidReadHold mode="error" onRetry={onRetry} />
+      ) : hold === 'loading' || (rowsPending && !months.keys.length) ? (
         <div className="dash-hero-chart-skel" aria-hidden="true" data-testid="dashboard-hero-chart-placeholder" />
       ) : months.keys.length ? (
         <DivergingBars
@@ -97,7 +138,9 @@ export function DashboardHero({ rows, openValue, weighted, openCount, feed, onDr
       ) : (
         <p className="viz-empty">No dated bids yet.</p>
       )}
-      <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      {hold ? null : (
+        <div className="viz-caption">Overdue bids hang below the line. Select a month or a number to see the bids.</div>
+      )}
     </ChartCard>
   );
 }
@@ -111,10 +154,13 @@ function HeroFig({ onClick, label, children }: { onClick?: () => void; label: st
   );
 }
 
-export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
+export function NeedsYou({ rows, overdueTasks, feed, pending = false, rowsFailed = false, onRetry }: {
   rows: OppRow[]; overdueTasks: number; feed?: WatchdogFeed;
   /** Opportunities or feed still loading: late items would insert above earlier ones and push them down. */
   pending?: boolean;
+  /** The bid read failed and there are no rows to keep. */
+  rowsFailed?: boolean;
+  onRetry?: () => void;
 }) {
   const [now] = useState(() => Date.now());
   const pastDue = pastDueOpen(rows, now);
@@ -125,6 +171,7 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
     (feed?.newAlertCount ?? 0) > 0 && { key: 'alerts', to: `/accounts/${feed!.alerts[0]!.companyId}`, title: `${feed!.newAlertCount} new account signal${feed!.newAlertCount === 1 ? '' : 's'}`, meta: feed!.alerts[0]!.title, kind: feed!.alerts[0]!.implication },
     ...soon.slice(0, 2).map((e) => ({ key: e.id, to: `/accounts/${e.companyId}`, title: `${e.companyName} results ${dayFmt.format(new Date(e.expectedAt))}`, meta: `${e.fiscalPeriod}${e.confirmed ? ' · confirmed' : ''}`, kind: 'NEUTRAL' })),
   ].filter(Boolean) as Array<{ key: string; to: string; title: string; meta: string; kind: string }>;
+  const bidsUnread = rowsFailed && rows.length === 0;
   return (
     <section className="viz dash-needs" aria-labelledby="dash-needs-t" data-testid="needs-you">
       <header className="viz-head"><h2 id="dash-needs-t" className="viz-title">Needs you</h2><span className="viz-meta">{pending ? '\u00a0' : items.length}</span></header>
@@ -132,7 +179,11 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
         <div className="dash-needs-skel" aria-busy="true" data-testid="needs-you-placeholder">
           <span /><span /><span />
         </div>
+      ) : bidsUnread && items.length === 0 ? (
+        <BidReadHold mode="error" onRetry={onRetry} />
       ) : items.length === 0 ? <p className="viz-empty">Nothing waiting. Nice.</p> : (
+        <>
+        {bidsUnread ? <BidReadHold mode="error" onRetry={onRetry} /> : null}
         <ul className="dash-needs-list">
           {items.map((it, i) => (
             <li key={it.key} style={{ '--i': i } as React.CSSProperties}>
@@ -147,6 +198,7 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
             </li>
           ))}
         </ul>
+        </>
       )}
     </section>
   );
@@ -154,15 +206,27 @@ export function NeedsYou({ rows, overdueTasks, feed, pending = false }: {
 
 /** Pipeline by stage and bids by status, merged (both answered "where are my
  *  bids?"). Each funnel column and each status chip opens the bid drill. */
-export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDrill }) {
+export function PipelineCard({ rows, onDrill, rowsPending = false, rowsFailed = false, onRetry }: {
+  rows: OppRow[];
+  onDrill: OnDrill;
+  rowsPending?: boolean;
+  rowsFailed?: boolean;
+  onRetry?: () => void;
+}) {
   const data = stageFunnel(rows);
   const ids = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const m = statusMix(rows);
+  const hold = bidHold(rows, rowsPending, rowsFailed);
+  const summary = hold === 'loading'
+    ? 'Loading bids'
+    : hold === 'error'
+      ? "Couldn't load bids"
+      : data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids';
   return (
-    <ChartCard title="Pipeline" meta={`${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
-      summary={data.map((d) => `${d.label}: ${fmtCompact(d.value)} across ${d.count}`).join('; ') || 'No open bids'}
-      table={{ columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
-      {data.length ? (
+    <ChartCard title="Pipeline" meta={hold ? undefined : `${m.open} open of ${m.open + m.won + m.lost} bids · value per stage`} interactive testId="dashboard-pipeline"
+      summary={summary}
+      table={hold ? undefined : { columns: ['Stage', 'Bids', 'Value'], rows: data.map((d) => [d.label, d.count, fmtCompact(d.value)]) }}>
+      {hold ? <BidReadHold mode={hold} onRetry={onRetry} /> : data.length ? (
         <div style={{ position: 'relative' }}>
           <StageFunnel data={data} format={fmtCompact} />
           <div className="viz-hits">
@@ -173,6 +237,8 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           </div>
         </div>
       ) : <p className="viz-empty">No open bids.</p>}
+      {hold ? null : (
+        <>
       <div className="viz-caption">Where your open bids sit today. Select a stage or a status to see the bids.</div>
       <div className="dash-chips" role="group" aria-label="Bids by status">
         {([['open', 'Open', m.open], ['won', 'Won', m.won], ['lost', 'Lost', m.lost]] as const).map(([k, label, n]) => (
@@ -181,6 +247,8 @@ export function PipelineCard({ rows, onDrill }: { rows: OppRow[]; onDrill: OnDri
           </button>
         ))}
       </div>
+        </>
+      )}
     </ChartCard>
   );
 }
@@ -285,26 +353,33 @@ export function SignalsCard({ feed }: { feed?: WatchdogFeed }) {
 /** Revenue, win rate and top accounts in one card with kokonutui SmoothTab
  *  (MIT): one surface instead of three, each view keeps its own summary and
  *  table toggle. */
-export function PerformanceCard({ rows, projection, onDrill }: {
+export function PerformanceCard({ rows, projection, onDrill, rowsPending = false, rowsFailed = false, onRetry }: {
   rows: OppRow[];
   projection?: Parameters<typeof ForecastCard>[0]['projection'];
   onDrill?: OnDrill;
+  rowsPending?: boolean;
+  rowsFailed?: boolean;
+  onRetry?: () => void;
 }) {
   const [tab, setTab] = useState('revenue');
   const headId = useId();
+  const hold = bidHold(rows, rowsPending, rowsFailed);
   return (
     <section className="viz dash-perf" aria-labelledby={headId} data-testid="dashboard-performance">
       <header className="viz-head">
         <div style={{ minWidth: 0 }}>
           <h2 id={headId} className="viz-title">Performance</h2>
-          <div className="viz-meta">Revenue, win rate and top accounts from your bids</div>
+          <div className="viz-meta">
+            {hold === 'loading' ? 'Loading bids' : hold === 'error' ? "Couldn't load bids" : 'Revenue, win rate and top accounts from your bids'}
+          </div>
         </div>
-        {onDrill ? (
+        {onDrill && !hold ? (
           <button type="button" className="drill-more" onClick={() => onDrill({ status: tab === 'revenue' ? 'won' : 'all' })}>
             Breakdown
           </button>
         ) : null}
       </header>
+      {hold ? <BidReadHold mode={hold} onRetry={onRetry} /> : (
       <SmoothTab
         label="Performance views"
         value={tab}
@@ -315,6 +390,7 @@ export function PerformanceCard({ rows, projection, onDrill }: {
           { id: 'accounts', title: 'Top accounts', content: <TopAccountsBarCard rows={rows} headingLevel={3} onDrill={onDrill} /> },
         ]}
       />
+      )}
     </section>
   );
 }

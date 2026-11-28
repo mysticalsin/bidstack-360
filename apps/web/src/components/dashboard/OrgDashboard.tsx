@@ -46,6 +46,11 @@ export const OrgDashboard = memo(function OrgDashboard() {
   const projection = useForecastProjection();
   const feed = useWatchdogFeed(30);
   const oppRows = useMemo(() => opps.data?.items ?? [], [opps.data?.items]);
+  // Empty is a result only after this read succeeds. A later failure keeps the last rows.
+  const bidsFailed = opps.isError && !opps.data;
+  const retryBids = () => {
+    void opps.refetch();
+  };
   // Progressive disclosure (Tony 15:21): five visuals up top, every number,
   // stage, status and account opens this one drill-down sheet.
   const [drill, setDrill] = useState<OppDrillFilter | null>(null);
@@ -254,6 +259,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
             feed={feed.data}
             onDrill={setDrill}
             rowsPending={opps.isLoading}
+            rowsFailed={bidsFailed}
+            onRetry={retryBids}
             feedPending={feed.isLoading}
           />
           <NeedsYou
@@ -261,6 +268,8 @@ export const OrgDashboard = memo(function OrgDashboard() {
             overdueTasks={s?.overdueTasks ?? 0}
             feed={feed.data}
             pending={opps.isLoading || feed.isLoading}
+            rowsFailed={bidsFailed}
+            onRetry={retryBids}
           />
         </div>
         <Suspense
@@ -275,10 +284,23 @@ export const OrgDashboard = memo(function OrgDashboard() {
         </Suspense>
         <HemaLeverageTile />
         <div className="viz-grid-3">
-          <PipelineCard rows={oppRows} onDrill={setDrill} />
+          <PipelineCard
+            rows={oppRows}
+            onDrill={setDrill}
+            rowsPending={opps.isLoading}
+            rowsFailed={bidsFailed}
+            onRetry={retryBids}
+          />
           <ActivityByHourCard />
         </div>
-        <PerformanceCard rows={oppRows} projection={projection.data} onDrill={setDrill} />
+        <PerformanceCard
+          rows={oppRows}
+          projection={projection.data}
+          onDrill={setDrill}
+          rowsPending={opps.isLoading}
+          rowsFailed={bidsFailed}
+          onRetry={retryBids}
+        />
         <OppDrill rows={oppRows} filter={drill} onFilterChange={setDrill} onClose={() => setDrill(null)} />
 
         <details className="dash-more">
