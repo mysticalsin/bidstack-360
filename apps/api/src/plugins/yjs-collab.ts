@@ -90,7 +90,8 @@ const yjsCollabPluginImpl: FastifyPluginAsync = async (server) => {
   // Registered at /api/v1/yjs-sync: the rewriteUrl hook normalizes /api/* to
   // /api/v1/*, so a route at /api/yjs-sync was never reachable (it 404'd as
   // /api/v1/yjs-sync). Auth is on the Upgrade via req.auth; the browser client
-  // passes its token as ?access_token= (headers aren't settable on a WS).
+  // passes a one-time ?ticket= from POST /api/v1/realtime/ticket. A Clerk
+  // JWT in the query string is ignored.
   server.get(
     '/api/v1/yjs-sync',
     {

@@ -12,6 +12,8 @@
 export const UNGATED_ALLOWLIST: Record<string, string> = {
   // ── Self-scoped: every query filters by req.auth.userId ──────────────────
   'GET /api/v1/me/capabilities': 'Returns the caller’s own permissions.',
+  'POST /api/v1/realtime/ticket':
+    'Mints the caller’s own one-time WebSocket ticket from req.auth (orgId + userId). It is not another user’s data.',
   'GET /api/v1/me': 'Returns the caller’s own identity (id/email/role).',
   'GET /api/v1/notifications': 'Self-scoped (orgId + userId).',
   'GET /api/v1/notifications/prefs': 'Self-scoped (userId).',

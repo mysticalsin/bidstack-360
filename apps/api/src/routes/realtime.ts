@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 import type { PermissionKey } from '@bidstack/shared';
 import { canOverrideOwnership } from '../lib/org-admin.js';
+import { issueWsTicket, WsTicketUnavailableError } from '../lib/ws-ticket.js';
 import { getOrgPresence, getEntityPresence } from '../services/presence.service.js';
 import { publish } from '../services/realtime.service.js';
 
@@ -42,6 +43,36 @@ const lockBodySchema = z.object({
 
 export const realtimeRoutes: FastifyPluginAsync = async (server) => {
   const app = server.withTypeProvider<ZodTypeProvider>();
+
+  // POST /realtime/ticket — exchange a bearer (header) for a one-time
+  // WebSocket id. The id is the only credential that may appear on the
+  // upgrade URL. The response is the ticket itself; do not log it.
+  app.post(
+    '/realtime/ticket',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      schema: {
+        // Empty POST. The inventory treats a mutation without a body schema as ungated.
+        body: z.object({}).strict().nullish(),
+        response: {
+          200: z.object({
+            ticket: z.string().min(1),
+            expiresIn: z.number().int().positive(),
+          }),
+        },
+      },
+    },
+    async (req) => {
+      try {
+        return await issueWsTicket(req.auth);
+      } catch (err) {
+        if (err instanceof WsTicketUnavailableError) {
+          throw server.httpErrors.serviceUnavailable('Realtime tickets are unavailable');
+        }
+        throw err;
+      }
+    },
+  );
 
   // ─── POST /entities/:type/:id/lock ──────────────────────────────────────
   app.post(

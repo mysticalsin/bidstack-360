@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/api', async (orig) => ({
   ...(await orig<typeof import('@/lib/api')>()),
   getAuthToken: vi.fn(async () => 'tok'),
+  fetchRealtimeTicket: vi.fn(async () => 'ticket-1'),
 }));
 
 vi.mock('@/components/ui/Toast', () => ({
@@ -69,8 +70,9 @@ afterEach(() => {
 });
 
 describe('notification stream', () => {
-  it('builds the socket URL under /api/v1 with the token', () => {
-    expect(realtimeUrl('a b')).toMatch(/\/api\/v1\/realtime\?access_token=a%20b$/);
+  it('builds the socket URL under /api/v1 with a one-time ticket', () => {
+    expect(realtimeUrl('a b')).toMatch(/\/api\/v1\/realtime\?ticket=a%20b$/);
+    expect(realtimeUrl('a b')).not.toContain('access_token');
   });
 
   it('ignores frames that are not user notifications', () => {
@@ -99,7 +101,9 @@ describe('notification stream', () => {
     );
     await vi.waitFor(() => expect(FakeSocket.last).not.toBeNull());
     const socket = FakeSocket.last!;
-    expect(socket.url).toContain('access_token=tok');
+    expect(socket.url).toContain('ticket=ticket-1');
+    expect(socket.url).not.toContain('access_token');
+    expect(socket.url).not.toContain('tok');
 
     act(() =>
       socket.emit(

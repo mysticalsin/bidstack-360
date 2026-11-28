@@ -60,6 +60,7 @@ const PII_FIELDS = new Set([
   'api_key',
   'accessToken',
   'access_token',
+  'ticket',
   'refreshToken',
   'refresh_token',
   'authToken',
