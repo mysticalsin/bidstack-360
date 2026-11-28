@@ -269,6 +269,46 @@ describe('OpportunityDetailPage load states', () => {
   });
 });
 
+describe('OpportunityDetailPage account link', () => {
+  const companyId = '00000000-0000-4000-8000-0000000000aa';
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('opens the account the bid is filed on', () => {
+    // WHY: the customer name on the deal is an editor, not a way into the
+    // cockpit. Demo OP-2041 is filed on CI Financial. Searching that name
+    // is a second page and can miss the account.
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: { ...OPPORTUNITY, customer: 'CI Financial', companyId },
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Open CI Financial account' }).getAttribute('href')).toBe(
+      `/accounts/${companyId}`,
+    );
+  });
+
+  it('does not invent an account link when the bid is not filed on a company', () => {
+    vi.mocked(useOpportunity).mockReturnValue({
+      data: OPPORTUNITY,
+      isLoading: false,
+      isError: false,
+      error: null,
+    } as unknown as ReturnType<typeof useOpportunity>);
+
+    renderPage();
+
+    expect(screen.queryByRole('link', { name: /account/i })).toBeNull();
+  });
+});
+
 describe('OpportunityDetailPage deal value', () => {
   beforeEach(() => {
     vi.mocked(useOpportunity).mockReturnValue({

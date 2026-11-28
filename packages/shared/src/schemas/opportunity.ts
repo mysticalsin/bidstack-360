@@ -86,6 +86,10 @@ export const Opportunity = z.object({
   // different class from its own defaults.
   fteEstimate: z.number().nullable().default(null),
   commitmentLevel: z.string().nullable().default(null),
+  // Company this bid is filed on. Null when the customer name matches no
+  // account. Read-only: create and patch omit it, and the server re-links
+  // from the customer name. A name search is not a substitute.
+  companyId: z.string().uuid().nullable().optional(),
 });
 export type Opportunity = z.infer<typeof Opportunity>;
 
@@ -100,6 +104,7 @@ export const OpportunityCreate = Opportunity.omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
+  companyId: true,
 }).extend({
   code: CanonicalOpportunityCode.optional(),
   stage: z.string().nullable().optional(),
@@ -119,6 +124,7 @@ export const OpportunityPatch = Opportunity.partial().omit({
   bidClass: true,
   fteEstimate: true,
   commitmentLevel: true,
+  companyId: true,
 }).extend({
   customFieldValues: z.array(CustomFieldValueInput).optional(),
   // Optimistic-concurrency token: clients echo the updatedAt they loaded and
