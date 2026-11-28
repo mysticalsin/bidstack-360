@@ -15,6 +15,7 @@ import { EmailPanel } from '@/components/email/EmailPanel';
 import { CustomFieldValuesSection } from '@/components/CustomFieldValuesSection';
 import { CollaborativeNotesSection } from '@/components/editor/CollaborativeNotesSection';
 import { formatDate } from '@/lib/format';
+import { contactAccountHref } from './contacts/contactAccountHref';
 
 export function ContactDetailPage() {
   const { t } = useTranslation('crm');
@@ -59,6 +60,7 @@ export function ContactDetailPage() {
   }
 
   const c = contact.data;
+  const accountHref = contactAccountHref(c.companyId);
   const relatedOpps = allOpps.data?.items.filter((o) => o.customer === c.customer) ?? [];
   const relatedTasks =
     allTasks.data?.items.filter((t) => t.oppId && relatedOpps.some((o) => o.id === t.oppId)) ?? [];
@@ -91,12 +93,19 @@ export function ContactDetailPage() {
               {c.customer ? (
                 <>
                   {' · '}
-                  <Link
-                    to={`/companies?search=${encodeURIComponent(c.customer)}`}
-                    className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
-                  >
-                    {c.customer}
-                  </Link>
+                  {accountHref ? (
+                    <Link
+                      to={accountHref}
+                      className="rounded text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-card)]"
+                    >
+                      {c.customer}
+                      <span className="sr-only">
+                        {t('contactDetail.openAccount', ', open account')}
+                      </span>
+                    </Link>
+                  ) : (
+                    c.customer
+                  )}
                 </>
               ) : null}
             </p>

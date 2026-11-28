@@ -9,7 +9,7 @@
  * Exports ContactSortKey and ContactSortState so ContactsPage can type its
  * URL-persisted sort state without duplicating the union.
  *
- * Import DAG: no local sibling imports. Imported by ContactsPage.
+ * Import DAG: the account href helper only. Imported by ContactsPage.
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -29,6 +29,8 @@ import { SpotlightTable, SpotlightTableRow } from '@/components/ui/SpotlightTabl
 import { EmptyState, EmptyStateLink, ErrorState } from '@/components/ui/StateMessages';
 import type { useDeleteContact, useUpdateContact } from '@/hooks/useContacts';
 import type { Contact, Sentiment } from '@bidstack/shared';
+
+import { contactAccountHref } from './contactAccountHref';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +92,21 @@ export interface ContactTableProps {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+function CustomerAccount({ companyId, name }: { companyId: string | null; name: string }) {
+  const { t } = useTranslation('crm');
+  const href = contactAccountHref(companyId);
+  if (!href) return name;
+  return (
+    <Link
+      to={href}
+      className="rounded text-[var(--brand-primary)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--surface-page)]"
+    >
+      {name}
+      <span className="sr-only">{t('contactTable.openAccount', ', open account')}</span>
+    </Link>
+  );
+}
 
 export function ContactTable({
   items,
@@ -326,7 +343,9 @@ export function ContactTable({
                       display={(v) => v || <span className="text-[var(--fg-tertiary)]">—</span>}
                     />
                   </td>
-                  <td className="px-5 py-3 text-[var(--fg-secondary)]">{c.customer}</td>
+                  <td className="px-5 py-3 text-[var(--fg-secondary)]">
+                    <CustomerAccount companyId={c.companyId} name={c.customer} />
+                  </td>
                   <td className="px-5 py-3 text-[var(--fg-secondary)]">
                     <div className="flex flex-col">
                       {c.email ? (
