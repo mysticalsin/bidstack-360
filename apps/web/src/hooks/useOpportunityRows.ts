@@ -1,15 +1,20 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { accountBidQuery } from '@/lib/account-bid-rows';
 import type { OppRow } from '@/components/viz/viz-data';
 
 import { fetchAllCursorPages } from './useInsightsData';
 
-/** Up to 100 opportunity rows for chart derivations (read-only snapshot). */
-export function useOpportunityRows() {
+/**
+ * Up to 100 opportunity rows for chart derivations (read-only snapshot).
+ * Pass a company uuid to read that account. Anything else stays the portfolio page.
+ */
+export function useOpportunityRows(companyId?: string | null) {
+  const request = accountBidQuery(companyId);
   return useQuery({
-    queryKey: ['opportunity-rows:viz'],
-    queryFn: ({ signal }) => api<{ items: OppRow[] }>('/api/opportunities?limit=100', { signal }),
+    queryKey: request.queryKey,
+    queryFn: ({ signal }) => api<{ items: OppRow[] }>(request.path, { signal }),
     staleTime: 60_000,
   });
 }

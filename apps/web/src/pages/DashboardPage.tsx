@@ -43,6 +43,7 @@ import { PotentialProjectsCard } from '@/components/enrichment/PotentialProjects
 import { OppDrill } from '@/components/drill/OppDrill';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { bidCompanyId, rowsForAccountBids } from '@/lib/account-bid-rows';
 import { AccountDetailsFold } from '@/components/account/AccountDetailsFold';
 import { FilesPanel } from '@/components/files/FilesPanel';
 import { AccountIntelPanel } from '@/components/account-intel/AccountIntelPanel';
@@ -119,7 +120,24 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
   // Account bid drill: header numbers and the stage bars open one side sheet
   // listing this account's bids (progressive disclosure, Tony 15:21).
   const [drill, setDrill] = useState<OppDrillFilter | null>(null);
-  const oppRows = useOpportunityRows();
+  const cachedSnapshot = useMemo(() => {
+    if (!accountId) return null;
+    try {
+      const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
+      if (stored) return JSON.parse(stored) as CrmDashboardSnapshot;
+    } catch {
+      // ignore parse errors
+    }
+    return null;
+  }, [accountId]);
+  const isTransientError =
+    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
+  // A company uuid is this account. The stage chart and the bid sheet share
+  // that read. A name-keyed cockpit still uses the portfolio page.
+  const scopedCompanyId = bidCompanyId(
+    dashboard.data?.cockpit.company.id ?? (isTransientError ? cachedSnapshot?.cockpit.company.id : undefined),
+  );
+  const oppRows = useOpportunityRows(scopedCompanyId);
   // Per-user block visibility (Customize menu). Default-visible: an unknown/new
   // id is shown unless the user explicitly turned it off.
   const visibleCards = useCockpitLayout((s) => s.visibleCards);
@@ -160,25 +178,12 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
     [tasks.data?.items],
   );
 
-  const cachedSnapshot = useMemo(() => {
-    if (!accountId) return null;
-    try {
-      const stored = sessionStorage.getItem(`bidstack:account-cockpit:${accountId}`);
-      if (stored) return JSON.parse(stored) as CrmDashboardSnapshot;
-    } catch {
-      // ignore parse errors
-    }
-    return null;
-  }, [accountId]);
-
   useEffect(() => {
     if (dashboard.data && accountId) {
       sessionStorage.setItem(`bidstack:account-cockpit:${accountId}`, JSON.stringify(dashboard.data));
     }
   }, [dashboard.data, accountId]);
 
-  const isTransientError =
-    dashboard.isError && !(dashboard.error instanceof ApiError && dashboard.error.status === 404);
   const snapshot = dashboard.data ?? (isTransientError ? cachedSnapshot : null);
 
   if (dashboard.isLoading && !snapshot) {
@@ -450,7 +455,7 @@ function AccountCockpitPage({ accountId }: { accountId: string }) {
           <AgreementsSummaryCard companyId={cockpit.company.id} companyName={cockpit.company.name} />
           <WhoWorksWithThem companyId={cockpit.company.id} />
           <OppDrill
-            rows={(oppRows.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === cockpit.company.name.toLowerCase())}
+            rows={rowsForAccountBids(oppRows.data?.items, scopedCompanyId ?? cockpit.company.id, cockpit.company.name)}
             filter={drill}
             onFilterChange={setDrill}
             onClose={() => setDrill(null)}

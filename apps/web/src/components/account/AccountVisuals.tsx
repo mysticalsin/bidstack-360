@@ -7,9 +7,11 @@ import { Link } from 'react-router-dom';
 import { ChartCard, SignalShape } from '@/components/viz/ChartCard';
 import { StageBars } from '@/components/viz/charts';
 import type { OppDrillFilter } from '@/components/drill/filterOpps';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { fmtCompact, OPEN_STAGES, stageFunnel, stageKey, statusMix, type OppRow } from '@/components/viz/viz-data';
 import { usePeopleMap } from '@/hooks/useAccountPeople';
 import { useOpportunityRows } from '@/hooks/useOpportunityRows';
+import { rowsForAccountBids } from '@/lib/account-bid-rows';
 
 import { layoutOrg, type MapPerson } from './org-layout';
 
@@ -23,6 +25,10 @@ const STANDING: Record<string, { kind: string; label: string }> = {
 };
 
 const NW = 176, NH = 52, GX = 16, GY = 40;
+
+// 44px target. The ring is the focus state. Text stays the primary foreground.
+const RETRY =
+  'inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--border-default)] bg-[var(--surface-card)] px-4 text-sm font-medium text-[var(--fg-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]';
 
 function RelationshipMap({ company, people }: { company: string; people: MapPerson[] }) {
   const { levels, parent } = layoutOrg(people);
@@ -67,12 +73,22 @@ function RelationshipMap({ company, people }: { company: string; people: MapPers
 }
 
 export function AccountVisuals({ companyId, companyName, onDrill }: { companyId: string; companyName: string; onDrill?: (f: OppDrillFilter) => void }) {
-  const opps = useOpportunityRows();
+  const opps = useOpportunityRows(companyId);
   const people = usePeopleMap({ companyId });
-  const rows: OppRow[] = (opps.data?.items ?? []).filter((o) => (o.customer ?? '').toLowerCase() === companyName.toLowerCase());
+  // Empty is a result only after this account's read succeeds.
+  // A later refresh that fails keeps the last rows. It is not a loading state.
+  const bidsFailed = opps.isError && !opps.data;
+  const bidsLoading = !bidsFailed && !opps.isSuccess && !opps.data;
+  const rows: OppRow[] = rowsForAccountBids(opps.data?.items, companyId, companyName);
   const stages = stageFunnel(rows);
   const stageIds = OPEN_STAGES.filter((id) => rows.some((o) => stageKey(o.stage) === id));
   const mix = statusMix(rows);
+  const openBids = stages.reduce((m, s) => m + s.count, 0);
+  const bidSummary = bidsLoading
+    ? 'Loading bids for this account'
+    : bidsFailed
+      ? "Couldn't load bids for this account"
+      : stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account';
   const ppl: MapPerson[] = (people.data?.people ?? []).map((p) => ({ id: p.id, name: p.name, title: p.title ?? null, standing: p.standing, reportsToContactId: p.reportsToContactId ?? null }));
   const { edges } = layoutOrg(ppl);
   const counts = ppl.reduce<Record<string, number>>((m, p) => { const l = (STANDING[p.standing] ?? STANDING.unknown!).label; m[l] = (m[l] ?? 0) + 1; return m; }, {});
@@ -81,17 +97,29 @@ export function AccountVisuals({ companyId, companyName, onDrill }: { companyId:
     <div className="acct-visuals" data-testid="account-visuals">
       <ChartCard
         title="Pipeline by stage"
-        interactive={Boolean(onDrill)}
+        interactive={bidsFailed || (Boolean(onDrill) && !bidsLoading)}
         testId="account-pipeline"
-        meta={(() => { const n = stages.reduce((m, s) => m + s.count, 0); return `${n} open bid${n === 1 ? '' : 's'}`; })()}
-        summary={stages.map((s) => `${s.label}: ${fmtCompact(s.value)}`).join('; ') || 'No open bids for this account'}
-        table={{ columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) }}
+        meta={bidsLoading ? 'Loading bids for this account' : bidsFailed ? undefined : `${openBids} open bid${openBids === 1 ? '' : 's'}`}
+        summary={bidSummary}
+        table={bidsLoading || bidsFailed ? undefined : { columns: ['Stage', 'Bids', 'Value'], rows: stages.map((s) => [s.label, s.count, fmtCompact(s.value)]) }}
       >
-        {stages.length ? (
+        {bidsLoading ? (
+          <LoadingSkeleton rows={3} />
+        ) : bidsFailed ? (
+          <ErrorState
+            title="Couldn't load bids"
+            message="Please try again."
+            action={
+              <button type="button" className={RETRY} onClick={() => void opps.refetch()}>
+                Retry
+              </button>
+            }
+          />
+        ) : stages.length ? (
           <StageBars data={stages} format={fmtCompact}
             onSelect={onDrill ? (label) => { const i = stages.findIndex((x) => x.label === label); onDrill({ status: 'open', stage: stageIds[i] ?? null }); } : undefined} />
         ) : <p className="viz-empty">No open bids for this account.</p>}
-        {onDrill && rows.length ? (
+        {!bidsLoading && !bidsFailed && onDrill && rows.length ? (
           <>
             <div className="viz-caption">Select a stage bar or a status to see the bids behind it.</div>
             <div className="dash-chips" role="group" aria-label="Bids by status">
