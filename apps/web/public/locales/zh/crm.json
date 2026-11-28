@@ -3219,9 +3219,9 @@
     "filterGroupLabel": "按行业筛选",
     "allSectors": "所有行业",
     "openInAcademy": "在 Mantu Academy 中打开",
-    "sampleDataLabel": "示例数据。",
-    "sampleDataIntro": "这些是示例工具包。请设置",
-    "sampleDataOutro": "+ 凭据，以便从 Mantu Academy 获取实时课程。"
+    "sampleDataLabel": "参考。",
+    "sampleDataIntro": "这些是参考记录。请设置",
+    "sampleDataOutro": "+ 凭据，以便从 Mantu Academy 获取课程。"
   },
   "reviewStep": {
     "toastRemoved": "已移除“{{name}}”",

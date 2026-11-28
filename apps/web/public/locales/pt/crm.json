@@ -3219,9 +3219,9 @@
     "filterGroupLabel": "Filtrar por setor",
     "allSectors": "Todos os setores",
     "openInAcademy": "Abrir na Mantu Academy",
-    "sampleDataLabel": "Dados de exemplo.",
-    "sampleDataIntro": "Estes são kits ilustrativos. Defina",
-    "sampleDataOutro": "+ credenciais para obter cursos ao vivo da Mantu Academy."
+    "sampleDataLabel": "Referência.",
+    "sampleDataIntro": "Estes são registros de referência. Defina",
+    "sampleDataOutro": "+ credenciais para obter cursos da Mantu Academy."
   },
   "reviewStep": {
     "toastRemoved": "\"{{name}}\" removido",

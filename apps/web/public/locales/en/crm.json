@@ -3235,9 +3235,9 @@
     "filterGroupLabel": "Filter by sector",
     "allSectors": "All sectors",
     "openInAcademy": "Open in Mantu Academy",
-    "sampleDataLabel": "Sample data.",
-    "sampleDataIntro": "These are illustrative toolkits. Set",
-    "sampleDataOutro": "+ credentials to pull live courses from Mantu Academy."
+    "sampleDataLabel": "Reference.",
+    "sampleDataIntro": "These are reference records. Set",
+    "sampleDataOutro": "+ credentials to pull courses from Mantu Academy."
   },
   "reviewStep": {
     "toastRemoved": "Removed \"{{name}}\"",
