@@ -122,7 +122,8 @@
     },
     "error": {
       "title": "Couldn't load opportunities",
-      "message": "Try again in a moment."
+      "message": "Try again in a moment.",
+      "retry": "Retry"
     },
     "empty": {
       "title": "No opportunities yet",
@@ -2144,6 +2145,8 @@
     "stageOpportunities": "{{stage}} opportunities",
     "clearFilter": "clear filter",
     "bidsInFlight": "{{count}} bids in flight · click any cell to edit inline.",
+    "listLoading": "Loading the bid list.",
+    "listFailed": "The bid list did not load.",
     "exportingLabel": "Exporting opportunities…",
     "exportLabel": "Export visible opportunities as CSV",
     "exporting": "Exporting…",

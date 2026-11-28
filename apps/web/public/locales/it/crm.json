@@ -122,7 +122,8 @@
     },
     "error": {
       "title": "Impossibile caricare le opportunità",
-      "message": "Riprova tra poco."
+      "message": "Riprova tra poco.",
+      "retry": "Riprova"
     },
     "empty": {
       "title": "Ancora nessuna opportunità",
@@ -2135,6 +2136,8 @@
     "stageOpportunities": "opportunità {{stage}}",
     "clearFilter": "cancella filtro",
     "bidsInFlight": "{{count}} offerte in corso · fai clic su una cella per modificare in linea.",
+    "listLoading": "Caricamento dell'elenco delle offerte.",
+    "listFailed": "L'elenco delle offerte non si è caricato.",
     "exportingLabel": "Esportazione delle opportunità…",
     "exportLabel": "Esporta le opportunità visibili come CSV",
     "exporting": "Esportazione…",

@@ -13,6 +13,12 @@ vi.mock('@/hooks/useOpportunities', () => ({
   useCreateOpportunity: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+// The page also reads the org summary. Leave it unsettled so the suite does
+// not call the API, and so a missing summary is not mistaken for a bid total.
+vi.mock('@/hooks/useOrgSummary', () => ({
+  useOrgSummary: vi.fn(() => ({ data: undefined, isLoading: false, isError: false, error: null })),
+}));
+
 // Opportunity writes are gated server-side behind opportunities:write (a role
 // like Presales holds read but not write) — default true here so the existing
 // suite below (which doesn't care about permission) keeps seeing every
@@ -237,6 +243,69 @@ describe('OpportunitiesPage', () => {
     expect(screen.getByRole('link', { name: /import your deal book/i }).getAttribute('href')).toBe(
       '/settings?tab=data-import',
     );
+    // A settled empty book may say there are no bids in flight.
+    expect(screen.getByText(/bids in flight/)).toBeTruthy();
+  });
+
+  // WHY: the header used the missing page as "0 bids in flight" while the
+  // request was still out. On the demo book that flash says the pipeline is
+  // empty before the bids arrive.
+  it('does not call an in-flight list an empty book', () => {
+    mockOpportunities({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    expect(screen.queryByText(/bids in flight/)).toBeNull();
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.getByText('Loading the bid list.')).toBeTruthy();
+  });
+
+  // WHY: a failed read is not an empty book, and "try again" with no control
+  // leaves the list stranded. Retry reloads the same read.
+  it('retries a failed list instead of saying there are no bids', () => {
+    const refetch = vi.fn();
+    mockOpportunities({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: null,
+      refetch,
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    expect(screen.queryByText(/bids in flight/)).toBeNull();
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.getByText('The bid list did not load.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: "Couldn't load opportunities" })).toBeTruthy();
+    const retry = screen.getByRole('button', { name: 'Retry' });
+    expect(retry.className).toContain('h-11');
+    expect(retry.className).toContain('focus-visible:ring-2');
+    fireEvent.click(retry);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // WHY: a failed refresh is not a new empty book. The last rows stay.
+  it('keeps the last bids when a later refresh fails', () => {
+    mockOpportunities({
+      data: { items: [seededOpportunity()], nextCursor: null },
+      isLoading: false,
+      isError: true,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<OpportunitiesPage />);
+
+    expect(screen.getByText('Acme Upgrade')).toBeTruthy();
+    expect(screen.queryByText('No open bids yet')).toBeNull();
+    expect(screen.queryByRole('heading', { name: "Couldn't load opportunities" })).toBeNull();
   });
 });
 

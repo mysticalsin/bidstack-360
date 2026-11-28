@@ -340,7 +340,8 @@
     },
     "error": {
       "title": "No se pudieron cargar las oportunidades",
-      "message": "Vuelve a intentarlo en un momento."
+      "message": "Vuelve a intentarlo en un momento.",
+      "retry": "Reintentar"
     },
     "empty": {
       "title": "Aún no hay oportunidades",
@@ -2168,6 +2169,8 @@
     "stageOpportunities": "oportunidades {{stage}}",
     "clearFilter": "borrar filtro",
     "bidsInFlight": "{{count}} ofertas en curso · haz clic en cualquier celda para editar en línea.",
+    "listLoading": "Cargando la lista de ofertas.",
+    "listFailed": "La lista de ofertas no se cargó.",
     "exportingLabel": "Exportando oportunidades…",
     "exportLabel": "Exportar las oportunidades visibles como CSV",
     "exporting": "Exportando…",
