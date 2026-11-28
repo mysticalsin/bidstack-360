@@ -3866,7 +3866,8 @@
   },
   "keyContacts": {
     "title": "Contatos principais",
-    "noTitleOrEmail": "n/d"
+    "noTitleOrEmail": "n/d",
+    "openContact": ", abrir contato"
   },
   "pipelineByStageMini": {
     "heading": "Pipeline por etapa"

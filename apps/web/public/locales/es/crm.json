@@ -3893,7 +3893,8 @@
   },
   "keyContacts": {
     "title": "Contactos clave",
-    "noTitleOrEmail": "n/d"
+    "noTitleOrEmail": "n/d",
+    "openContact": ", abrir contacto"
   },
   "pipelineByStageMini": {
     "heading": "Pipeline por etapa"

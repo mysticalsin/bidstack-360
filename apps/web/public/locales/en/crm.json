@@ -3882,7 +3882,8 @@
   },
   "keyContacts": {
     "title": "Key contacts",
-    "noTitleOrEmail": "n/a"
+    "noTitleOrEmail": "n/a",
+    "openContact": ", open contact"
   },
   "pipelineByStageMini": {
     "heading": "Pipeline by stage"

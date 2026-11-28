@@ -3866,7 +3866,8 @@
   },
   "keyContacts": {
     "title": "关键联系人",
-    "noTitleOrEmail": "无"
+    "noTitleOrEmail": "无",
+    "openContact": "，打开联系人"
   },
   "pipelineByStageMini": {
     "heading": "按阶段划分的销售管道"
