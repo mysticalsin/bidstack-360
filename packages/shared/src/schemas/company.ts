@@ -122,6 +122,7 @@ export const CompanyDetail = Company.extend({
     z.object({
       id: z.string().uuid(),
       title: z.string(),
+      bodyMd: z.string().max(32_000),
       authorName: z.string().nullable(),
       createdAt: z.string().datetime(),
     }),
