@@ -3386,6 +3386,7 @@
     "regionLabel": "Problemi aperti per gravità",
     "title": "Problemi aperti",
     "captionAllClear": "Tutto a posto",
+    "captionUnrecorded": "Niente registrato",
     "captionItemsToAction": "{{count}} elemento{{plural}} da gestire",
     "bucketsLabel": "Gruppi di gravità",
     "severityCritical": "Critico",
@@ -3393,7 +3394,8 @@
     "severityMedium": "Medio",
     "severityLow": "Basso",
     "emptyTitle": "Nessun problema aperto",
-    "emptyMessage": "Qui è tutto a posto.",
+    "emptyMessage": "Non risultano ancora rischi o controlli di conformità per questo account.",
+    "emptyClosedMessage": "I rischi e i controlli registrati sono chiusi.",
     "unassigned": "Non assegnato",
     "dueSuffix": " - scadenza {{dueDate}}",
     "noOwner": "Nessun responsabile"

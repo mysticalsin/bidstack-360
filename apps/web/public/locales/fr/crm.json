@@ -3441,6 +3441,7 @@
     "regionLabel": "Problèmes ouverts par gravité",
     "title": "Problèmes ouverts",
     "captionAllClear": "Tout est en ordre",
+    "captionUnrecorded": "Rien d'enregistré",
     "captionItemsToAction": "{{count}} élément{{plural}} à traiter",
     "bucketsLabel": "Groupes de gravité",
     "severityCritical": "Critique",
@@ -3448,7 +3449,8 @@
     "severityMedium": "Moyen",
     "severityLow": "Faible",
     "emptyTitle": "Aucun problème ouvert",
-    "emptyMessage": "Tout est au vert ici.",
+    "emptyMessage": "Aucun risque ni contrôle de conformité n'est encore enregistré pour ce compte.",
+    "emptyClosedMessage": "Les risques et contrôles enregistrés sont clos.",
     "unassigned": "Non attribué",
     "dueSuffix": " - échéance {{dueDate}}",
     "noOwner": "Aucun responsable"
