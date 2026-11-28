@@ -105,9 +105,13 @@ export default defineConfig(({ command, mode }) => {
     server: {
       port: 38081,
       strictPort: true,
-      host: true,
+      // Stub auth is localhost-only. Binding every interface and proxying /api
+      // made a LAN browser look like 127.0.0.1 to the API. Stay on loopback.
+      // xfwd records the browser address so the API can refuse a non-local hop
+      // if this host is widened again.
+      host: '127.0.0.1',
       proxy: {
-        '/api': { target: apiUrl, changeOrigin: true },
+        '/api': { target: apiUrl, changeOrigin: true, xfwd: true },
         '/webhooks/dust': { target: apiUrl, changeOrigin: true },
         '/livez': { target: apiUrl, changeOrigin: true },
         '/readyz': { target: apiUrl, changeOrigin: true },
@@ -126,7 +130,7 @@ export default defineConfig(({ command, mode }) => {
       port: Number(process.env.POLO_PREVIEW_WEB_PORT ?? 4173),
       strictPort: true,
       proxy: {
-        '/api': { target: apiUrl, changeOrigin: true },
+        '/api': { target: apiUrl, changeOrigin: true, xfwd: true },
         '/webhooks/dust': { target: apiUrl, changeOrigin: true },
         '/livez': { target: apiUrl, changeOrigin: true },
         '/readyz': { target: apiUrl, changeOrigin: true },
