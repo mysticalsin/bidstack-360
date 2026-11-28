@@ -235,3 +235,56 @@ describe('OrgChartPage', () => {
     expect(srv.nodes.get(ceo.id)!.linkedinUrl).toBe('https://www.linkedin.com/in/ana-example');
   });
 });
+
+// A seller must not be told an uncharted account is a sample or a demo.
+// The generated people stay source "sample" so the slot is never treated as live.
+const DEMO_COPY = /sample|demo|sandbox|illustrative|not live/i;
+
+describe('org chart reference copy', () => {
+  it('labels an uncharted account Reference and keeps each placeholder a sample slot', async () => {
+    renderPage();
+    const page = await screen.findByTestId('orgchart-page');
+    await node('Alex Morgan');
+    const badge = page.querySelector('.oc-sample');
+    expect(badge?.textContent).toBe('Reference');
+    expect(badge?.getAttribute('title') ?? '').not.toMatch(DEMO_COPY);
+    expect(page.textContent).toMatch(/reference record/i);
+    expect(page.textContent).not.toMatch(DEMO_COPY);
+    expect(page.textContent).not.toMatch(/\blive\b/i);
+
+    const alex = await node('Alex Morgan');
+    expect(alex.dataset.sample).toBe('true');
+    fireEvent.click(alex);
+    const panel = await screen.findByTestId('orgchart-panel');
+    expect(panel.textContent).toMatch(/Reference record/);
+    expect(panel.textContent).not.toMatch(DEMO_COPY);
+    expect(panel.textContent).not.toMatch(/\blive\b/i);
+  });
+
+  it('labels the account card Reference when nobody has saved a chart', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <OrgChartCard companyId={CI} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const card = await screen.findByTestId('account-orgchart-card');
+    await waitFor(() => expect(card.querySelector('.en-sample')?.textContent).toBe('Reference'));
+    expect(card.textContent).toMatch(/reference record/i);
+    expect(card.textContent).not.toMatch(DEMO_COPY);
+    expect(card.textContent).not.toMatch(/\blive\b/i);
+  });
+
+  it('does not mark a saved chart as Reference or live', async () => {
+    srv.add({ name: 'Ana Silva', title: 'Chief Executive Officer', seniority: 'c_level' }, null);
+    renderPage();
+    await node('Ana Silva');
+    const page = screen.getByTestId('orgchart-page');
+    expect(page.querySelector('.oc-sample')).toBeNull();
+    expect(screen.queryByText('Reference')).toBeNull();
+    expect(screen.queryByText('Sample')).toBeNull();
+    expect(page.textContent).not.toMatch(/\blive\b/i);
+  });
+});
