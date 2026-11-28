@@ -3369,6 +3369,7 @@
     "heading": "Activité récente",
     "latestUpdates": "Dernières mises à jour",
     "empty": "Aucune activité récente",
+    "overdueDays": "{{count}} j de retard",
     "viewAll": "Voir les {{count}} activités →"
   },
   "extractStep": {

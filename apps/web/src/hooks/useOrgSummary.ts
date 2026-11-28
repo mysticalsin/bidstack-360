@@ -18,6 +18,7 @@ export interface OrgSummary {
     subtitle: string | null;
     date: string;
     url: string | null;
+    dueDate?: string | null;
   }>;
 }
 

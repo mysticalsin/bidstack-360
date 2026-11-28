@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
+import { activityLateDays } from '@/components/dashboard/activity-late';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Badge } from '@/components/ui/Badge';
 import { Icon } from '@/components/ui/Icon';
@@ -48,6 +49,8 @@ type ActivityItem = {
   subtitle: string | null;
   date: string;
   url: string | null;
+  /** Close date for a bid, due date for a follow-up. Absent on older payloads. */
+  dueDate?: string | null;
 };
 
 export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
@@ -60,11 +63,19 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--surface-sunken)]">
-              <Icon name="activity" size={13} className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]" />
+              <Icon
+                name="activity"
+                size={13}
+                className="text-[var(--brand-primary)] dark:text-[var(--brand-deep)]"
+              />
             </div>
-            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">{t('recentActivity.heading', 'Recent activity')}</h2>
+            <h2 className="text-sm font-semibold text-[var(--fg-primary)]">
+              {t('recentActivity.heading', 'Recent activity')}
+            </h2>
           </div>
-          <span className="text-xs text-[var(--fg-tertiary)]">{t('recentActivity.latestUpdates', 'Latest updates')}</span>
+          <span className="text-xs text-[var(--fg-tertiary)]">
+            {t('recentActivity.latestUpdates', 'Latest updates')}
+          </span>
         </div>
       </div>
       <div className="divide-y divide-[var(--border-subtle)]">
@@ -73,53 +84,61 @@ export function RecentActivityCard({ activity }: { activity: ActivityItem[] }) {
             {t('recentActivity.empty', 'No recent activity')}
           </div>
         ) : (
-          visible.map((a, i) => (
-            <motion.div
-              key={`${a.type}-${a.title}-${a.date}`}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...springSoft, delay: i * 0.032 }}
-              className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-hover)] transition-colors"
-            >
-              <div
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-                style={{
-                  background: TYPE_COLORS[a.type] ?? 'var(--surface-sunken)',
-                  color: TYPE_FG[a.type] ?? 'var(--fg-secondary)',
-                }}
+          visible.map((a, i) => {
+            const late = activityLateDays(a);
+            return (
+              <motion.div
+                key={`${a.type}-${a.title}-${a.date}`}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ ...springSoft, delay: i * 0.032 }}
+                className="flex items-center gap-3 px-5 py-3 hover:bg-[var(--surface-hover)] transition-colors"
               >
-                <Icon name={TYPE_ICONS[a.type] ?? 'circle'} size={14} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {a.url ? (
-                    <Link
-                      to={a.url}
-                      className="truncate text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
-                    >
-                      {a.title}
-                    </Link>
-                  ) : (
-                    <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
-                      {a.title}
-                    </span>
-                  )}
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: TYPE_COLORS[a.type] ?? 'var(--surface-sunken)',
+                    color: TYPE_FG[a.type] ?? 'var(--fg-secondary)',
+                  }}
+                >
+                  <Icon name={TYPE_ICONS[a.type] ?? 'circle'} size={14} />
                 </div>
-                <div className="flex items-center gap-2 text-xs text-[var(--fg-secondary)]">
-                  <span className="capitalize">{a.type}</span>
-                  {a.subtitle && (
-                    <>
-                      <span>·</span>
-                      <Badge tone="gray">{formatStage(a.subtitle)}</Badge>
-                    </>
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    {a.url ? (
+                      <Link
+                        to={a.url}
+                        className="truncate text-sm font-medium text-[var(--fg-primary)] hover:text-[var(--brand-primary)] dark:hover:text-[var(--brand-deep)]"
+                      >
+                        {a.title}
+                      </Link>
+                    ) : (
+                      <span className="truncate text-sm font-medium text-[var(--fg-primary)]">
+                        {a.title}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-[var(--fg-secondary)]">
+                    <span className="capitalize">{a.type}</span>
+                    {a.subtitle && (
+                      <>
+                        <span>·</span>
+                        <Badge tone="gray">{formatStage(a.subtitle)}</Badge>
+                      </>
+                    )}
+                    {late !== null ? (
+                      <Badge tone="tomato">
+                        {t('recentActivity.overdueDays', '{{count}}d overdue', { count: late })}
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              <time className="shrink-0 text-xs text-[var(--fg-tertiary)]" dateTime={a.date}>
-                {relativeTime(a.date)}
-              </time>
-            </motion.div>
-          ))
+                <time className="shrink-0 text-xs text-[var(--fg-tertiary)]" dateTime={a.date}>
+                  {relativeTime(a.date)}
+                </time>
+              </motion.div>
+            );
+          })
         )}
       </div>
     </GlassCard>

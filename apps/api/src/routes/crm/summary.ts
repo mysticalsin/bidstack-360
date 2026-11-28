@@ -3,6 +3,8 @@ import { type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '@bidstack/db';
 
+import { opportunityActivity, taskActivity } from './summary-activity.js';
+
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
@@ -37,6 +39,7 @@ type CrmSummaryPayload = {
     subtitle: string | null;
     date: string;
     url: string;
+    dueDate: string | null;
   }>;
 };
 
@@ -112,6 +115,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
           id: true,
           name: true,
           stage: true,
+          dueDate: true,
           updatedAt: true,
           company: { select: { id: true, name: true } },
         },
@@ -136,6 +140,7 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
           id: true,
           title: true,
           status: true,
+          dueDate: true,
           createdAt: true,
         },
       }),
@@ -170,33 +175,23 @@ async function buildCrmSummary(orgId: string, limit: number): Promise<CrmSummary
   const pipelineValueMicros = Number(counts.pipelineValueMicros ?? 0);
 
   const recentActivity = [
-    ...recentOpportunities.map((o) => ({
-      type: 'opportunity' as const,
-      title: o.name,
-      subtitle: o.stage,
-      date: o.updatedAt.toISOString(),
-      url: `/opportunities/${o.id}`,
-    })),
+    ...recentOpportunities.map((o) => opportunityActivity(o)),
     ...recentLeads.map((l) => ({
       type: 'lead' as const,
       title: `${l.firstName} ${l.lastName ?? ''}`.trim(),
       subtitle: l.status,
       date: l.updatedAt.toISOString(),
       url: `/leads/${l.id}`,
+      dueDate: null,
     })),
-    ...recentTasks.map((t) => ({
-      type: 'task' as const,
-      title: t.title,
-      subtitle: t.status,
-      date: t.createdAt.toISOString(),
-      url: `/tasks/${t.id}`,
-    })),
+    ...recentTasks.map((t) => taskActivity(t)),
     ...recentCases.map((c) => ({
       type: 'case' as const,
       title: c.subject,
       subtitle: c.status,
       date: c.updatedAt.toISOString(),
       url: `/service-desk/${c.id}`,
+      dueDate: null,
     })),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -261,6 +256,7 @@ export async function crmSummaryRoutes(server: FastifyInstance) {
                 subtitle: z.string().nullable(),
                 date: z.string(),
                 url: z.string(),
+                dueDate: z.string().nullable(),
               }),
             ),
           }),

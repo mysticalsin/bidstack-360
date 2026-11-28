@@ -3314,6 +3314,7 @@
     "heading": "最近活动",
     "latestUpdates": "最新更新",
     "empty": "暂无最近活动",
+    "overdueDays": "逾期 {{count}} 天",
     "viewAll": "查看全部 {{count}} 项活动 →"
   },
   "extractStep": {
