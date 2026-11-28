@@ -29,6 +29,30 @@ const weekLabel = (isoDay: string) =>
     timeZone: 'UTC',
   });
 
+/** UTC calendar day. A task due date is midnight UTC; local formatting would move it. */
+function utcDayLabel(iso: string): string {
+  const label = new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return label === 'Invalid Date' ? '' : label;
+}
+
+/**
+ * Follow-ups due before the drawn weeks never increment a bar. The count the
+ * summary already computed is the only place they show up.
+ */
+function lateOutsideMessage(outside: number, weeks: number, oldestDueAt: string | null): string {
+  const subject =
+    outside === 1 ? '1 open follow-up is' : `${outside.toLocaleString('en-US')} open follow-ups are`;
+  const windowLabel = weeks === 1 ? '1-week' : `${weeks}-week`;
+  const lead = `${subject} already late and outside this ${windowLabel} chart.`;
+  const oldest = oldestDueAt ? utcDayLabel(oldestDueAt) : '';
+  return oldest ? `${lead} Oldest due ${oldest}.` : lead;
+}
+
 function ChartCard({
   icon,
   title,
@@ -90,6 +114,20 @@ export function AccountActivityCharts({ companyId }: { companyId: string }) {
     );
   }
 
+  const barredOverdue = data.weekly.reduce((sum, week) => sum + week.overdue, 0);
+  const outside = Math.max(0, data.overdue.count - barredOverdue);
+  const weeks = data.weekly.length || ACTIVITY_SUMMARY_DEFAULT_WEEKS;
+  const outsideNote =
+    outside > 0 ? (
+      <Card>
+        <div className="p-4">
+          <p aria-live="polite" className="text-sm font-medium text-[var(--danger)]">
+            {lateOutsideMessage(outside, weeks, data.overdue.oldestDueAt)}
+          </p>
+        </div>
+      </Card>
+    ) : null;
+
   if (data.total === 0 && data.overdue.count === 0) {
     return (
       <Card>
@@ -100,41 +138,50 @@ export function AccountActivityCharts({ companyId }: { companyId: string }) {
     );
   }
 
+  // A quiet window is not a quiet account when every late follow-up is older
+  // than the bars. Blank charts would hide that.
+  if (data.total === 0 && barredOverdue === 0 && outsideNote) {
+    return outsideNote;
+  }
+
   const present = TYPES.filter(
     (t) => data.byHour.some((h) => h[t.id] > 0) || data.weekly.some((w) => w[t.id] > 0),
   );
   const shown = present.length > 0 ? present : TYPES.slice(0, 1);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-      <ChartCard icon={<Clock size={16} />} title="Activity by hour">
-        <RadialDots
-          title="Activity by hour"
-          labels={HOURS}
-          series={shown.map((t) => ({
-            id: t.id,
-            label: t.label,
-            values: data.byHour.map((h) => h[t.id]),
-          }))}
-          center={{ value: data.total.toLocaleString('en-US'), caption: 'activities' }}
-        />
-      </ChartCard>
-      <ChartCard icon={<CalendarRange size={16} />} title="Activity per week">
-        <DivergingBars
-          title="Activity per week"
-          labels={data.weekly.map((w) => weekLabel(w.weekStart))}
-          series={shown.map((t) => ({
-            id: t.id,
-            label: t.label,
-            values: data.weekly.map((w) => w[t.id]),
-          }))}
-          below={{
-            id: 'overdue',
-            label: 'Overdue',
-            values: data.weekly.map((w) => w.overdue),
-          }}
-        />
-      </ChartCard>
+    <div className="space-y-3">
+      {outsideNote}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <ChartCard icon={<Clock size={16} />} title="Activity by hour">
+          <RadialDots
+            title="Activity by hour"
+            labels={HOURS}
+            series={shown.map((t) => ({
+              id: t.id,
+              label: t.label,
+              values: data.byHour.map((h) => h[t.id]),
+            }))}
+            center={{ value: data.total.toLocaleString('en-US'), caption: 'activities' }}
+          />
+        </ChartCard>
+        <ChartCard icon={<CalendarRange size={16} />} title="Activity per week">
+          <DivergingBars
+            title="Activity per week"
+            labels={data.weekly.map((w) => weekLabel(w.weekStart))}
+            series={shown.map((t) => ({
+              id: t.id,
+              label: t.label,
+              values: data.weekly.map((w) => w[t.id]),
+            }))}
+            below={{
+              id: 'overdue',
+              label: 'Overdue',
+              values: data.weekly.map((w) => w.overdue),
+            }}
+          />
+        </ChartCard>
+      </div>
     </div>
   );
 }
