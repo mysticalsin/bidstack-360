@@ -168,6 +168,22 @@ describe('CsvImportWizard', () => {
     expect(screen.getByRole('button', { name: 'Preview 1 row' })).toBeTruthy();
   });
 
+  it('labels the first-row column Reference and still shows that row', async () => {
+    // WHY: a seller mapping their own file was reading a Sample column header,
+    // which reads as demo data. The header names the column. The cell under it
+    // is still the first row they uploaded, and the other headers stay.
+    stubHooks();
+    render(<CsvImportWizard />);
+    await uploadFile('name,domain\nAcme,acme.com');
+
+    expect(screen.getByRole('columnheader', { name: 'Reference' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Sample' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'CSV column' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Maps to' })).toBeTruthy();
+    expect(screen.getByText('Acme')).toBeTruthy();
+    expect(screen.getByText('acme.com')).toBeTruthy();
+  });
+
   it('renders progress from the polled migration job and exposes the error-report download once rows fail', async () => {
     stubHooks();
     hookMocks.useMigrationJob.mockReturnValue({
