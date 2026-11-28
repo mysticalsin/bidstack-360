@@ -72,10 +72,17 @@ describe('headline / applyView', () => {
   });
 });
 
+const DEMO_COPY = /sample|demo|sandbox|fixture|illustrative|not live/i;
+
 describe('AgreementsPage', () => {
-  it('shows Sample banner, headline numbers, strip and table; a number filters the table via the URL', async () => {
+  it('labels the fixture library as reference records, keeps those rows, and does not call the screen a sample', async () => {
     renderAt('/agreements');
-    expect(await screen.findByTestId('agreements-sample-banner')).toBeTruthy();
+    const banner = await screen.findByTestId('agreements-sample-banner');
+    // The missing-route fallback still draws the fixture agreements. The flag stays sample; the words do not.
+    expect(banner.textContent).toMatch(/reference records/i);
+    expect(banner.textContent).not.toMatch(DEMO_COPY);
+    expect(screen.getAllByText('Master services agreement').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Sample')).toBeNull();
     expect(screen.getByTestId('msa-intake-dropzone')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 1, name: 'Agreements' })).toBeTruthy();
     expect(within(screen.getByTestId('agreements-expiring-strip')).getAllByRole('link')).toHaveLength(4);
@@ -90,19 +97,32 @@ describe('AgreementsPage', () => {
     expect(screen.getByTestId('where').textContent).toBe('/agreements');
   });
 
-  it('turns uploads off in Sample mode and says why', async () => {
+  it('keeps uploads off for reference records and does not say the service is a sample preview', async () => {
     renderAt('/agreements');
     fireEvent.click(await screen.findByTestId('agreements-new'));
     const dlg = await screen.findByRole('dialog');
-    expect(within(dlg).getByText(/Uploading is off in this Sample preview/)).toBeTruthy();
+    const reason = within(dlg).getByText(/Uploads stay off for reference records/);
+    expect(reason.textContent).not.toMatch(DEMO_COPY);
     expect(within(dlg).getByRole('button', { name: 'Create agreement' }).hasAttribute('disabled')).toBe(true);
   });
 
-  it('surfaces a real API error instead of Sample data', async () => {
+  it('shows a production empty library when no agreements are stored', async () => {
+    vi.mocked(api).mockResolvedValue({ items: [], nextCursor: null, total: 0 });
+    renderAt('/agreements');
+    const empty = await screen.findByTestId('agreements-empty');
+    expect(within(empty).getByRole('heading', { name: 'No agreements on file' })).toBeTruthy();
+    expect(empty.textContent).toMatch(/Add an agreement when a signed MSA/);
+    expect(empty.textContent).not.toMatch(DEMO_COPY);
+    expect(screen.queryByTestId('agreements-sample-banner')).toBeNull();
+    expect(screen.queryByTestId('agreements-table')).toBeNull();
+  });
+
+  it('surfaces a real API error instead of reference records', async () => {
     vi.mocked(api).mockRejectedValue(new ApiError('Forbidden', 403, { message: 'Forbidden' }));
     renderAt('/agreements');
     expect(await screen.findByText("Couldn't load agreements")).toBeTruthy();
     expect(screen.queryByTestId('agreements-sample-banner')).toBeNull();
+    expect(screen.queryByTestId('agreements-empty')).toBeNull();
   });
 });
 
@@ -119,7 +139,15 @@ describe('AgreementDetailPage', () => {
       'SOW 7 — Legacy app retirement', 'SOW 8 — Security operations uplift', 'Amendment 2 — Rate card 2026',
     ]);
     expect(await screen.findByText('Last day to give notice')).toBeTruthy();
-    expect(screen.getByTestId('agreement-viewer-sample')).toBeTruthy();
+    const banner = screen.getByTestId('agreements-sample-banner');
+    expect(banner.textContent).toMatch(/reference records/i);
+    expect(banner.textContent).not.toMatch(DEMO_COPY);
+    const viewer = screen.getByTestId('agreement-viewer-sample');
+    expect(viewer.textContent).toMatch(/No file is stored for this reference record/);
+    expect(viewer.textContent).not.toMatch(DEMO_COPY);
+    fireEvent.click(screen.getByTestId('agreement-upload-version'));
+    const dlg = await screen.findByRole('dialog');
+    expect(within(dlg).getByText(/Uploads stay off for reference records/).textContent).not.toMatch(DEMO_COPY);
   });
 
   it('shows a not-found state for a missing record', async () => {
@@ -162,7 +190,10 @@ describe('AgreementsSummaryCard', () => {
     expect(within(card).getByRole('link', { name: 'View all' }).getAttribute('href')).toBe(`/agreements?companyId=${CI}`);
     expect(within(card).getByRole('link', { name: /Active of 5/ }).getAttribute('href')).toBe(`/agreements?companyId=${CI}&view=active`);
     expect(within(card).getByRole('link', { name: '2 SOWs' }).getAttribute('href')).toBe(`/agreements?companyId=${CI}&kind=sow`);
-    expect(within(card).getByText('Sample')).toBeTruthy();
+    // Fixture summary stays on screen and is labelled Reference. It is not marked live and it is not called a sample.
+    expect(within(card).getByText('Reference')).toBeTruthy();
+    expect(within(card).queryByText('Sample')).toBeNull();
+    expect(card.textContent).not.toMatch(DEMO_COPY);
   });
 });
 

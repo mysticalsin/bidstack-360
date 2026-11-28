@@ -27,7 +27,7 @@ describe('isMissingRoute', () => {
 });
 
 describe('msaClient sample fallback', () => {
-  it('falls back to labelled Sample data when the API has no MSA routes', async () => {
+  it('keeps the missing-route fallback marked sample so the screen can say Reference without treating it as live', async () => {
     vi.mocked(api).mockRejectedValueOnce(missing);
     const res = await msaClient.list({ topLevel: 'false' });
     expect(res.sample).toBe(true);

@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 
 import { accountAgreementCaption } from '@/components/agreements/account-agreement-caption';
 import { LeverageFlag } from '@/components/agreements/LeverageFlag';
+import { AGREEMENT_REFERENCE_BADGE } from '@/components/agreements/reference-copy';
 import { MsaStatusBadge } from '@/components/agreements/StatusBadge';
 import { useMsaLeverage } from '@/hooks/useMsaLeverage';
 import { useMsaAccountSummary } from '@/hooks/useMsa';
@@ -23,7 +24,7 @@ export function AgreementsSummaryCard({ companyId, companyName }: { companyId: s
     <section className="agr-section" aria-labelledby="agr-acct" data-testid="account-agreements-card">
       <div className="agr-head" style={{ alignItems: 'center' }}>
         <h2 id="agr-acct" style={{ fontSize: 16, fontWeight: 500, margin: 0 }}>
-          Agreements{q.data?.sample ? <span className="drill-sub" style={{ display: 'inline', marginLeft: 8 }}>Sample</span> : null}
+          Agreements{q.data?.sample ? <span className="drill-sub" style={{ display: 'inline', marginLeft: 8 }}>{AGREEMENT_REFERENCE_BADGE}</span> : null}
         </h2>
         <Link className="drill-more" to={base}>View all</Link>
       </div>
