@@ -6,6 +6,7 @@ import { SearchResponse, searchPageSlice, type PermissionKey } from '@bidstack/s
 
 import { applyCompanyScope, countryVariantsForScope, getAccessScope } from '../lib/access-scope.js';
 import { scoreMatch, tokenize } from '../lib/search-score.js';
+import { taskRecordHref } from './task-record-href.js';
 
 const VALID_TYPES = [
   'opportunity',
@@ -333,17 +334,25 @@ export const searchRoutes: FastifyPluginAsyncZod = async (server) => {
               take: perTypeLimit + 1,
             });
             addResults(
-              tasks.map((t) => ({
-                item: {
-                  type: 'task' as const,
-                  id: t.id,
-                  title: t.title,
-                  subtitle: t.status,
-                  url: `/tasks?search=${encodeURIComponent(t.title)}`,
-                  score: scoreMatch(q, [{ text: t.title, weight: 3 }]),
-                },
-                recency: recencyMs(t.createdAt),
-              })),
+              tasks.flatMap((t) => {
+                const url = taskRecordHref(t.id);
+                // A non-uuid id is not a record. Omit it rather than building
+                // a path or a title search the tasks page does not read.
+                if (!url) return [];
+                return [
+                  {
+                    item: {
+                      type: 'task' as const,
+                      id: t.id,
+                      title: t.title,
+                      subtitle: t.status,
+                      url,
+                      score: scoreMatch(q, [{ text: t.title, weight: 3 }]),
+                    },
+                    recency: recencyMs(t.createdAt),
+                  },
+                ];
+              }),
             );
           })(),
         );
