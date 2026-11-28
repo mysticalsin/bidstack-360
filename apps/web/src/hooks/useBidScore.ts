@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
 
 interface BidScoreItem {
   id: string;
@@ -35,7 +35,14 @@ export function useBidScoreLatest(opportunityId: string | undefined) {
     queryKey: ['bid-score', 'latest', opportunityId],
     queryFn: async () => {
       if (!opportunityId) return null;
-      return api<BidScoreItem>(`/api/v1/bid-scores/${opportunityId}/latest`);
+      try {
+        return await api<BidScoreItem | null>(`/api/v1/bid-scores/${opportunityId}/latest`);
+      } catch (error) {
+        // No score yet is an empty card, not a failed load. A 204 from the
+        // API is already null; a 404 from an older server is the same fact.
+        if (error instanceof ApiError && error.status === 404) return null;
+        throw error;
+      }
     },
     enabled: Boolean(opportunityId),
     retry: (failureCount, error: { status?: number }) => {

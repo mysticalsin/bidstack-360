@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Save, ArrowLeft, Play, Trash2 } from 'lucide-react';
 
+import { brandTextLinkClass } from '@/lib/brand-link';
 import { cn } from '@/lib/cn';
 import { Card, SectionHeader } from '@/components/ui/Card';
 import { ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
@@ -411,7 +412,7 @@ function SortEditor({
         <button
           type="button"
           onClick={() => onChange([...sort, { field: '', dir: 'desc' }])}
-          className="min-h-[44px] rounded px-2 text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+          className={cn(brandTextLinkClass, 'min-h-[44px] rounded px-2 text-xs')}
         >
           {t('reportBuilder.sort.add', '+ Add sort')}
         </button>

@@ -16,6 +16,8 @@ import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 
 import { GlassCard } from '@/components/ui/GlassCard';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { Icon } from '@/components/ui/Icon';
 import { DueDateChip, daysUntilDueUtc } from '@/components/ui/DueDateChip';
 import { useFormatMoney } from '@/hooks/useFormatMoney';
@@ -52,7 +54,7 @@ export function ClosingThisWeekCard() {
             {t('closingThisWeek.heading', 'Closing this week')}
           </h2>
         </div>
-        <Link to="/opportunities?due=within7" className="text-xs text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline">
+        <Link to="/opportunities?due=within7" className={cn(brandTextLinkClass, 'text-xs')}>
           {t('closingThisWeek.viewAll', 'View all')}
         </Link>
       </div>

@@ -13,6 +13,8 @@ import { Card } from '@/components/ui/Card';
 import { CrossSellStatusControls } from '@/components/account-intel/CrossSellStatusControls';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/StateMessages';
 import { toast } from '@/components/ui/Toast';
+import { brandTextLinkClass } from '@/lib/brand-link';
+import { cn } from '@/lib/cn';
 import { useHasPermission } from '@/hooks/useCapabilities';
 import { useCrossSellActions, usePatchCrossSellAction } from '@/hooks/useCrossSell';
 import type { CrossSellAction, GovernanceStatus } from '@bidstack/shared';
@@ -292,7 +294,7 @@ export default function CrossSellPage() {
                       <td className="px-4 py-3 align-top">
                         <Link
                           to={`/accounts/${encodeURIComponent(action.accountKey)}`}
-                          className="font-medium text-[var(--brand-primary)] dark:text-[var(--brand-deep)] hover:underline"
+                          className={cn(brandTextLinkClass, 'font-medium')}
                         >
                           {action.accountKey}
                         </Link>

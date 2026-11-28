@@ -96,22 +96,31 @@ export const bidScoreRoutes: FastifyPluginAsyncZod = async (server) => {
       config: { permission: 'opportunities:read' },
       schema: {
         params: z.object({ opportunityId: z.string().uuid() }),
-        response: { 200: BidScoreItem },
+        response: { 200: BidScoreItem, 204: z.null() },
       },
     },
     async (req, reply) => {
-      const scoped = await visibleOpportunityRelation(req.auth);
+      // Same gate as the other by-id deal routes: an out-of-scope (or missing)
+      // opportunity is 404. Only a visible deal with no score is the empty 204.
+      const opportunity = await prisma.opportunity.findFirst({
+        where: await visibleOpportunityWhere(req.auth, req.params.opportunityId),
+        select: { id: true },
+      });
+      if (!opportunity) {
+        return reply.notFound('Opportunity not found');
+      }
       const row = await prisma.bidScore.findFirst({
         where: {
           orgId: req.auth.orgId,
           opportunityId: req.params.opportunityId,
           deletedAt: null,
-          ...(scoped ? { opportunity: scoped } : {}),
         },
         orderBy: { version: 'desc' },
       });
       if (!row) {
-        return reply.notFound('No bid score found for this opportunity');
+        // No score is the empty state. A 404 shows up as a failed resource
+        // in the browser even when the card treats it as "not scored yet".
+        return reply.code(204).send(null);
       }
       return serializeBidScore(row);
     },
